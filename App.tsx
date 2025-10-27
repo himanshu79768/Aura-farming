@@ -92,6 +92,7 @@ const moodFromColors: Record<Mood, string> = {
 const DEFAULT_SETTINGS: Settings = {
     theme: Theme.Auto, sound: true, haptics: true, minimalism: false,
     focusSound: 'chime', appIcon: 'default', hapticIntensity: 'medium', focusMusic: 'Rain Drops',
+    gradientIntensity: 75,
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -161,6 +162,7 @@ export default function App() {
                 theme: data.theme || Theme.Auto, sound: data.sound ?? true, haptics: data.haptics ?? true,
                 minimalism: data.minimalism ?? false, focusSound: data.focusSound || 'chime', appIcon: data.appIcon || 'default',
                 hapticIntensity: data.hapticIntensity || 'medium', focusMusic: data.focusMusic || 'Rain Drops',
+                gradientIntensity: data.gradientIntensity ?? 75,
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
@@ -498,7 +500,10 @@ export default function App() {
                 />
             ) : (
                 <motion.div key="main-app" className="w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-                    <div className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 opacity-75 dark:opacity-50 pointer-events-none`}></div>
+                    <div 
+                        className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 pointer-events-none`}
+                        style={{ opacity: (settings.gradientIntensity ?? 75) / 100 }}
+                    ></div>
                     
                     <AnimatePresence mode="wait"><motion.div key={currentView} variants={pageVariants} initial="initial" animate="in" exit="out" transition={pageTransition} className="w-full h-full">{renderView()}</motion.div></AnimatePresence>
                     <AnimatePresence>{activeModal && (<motion.div key={activeModal.view} variants={modalVariants} initial="initial" animate="in" exit="out" transition={modalTransition} className="absolute inset-0 z-30 bg-light-bg dark:bg-dark-bg">{renderModal()}</motion.div>)}</AnimatePresence>

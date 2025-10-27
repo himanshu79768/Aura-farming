@@ -82,6 +82,20 @@ const SettingsPage: React.FC = () => {
                                     layoutId="mood-selector"
                                 />
                             </div>
+                             <div>
+                                <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary flex justify-between items-center">
+                                    <span>Gradient Intensity</span>
+                                    <span>{settings.gradientIntensity ?? 75}%</span>
+                                </h3>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={settings.gradientIntensity ?? 75}
+                                    onChange={(e) => setSettings(s => ({ ...s, gradientIntensity: Number(e.target.value) }))}
+                                    className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                            </div>
                         </div>
                     </div>
 

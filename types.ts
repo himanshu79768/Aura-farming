@@ -55,6 +55,7 @@ export interface Settings {
   appIcon: AppIcon;
   hapticIntensity: HapticIntensity;
   focusMusic: FocusMusic;
+  gradientIntensity: number;
 }
 
 export interface UserData extends Settings, UserProfile {
