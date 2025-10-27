@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f0f0f">
+    <link rel="manifest" href="manifest.json">
+    <title>Aura - Refresh & Focus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              dark: {
+                bg: '#0f0f0f',
+                'bg-secondary': '#1a1a1a',
+                'glass': 'rgba(26, 26, 26, 0.7)',
+                text: '#f8f9fb',
+                'text-secondary': '#a0a0a0',
+                accent: '#ffffff',
+              },
+              light: {
+                bg: '#f8f9fb',
+                'bg-secondary': '#ffffff',
+                'glass': 'rgba(255, 255, 255, 0.7)',
+                text: '#1a1a1a',
+                'text-secondary': '#606060',
+                accent: '#000000',
+              },
+            },
+            keyframes: {
+              'calm-pulse': {
+                '0%, 100%': { boxShadow: '0 0 0 0 rgba(255, 255, 255, 0.2)', opacity: '0.8' },
+                '50%': { boxShadow: '0 0 0 20px rgba(255, 255, 255, 0)', opacity: '1' },
+              },
+              'dark-calm-pulse': {
+                '0%, 100%': { boxShadow: '0 0 0 0 rgba(255, 255, 255, 0.2)', opacity: '0.8' },
+                '50%': { boxShadow: '0 0 0 20px rgba(255, 255, 255, 0)', opacity: '1' },
+              },
+              'fade-in': {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              'fade-out': {
+                '0%': { opacity: '1' },
+                '100%': { opacity: '0' },
+              },
+              'gradient-flow': {
+                '0%': { 'background-position': '0% 50%' },
+                '50%': { 'background-position': '100% 50%' },
+                '100%': { 'background-position': '0% 50%' },
+              },
+            },
+            animation: {
+              'calm-pulse': 'calm-pulse 4s infinite cubic-bezier(0.66, 0, 0, 1)',
+              'dark-calm-pulse': 'dark-calm-pulse 4s infinite cubic-bezier(0.66, 0, 0, 1)',
+              'fade-in': 'fade-in 1s ease-in-out',
+              'fade-out': 'fade-out 1s ease-in-out',
+              'gradient-flow': 'gradient-flow 20s ease-in-out infinite',
+            },
+            backgroundSize: {
+              '400%': '400% 400%',
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      .tappable {
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.548.0"
+  }
+}
+</script>
+<script>
+  (function() {
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (!themeMeta) return;
+
+    const lightColor = '#f8f9fb';
+    const darkColor = '#0f0f0f';
+
+    function setThemeColor() {
+      if (document.documentElement.classList.contains('dark')) {
+        themeMeta.setAttribute('content', darkColor);
+      } else {
+        themeMeta.setAttribute('content', lightColor);
+      }
+    }
+
+    // Set initial color
+    setThemeColor();
+
+    // Observe for future changes to the class attribute of the html element
+    const observer = new MutationObserver(setThemeColor);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  })();
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      // In a real-world app, this would be handled by a build process
+      // and not exposed in the client-side code directly.
+      window.process = {
+        env: {
+          API_KEY: 'AIzaSyCIJzOiMuA740PQXZolLqk5WcBb0Zc02ZM'
+        }
+      };
+    </script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+      import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+      import { getDatabase, ref, onValue, set, update, push, remove, serverTimestamp, query, orderByChild, equalTo, get } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyBoNMQW3bHxQ_tLBOQBPsS7y7QFlGr77eA",
+        authDomain: "aura-1cc21.firebaseapp.com",
+        projectId: "aura-1cc21",
+        storageBucket: "aura-1cc21.firebasestorage.app",
+        messagingSenderId: "881767410249",
+        appId: "1:881767410249:web:ef5409c264bbd70d67ad98",
+        measurementId: "G-PE2WBETQDB",
+        databaseURL: "https://aura-1cc21-default-rtdb.firebaseio.com/"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      
+      window.firebase = {
+        auth: auth,
+        db: getDatabase(app),
+        signInAnonymously: () => signInAnonymously(auth),
+        signOut: () => signOut(auth),
+        onAuthStateChanged,
+        ref,
+        onValue,
+        set,
+        update,
+        push,
+        remove,
+        serverTimestamp,
+        query,
+        orderByChild,
+        equalTo,
+        get
+      };
+    </script>
+    <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

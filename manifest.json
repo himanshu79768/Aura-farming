@@ -1,0 +1,21 @@
+{
+  "name": "Aura",
+  "short_name": "Aura",
+  "description": "A beautiful, minimal iOS-style app to help you feel refreshed and motivated. Features mood selection, a focus timer, and inspirational quotes to reset your day with calm and energy.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#0f0f0f",
+  "icons": [
+    {
+      "src": "icons/192x192/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/512x512/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
