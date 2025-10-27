@@ -13,7 +13,7 @@ import BottomNav from './components/BottomNav';
 import AuraCheckinPage from './components/AuraCheckinPage';
 import JournalPage from './components/JournalPage';
 import JournalEntryPage from './components/JournalEntryPage';
-import { fetchQuotes, ApiKeyError } from './services/geminiService';
+import { fetchQuotes } from './services/geminiService';
 import { INITIAL_QUOTES } from './constants';
 import TimerPill from './components/TimerPill';
 import DeleteZone from './components/DeleteZone';
@@ -24,7 +24,6 @@ import SoundOptionsPage from './components/SoundOptionsPage';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard';
 import AlertModal from './components/AlertModal';
-import ApiKeySetup from './components/ApiKeySetup';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -68,7 +67,6 @@ interface AppContextType {
   loginUserByName: (name: string) => Promise<void>;
   showConfirmationModal: (options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => void;
   showAlertModal: (options: { title: string; message: string; }) => void;
-  handleApiKeyError: () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -113,8 +111,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
-  const [isApiKeyConfigured, setIsApiKeyConfigured] = useState(false);
-  const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
 
   // App State
   const [currentView, setCurrentView] = useState<View>('home');
@@ -152,39 +148,19 @@ export default function App() {
     message: '',
   });
   
-  const handleApiKeyError = useCallback(() => {
-    setIsApiKeyConfigured(false);
-  }, []);
-
   useEffect(() => {
-    const checkKey = async () => {
-      if ((window as any).aistudio && (await (window as any).aistudio.hasSelectedApiKey())) {
-        setIsApiKeyConfigured(true);
-      }
-      setIsCheckingApiKey(false);
-    };
-    setTimeout(checkKey, 100);
-  }, []);
-
-  useEffect(() => {
-    if (!isApiKeyConfigured) return;
-
     const loadInitialData = async () => {
-        try {
-            const geminiQuotes = await fetchQuotes();
-            if (geminiQuotes && geminiQuotes.length > 0) {
-                const combined = [...geminiQuotes, ...INITIAL_QUOTES];
-                const uniqueQuotes = Array.from(new Map(combined.map(q => [q.text.toLowerCase(), q])).values());
-                setQuotes(uniqueQuotes);
-            }
-        } catch (error) {
-            if (error instanceof ApiKeyError) {
-                handleApiKeyError();
-            }
+        const geminiQuotes = await fetchQuotes();
+        if (geminiQuotes && geminiQuotes.length > 0) {
+            // Combine initial quotes with fetched quotes, giving priority to fetched ones
+            const combined = [...geminiQuotes, ...INITIAL_QUOTES];
+            // Remove duplicates based on text content
+            const uniqueQuotes = Array.from(new Map(combined.map(q => [q.text.toLowerCase(), q])).values());
+            setQuotes(uniqueQuotes);
         }
     };
     loadInitialData();
-  }, [isApiKeyConfigured, handleApiKeyError]);
+  }, []); // Empty dependency array means this runs once on mount.
 
   // --- Firebase Auth & Data Sync ---
   useEffect(() => {
@@ -539,12 +515,8 @@ export default function App() {
     }
   }
 
-  if (isLoading || isCheckingApiKey) {
+  if (isLoading) {
     return <div className="w-screen h-screen bg-light-bg dark:bg-dark-bg" />;
-  }
-
-  if (!isApiKeyConfigured) {
-    return <ApiKeySetup onKeySetup={() => setIsApiKeyConfigured(true)} />;
   }
   
   const shouldOnboard = !userProfile.name;
@@ -559,8 +531,7 @@ export default function App() {
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
         focusSearchQuery, setFocusSearchQuery,
         logoutUser, loginUserByName,
-        showConfirmationModal, showAlertModal,
-        handleApiKeyError,
+        showConfirmationModal, showAlertModal
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">

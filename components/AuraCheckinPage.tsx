@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wind, CheckCircle, Zap, Heart } from 'lucide-react';
 import { useAppContext } from '../App';
-import { fetchAuraCheckin, ApiKeyError } from '../services/geminiService';
+import { fetchAuraCheckin } from '../services/geminiService';
 import Header from './Header';
 import { Mood } from '../types';
 
@@ -79,7 +79,7 @@ const AuraScanner: React.FC<{ mood: Mood }> = ({ mood }) => {
 
 
 const AuraCheckinPage: React.FC = () => {
-    const { navigateBack, navigateTo, mood, userProfile, playSound, vibrate, handleApiKeyError } = useAppContext();
+    const { navigateBack, navigateTo, mood, userProfile, playSound, vibrate } = useAppContext();
     const [isLoading, setIsLoading] = useState(true);
     const [auraData, setAuraData] = useState<AuraData | null>(null);
 
@@ -87,22 +87,14 @@ const AuraCheckinPage: React.FC = () => {
         const getAuraData = async () => {
             setIsLoading(true);
             vibrate('light');
-            try {
-                const data = await fetchAuraCheckin(mood, userProfile.name || 'friend', getTimeOfDay());
-                setAuraData(data);
-                vibrate('medium');
-                playSound('complete');
-            } catch (error) {
-                if (error instanceof ApiKeyError) {
-                    handleApiKeyError();
-                    navigateBack();
-                }
-            } finally {
-                setIsLoading(false);
-            }
+            const data = await fetchAuraCheckin(mood, userProfile.name || 'friend', getTimeOfDay());
+            setAuraData(data);
+            setIsLoading(false);
+            vibrate('medium');
+            playSound('complete');
         };
         getAuraData();
-    }, [mood, userProfile.name, playSound, vibrate, handleApiKeyError, navigateBack]);
+    }, [mood, userProfile.name, playSound, vibrate]);
     
     const handleSuggestionClick = () => {
         if (auraData?.suggestion.toLowerCase().includes('breath')) {

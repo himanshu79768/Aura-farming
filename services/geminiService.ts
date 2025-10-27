@@ -1,13 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Quote, Mood } from '../types';
 
-export class ApiKeyError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'ApiKeyError';
-    }
-}
-
 export const fetchQuotes = async (): Promise<Quote[]> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -42,11 +35,8 @@ export const fetchQuotes = async (): Promise<Quote[]> => {
     // Use crypto.randomUUID for a robust unique string ID
     return parsedQuotes.map((q) => ({ ...q, id: crypto.randomUUID() }));
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error fetching quotes from Gemini:", error);
-    if (error.message?.includes('API Key') || error.message?.includes('not found')) {
-      throw new ApiKeyError(error.message);
-    }
     return [];
   }
 };
@@ -75,11 +65,8 @@ export const fetchHomepageContent = async (mood: Mood, name: string, timeOfDay: 
         const jsonString = response.text.trim();
         return JSON.parse(jsonString);
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Error fetching homepage content from Gemini:", error);
-        if (error.message?.includes('API Key') || error.message?.includes('not found')) {
-          throw new ApiKeyError(error.message);
-        }
         return fallback;
     }
 };
@@ -113,11 +100,8 @@ export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'mor
         const jsonString = response.text.trim();
         return JSON.parse(jsonString);
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Error fetching aura check-in from Gemini:", error);
-        if (error.message?.includes('API Key') || error.message?.includes('not found')) {
-          throw new ApiKeyError(error.message);
-        }
         return fallback;
     }
 };
@@ -136,11 +120,8 @@ export const fetchJournalPrompt = async (): Promise<string> => {
         }
         return prompt;
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Error fetching journal prompt from Gemini:", error);
-        if (error.message?.includes('API Key') || error.message?.includes('not found')) {
-          throw new ApiKeyError(error.message);
-        }
         return "What are you grateful for today?";
     }
 };
