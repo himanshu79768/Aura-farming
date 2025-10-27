@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Sparkles, Trash2, Loader } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry } from '../types';
-import { fetchJournalPrompt } from '../services/geminiService';
+import { fetchJournalPrompt, ApiKeyError } from '../services/geminiService';
 import Header from './Header';
 
 interface JournalEntryPageProps {
@@ -11,7 +11,7 @@ interface JournalEntryPageProps {
 }
 
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
-    const { navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, vibrate, showConfirmationModal } = useAppContext();
+    const { navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, vibrate, showConfirmationModal, handleApiKeyError } = useAppContext();
     const [content, setContent] = useState('');
     const [isPromptLoading, setIsPromptLoading] = useState(false);
 
@@ -57,9 +57,16 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const handleGetPrompt = async () => {
         vibrate();
         setIsPromptLoading(true);
-        const prompt = await fetchJournalPrompt();
-        setContent(prev => `${prompt}\n\n${prev}`);
-        setIsPromptLoading(false);
+        try {
+            const prompt = await fetchJournalPrompt();
+            setContent(prev => `${prompt}\n\n${prev}`);
+        } catch (error) {
+            if (error instanceof ApiKeyError) {
+                handleApiKeyError();
+            }
+        } finally {
+            setIsPromptLoading(false);
+        }
     };
 
     const HeaderActions = (

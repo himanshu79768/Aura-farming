@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Loader, Sparkles, Wind } from 'lucide-react';
 import { useAppContext } from '../App';
-import { fetchHomepageContent } from '../services/geminiService';
+import { fetchHomepageContent, ApiKeyError } from '../services/geminiService';
 import Header from './Header';
 
 const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
@@ -14,17 +14,24 @@ const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
 }
 
 const HomePage: React.FC = () => {
-  const { mood, userProfile, playSound, vibrate, navigateTo } = useAppContext();
+  const { mood, userProfile, playSound, vibrate, navigateTo, handleApiKeyError } = useAppContext();
   const [content, setContent] = useState({ greeting: '', thought: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [timeOfDay, setTimeOfDay] = useState(getTimeOfDay());
 
   const loadContent = useCallback(async () => {
     setIsLoading(true);
-    const newContent = await fetchHomepageContent(mood, userProfile.name || 'friend', timeOfDay);
-    setContent(newContent);
-    setIsLoading(false);
-  }, [mood, userProfile.name, timeOfDay]);
+    try {
+      const newContent = await fetchHomepageContent(mood, userProfile.name || 'friend', timeOfDay);
+      setContent(newContent);
+    } catch (error) {
+      if (error instanceof ApiKeyError) {
+        handleApiKeyError();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [mood, userProfile.name, timeOfDay, handleApiKeyError]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
