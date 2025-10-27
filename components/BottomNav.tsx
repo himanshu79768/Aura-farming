@@ -1,10 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-// Fix: Import BookOpen icon for the journal navigation item.
 import { Home, Timer, MessageSquare, User, BookOpen } from 'lucide-react';
 import { View } from '../types';
-import { useAppContext } from '../App';
-
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -14,19 +11,17 @@ interface NavItemProps {
 }
 
 const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => {
-  const { settings } = useAppContext();
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-full transition-colors duration-300 tappable ${isActive ? 'text-light-accent dark:text-dark-accent' : 'text-light-text-secondary dark:text-dark-text-secondary hover:text-light-accent dark:hover:text-dark-accent'}`}
+      className={`relative flex items-center justify-center w-16 h-16 rounded-full transition-colors duration-300 tappable ${isActive ? 'text-light-accent dark:text-dark-accent' : 'text-light-text-secondary dark:text-dark-text-secondary hover:text-light-accent dark:hover:text-dark-accent'}`}
       aria-label={`Go to ${label}`}
     >
       {icon}
-      {!settings.minimalism && <span className="text-xs mt-1 capitalize">{label}</span>}
       {isActive && (
         <motion.div
           layoutId="active-nav-indicator"
-          className="absolute -bottom-1 h-1 w-8 bg-light-accent dark:bg-dark-accent rounded-full"
+          className="absolute bottom-0 h-1 w-8 bg-light-accent dark:bg-dark-accent rounded-full"
           initial={false}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         />
@@ -42,13 +37,12 @@ interface BottomNavProps {
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({ currentView, navigateTo }) => {
-  // Fix: Add Journal to the navigation items.
   const navItems: { view: View; icon: React.ReactNode }[] = [
-    { view: 'home', icon: <Home size={24} /> },
-    { view: 'focus', icon: <Timer size={24} /> },
-    { view: 'journal', icon: <BookOpen size={24} /> },
-    { view: 'quotes', icon: <MessageSquare size={24} /> },
-    { view: 'profile', icon: <User size={24} /> },
+    { view: 'home', icon: <Home size={28} /> },
+    { view: 'focus', icon: <Timer size={28} /> },
+    { view: 'journal', icon: <BookOpen size={28} /> },
+    { view: 'quotes', icon: <MessageSquare size={28} /> },
+    { view: 'profile', icon: <User size={28} /> },
   ];
 
   return (

@@ -8,6 +8,7 @@ interface HeaderProps {
     title?: string;
     showBackButton?: boolean;
     onBack?: () => void;
+    rightAction?: React.ReactNode;
 }
 
 const moodIcons: Record<Mood, React.ReactNode> = {
@@ -52,9 +53,9 @@ const MoodSelector: React.FC = () => {
     )
 }
 
-const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack }) => {
+const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, rightAction }) => {
     return (
-        <header className="relative w-full h-20 flex items-center justify-center p-4 z-20">
+        <header className="relative w-full h-20 flex items-center justify-center p-4 z-20 flex-shrink-0">
             <div className="absolute left-4">
                 {showBackButton && (
                     <motion.button 
@@ -80,7 +81,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack }
             </motion.h1>
 
             <div className="absolute right-4">
-                 {!showBackButton && <MoodSelector />}
+                 {rightAction ? rightAction : (!showBackButton && <MoodSelector />)}
             </div>
         </header>
     );

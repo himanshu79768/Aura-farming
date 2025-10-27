@@ -140,7 +140,8 @@ const FocusPage: React.FC = () => {
     <div className="w-full h-full flex flex-col">
        <audio ref={audioRef} loop />
        <Header title="Focus"/>
-       <div className="flex-grow flex items-center justify-center p-4">
+       <div className="flex-grow p-4 overflow-y-auto">
+        <div className="flex flex-col items-center justify-center min-h-full py-4">
             <AnimatePresence mode="wait">
             {isTimerFinished ? (
                 <motion.div key="finished" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="text-center">
@@ -184,6 +185,7 @@ const FocusPage: React.FC = () => {
                 </motion.div>
             )}
             </AnimatePresence>
+          </div>
        </div>
     </div>
   );

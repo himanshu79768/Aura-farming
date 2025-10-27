@@ -45,7 +45,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, onClick }) => {
 
 
 const ProfilePage: React.FC = () => {
-    const { userProfile, setUserProfile, favoriteQuotes, navigateTo, focusHistory, logoutUser } = useAppContext();
+    const { userProfile, updateUserName, favoriteQuotes, navigateTo, focusHistory, logoutUser } = useAppContext();
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(userProfile.name);
 
@@ -58,13 +58,18 @@ const ProfilePage: React.FC = () => {
         setName(e.target.value);
     };
     
-    const handleNameSave = () => {
-        if (name.trim()) {
-            setUserProfile(p => ({ ...p, name: name.trim() }));
-        } else {
-            setName(userProfile.name); // Reset if empty
-        }
+    const handleNameSave = async () => {
         setIsEditing(false);
+        const newNameTrimmed = name.trim();
+        if (newNameTrimmed && newNameTrimmed !== userProfile.name) {
+            const result = await updateUserName(newNameTrimmed);
+            if (!result.success && result.message) {
+                alert(result.message);
+                setName(userProfile.name);
+            }
+        } else {
+            setName(userProfile.name);
+        }
     };
 
     return (

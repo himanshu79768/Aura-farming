@@ -21,6 +21,7 @@ import FavoritesPage from './components/FavoritesPage';
 import FocusHistoryPage from './components/FocusHistoryPage';
 import FocusAnalyticsPage from './components/FocusAnalyticsPage';
 import SoundOptionsPage from './components/SoundOptionsPage';
+import { useVirtualKeyboard } from './hooks/useVirtualKeyboard';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -37,11 +38,11 @@ interface AppContextType {
   favoriteQuotes: string[];
   toggleFavorite: (id: string) => void;
   userProfile: UserProfile;
-  setUserProfile: (profile: UserProfile | ((p: UserProfile) => UserProfile)) => void;
+  updateUserName: (newName: string) => Promise<{ success: boolean; message?: string }>;
   journalEntries: JournalEntry[];
-  addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => void;
-  updateJournalEntry: (entry: JournalEntry) => void;
-  deleteJournalEntry: (id: string) => void;
+  addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => Promise<boolean>;
+  updateJournalEntry: (entry: JournalEntry) => Promise<boolean>;
+  deleteJournalEntry: (id: string) => Promise<boolean>;
   focusHistory: FocusSession[];
   addFocusSession: (durationInSeconds: number, name?: string) => void;
   playSound: (sound: string) => void;
@@ -80,9 +81,9 @@ const modalVariants = { initial: { opacity: 0, y: '100%' }, in: { opacity: 1, y:
 const pageTransition = { type: 'tween', ease: 'easeInOut', duration: 0.3 };
 const modalTransition = { type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.35 };
 const moodFromColors: Record<Mood, string> = {
-  [Mood.Calm]: 'from-blue-400/20',
-  [Mood.Focus]: 'from-purple-400/20',
-  [Mood.Energize]: 'from-yellow-400/20',
+  [Mood.Calm]: 'from-blue-400/25',
+  [Mood.Focus]: 'from-purple-400/25',
+  [Mood.Energize]: 'from-yellow-400/25',
 };
 
 // --- Default States ---
@@ -124,7 +125,7 @@ export default function App() {
 
   const [isPillDragging, setIsPillDragging] = useState(false);
   const constraintsRef = useRef(null);
-  const [appHeight, setAppHeight] = useState('100vh');
+  const isKeyboardOpen = useVirtualKeyboard();
 
   // --- Firebase Auth & Data Sync ---
   useEffect(() => {
@@ -194,36 +195,78 @@ export default function App() {
     const newSettings = value instanceof Function ? value(settings) : value;
     updateUserData(newSettings);
   };
-   const handleSetUserProfile = (value: UserProfile | ((p: UserProfile) => UserProfile)) => {
-    const newProfile = value instanceof Function ? value(userProfile) : value;
-    updateUserData(newProfile);
-  };
+
+  const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean; message?: string }> => {
+    if (!currentUser) return { success: false, message: 'Not authenticated.' };
+
+    const trimmedNewName = newName.trim();
+    if (!trimmedNewName) return { success: false, message: 'Name cannot be empty.' };
+
+    const oldName = userProfile.name.trim();
+    if (trimmedNewName === oldName) return { success: true };
+
+    const sanitizedNewName = trimmedNewName.toLowerCase();
+    const sanitizedOldName = oldName.toLowerCase();
+
+    const newUsernameRef = ref(db, `usernames/${sanitizedNewName}`);
+    const snapshot = await get(newUsernameRef);
+    if (snapshot.exists() && snapshot.val() !== currentUser.uid) {
+      return { success: false, message: 'This name is already taken.' };
+    }
+
+    const updates: { [key: string]: any } = {};
+    updates[`/users/${currentUser.uid}/name`] = trimmedNewName;
+    updates[`/usernames/${sanitizedNewName}`] = currentUser.uid;
+    if (sanitizedOldName && sanitizedOldName !== sanitizedNewName) {
+      updates[`/usernames/${sanitizedOldName}`] = null;
+    }
+    
+    try {
+      await update(ref(db), updates);
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating username:", error);
+      return { success: false, message: 'An error occurred.' };
+    }
+  }, [currentUser, userProfile.name]);
   
    const loginUserByName = useCallback(async (name: string) => {
     if (!currentUser) return;
     setIsLoggingIn(true);
-
-    const usersRef = ref(db, 'users');
-    const nameQuery = query(usersRef, orderByChild('name'), equalTo(name));
+    const trimmedName = name.trim();
+    const sanitizedName = trimmedName.toLowerCase();
+    const usernameRef = ref(db, `usernames/${sanitizedName}`);
     
     try {
-        const snapshot = await get(nameQuery);
+        const snapshot = await get(usernameRef);
         if (snapshot.exists()) {
-            const [[oldUserUid, oldUserData]] = Object.entries(snapshot.val());
-            
-            if (oldUserUid !== currentUser.uid) {
-                const newUserRef = ref(db, `users/${currentUser.uid}`);
-                await set(newUserRef, { ...(oldUserData as object), name });
-                const oldUserRef = ref(db, `users/${oldUserUid}`);
-                await remove(oldUserRef);
+            const existingUserUid = snapshot.val();
+            if (existingUserUid !== currentUser.uid) {
+                const oldUserRef = ref(db, `users/${existingUserUid}`);
+                const oldUserDataSnapshot = await get(oldUserRef);
+                
+                if (oldUserDataSnapshot.exists()) {
+                    const oldUserData = oldUserDataSnapshot.val();
+                    const updates: { [key: string]: any } = {};
+                    updates[`/users/${currentUser.uid}`] = { ...oldUserData, name: trimmedName };
+                    updates[`/users/${existingUserUid}`] = null;
+                    updates[`/usernames/${sanitizedName}`] = currentUser.uid;
+                    await update(ref(db), updates);
+                }
             }
+            setShowIntro(false);
         } else {
-            handleSetUserProfile(p => ({ ...p, name }));
+            const updates: { [key: string]: any } = {};
+            updates[`/users/${currentUser.uid}`] = { ...DEFAULT_USER_DATA, name: trimmedName };
+            updates[`/usernames/${sanitizedName}`] = currentUser.uid;
+            await update(ref(db), updates);
             setShowIntro(true);
         }
     } catch (error) {
         console.error("Error during login by name:", error);
-        handleSetUserProfile(p => ({ ...p, name }));
+        const updates: { [key: string]: any } = {};
+        updates[`/users/${currentUser.uid}/name`] = trimmedName;
+        await update(ref(db), updates);
         setShowIntro(true);
     } finally {
         setIsLoggingIn(false);
@@ -245,15 +288,6 @@ export default function App() {
   }, [vibrate]);
 
   useEffect(() => {
-    const initialHeight = window.innerHeight;
-    setAppHeight(`${initialHeight}px`);
-    const handleResize = () => { if (window.innerHeight >= initialHeight - 50) setAppHeight(`${window.innerHeight}px`); };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    // This effect is now only for the main app, OnboardingScreen handles its own theme
     if (userProfile.name) {
         const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.classList.toggle('dark', settings.theme === Theme.Auto ? isSystemDark : settings.theme === Theme.Dark);
@@ -303,22 +337,43 @@ export default function App() {
         set(favRef, true);
     }
   };
-  const addJournalEntry = (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => {
-    if (!currentUser) return;
-    const journalRef = ref(db, `users/${currentUser.uid}/journalEntries`);
-    const newEntryRef = push(journalRef);
-    set(newEntryRef, { ...entry, createdAt: serverTimestamp() });
+  const addJournalEntry = async (entry: Omit<JournalEntry, 'id' | 'createdAt'>): Promise<boolean> => {
+    if (!currentUser) return false;
+    try {
+        const journalRef = ref(db, `users/${currentUser.uid}/journalEntries`);
+        const newEntryRef = push(journalRef);
+        await set(newEntryRef, { ...entry, createdAt: serverTimestamp() });
+        return true;
+    } catch (error) {
+        console.error("Error adding journal entry:", error);
+        alert("Could not save your entry. Please try again.");
+        return false;
+    }
   };
-  const updateJournalEntry = (updatedEntry: JournalEntry) => {
-    if (!currentUser) return;
-    const { id, ...data } = updatedEntry;
-    const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
-    update(entryRef, data);
+  const updateJournalEntry = async (updatedEntry: JournalEntry): Promise<boolean> => {
+    if (!currentUser) return false;
+    try {
+        const { id, ...data } = updatedEntry;
+        const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
+        await update(entryRef, data);
+        return true;
+    } catch (error) {
+        console.error("Error updating journal entry:", error);
+        alert("Could not update your entry. Please try again.");
+        return false;
+    }
   };
-  const deleteJournalEntry = (id: string) => {
-    if (!currentUser) return;
-    const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
-    remove(entryRef);
+  const deleteJournalEntry = async (id: string): Promise<boolean> => {
+    if (!currentUser) return false;
+    try {
+        const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
+        await remove(entryRef);
+        return true;
+    } catch (error) {
+        console.error("Error deleting journal entry:", error);
+        alert("Could not delete your entry. Please try again.");
+        return false;
+    }
   };
   const addFocusSession = (durationInSeconds: number, name?: string) => {
     playSound(settings.focusSound);
@@ -390,14 +445,14 @@ export default function App() {
   return (
     <AppContext.Provider value={{ 
         mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
-        userProfile, setUserProfile: handleSetUserProfile, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry,
+        userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry,
         focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack,
         timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
         focusSearchQuery, setFocusSearchQuery,
         logoutUser, loginUserByName
     }}>
-      <main ref={constraintsRef} style={{ height: appHeight }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
+      <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
             {shouldOnboard ? (
                 <OnboardingScreen 
@@ -413,7 +468,7 @@ export default function App() {
                 />
             ) : (
                 <motion.div key="main-app" className="w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-                    <div className={`absolute bottom-0 left-0 right-0 h-[50%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 opacity-60 dark:opacity-40 pointer-events-none`}></div>
+                    <div className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 opacity-75 dark:opacity-50 pointer-events-none`}></div>
                     
                     <AnimatePresence mode="wait"><motion.div key={currentView} variants={pageVariants} initial="initial" animate="in" exit="out" transition={pageTransition} className="w-full h-full">{renderView()}</motion.div></AnimatePresence>
                     <AnimatePresence>{activeModal && (<motion.div key={activeModal.view} variants={modalVariants} initial="initial" animate="in" exit="out" transition={modalTransition} className="absolute inset-0 z-30 bg-light-bg dark:bg-dark-bg">{renderModal()}</motion.div>)}</AnimatePresence>
@@ -425,7 +480,19 @@ export default function App() {
             <>
                 <AnimatePresence>{timerState.isActive && currentView !== 'focus' && (<TimerPill constraintsRef={constraintsRef} />)}</AnimatePresence>
                 <AnimatePresence>{isPillDragging && <DeleteZone />}</AnimatePresence>
-                <BottomNav currentView={currentView} navigateTo={navigateTo} />
+                <AnimatePresence>
+                  {!isKeyboardOpen && (
+                    <motion.div
+                      initial={{ y: '100%' }}
+                      animate={{ y: '0%' }}
+                      exit={{ y: '100%' }}
+                      transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}
+                      className="absolute bottom-0 left-0 right-0 w-full"
+                    >
+                      <BottomNav currentView={currentView} navigateTo={navigateTo} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
             </>
         )}
       </main>
