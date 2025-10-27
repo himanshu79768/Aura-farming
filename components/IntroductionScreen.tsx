@@ -12,7 +12,8 @@ const screenVariants = {
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -300 },
 };
-const transition = { type: 'tween', ease: 'easeInOut', duration: 0.5 };
+// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
+const transition = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.5 };
 
 const FeatureCard: React.FC<{ icon: React.ReactNode; title: string; description: string; delay: number }> = ({ icon, title, description, delay }) => (
     <motion.div 

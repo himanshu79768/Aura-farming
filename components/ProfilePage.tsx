@@ -45,7 +45,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, onClick }) => {
 
 
 const ProfilePage: React.FC = () => {
-    const { userProfile, updateUserName, favoriteQuotes, navigateTo, focusHistory, logoutUser } = useAppContext();
+    const { userProfile, updateUserName, favoriteQuotes, navigateTo, focusHistory, logoutUser, showAlertModal } = useAppContext();
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(userProfile.name);
 
@@ -64,7 +64,7 @@ const ProfilePage: React.FC = () => {
         if (newNameTrimmed && newNameTrimmed !== userProfile.name) {
             const result = await updateUserName(newNameTrimmed);
             if (!result.success && result.message) {
-                alert(result.message);
+                showAlertModal({ title: 'Update Failed', message: result.message });
                 setName(userProfile.name);
             }
         } else {

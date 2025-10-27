@@ -62,12 +62,13 @@ const BreathingPage: React.FC = () => {
         setCyclesLeft(5);
     };
 
+    // Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types for 'ease'.
     const circleVariants = {
         idle: { scale: 0.8 },
-        inhale: { scale: 1.2, transition: { duration: 4, ease: 'easeInOut' } },
-        hold1: { scale: 1.2, transition: { duration: 4, ease: 'easeInOut' } },
-        exhale: { scale: 0.8, transition: { duration: 4, ease: 'easeInOut' } },
-        hold2: { scale: 0.8, transition: { duration: 4, ease: 'easeInOut' } },
+        inhale: { scale: 1.2, transition: { duration: 4, ease: 'easeInOut' as const } },
+        hold1: { scale: 1.2, transition: { duration: 4, ease: 'easeInOut' as const } },
+        exhale: { scale: 0.8, transition: { duration: 4, ease: 'easeInOut' as const } },
+        hold2: { scale: 0.8, transition: { duration: 4, ease: 'easeInOut' as const } },
     }
 
     return (

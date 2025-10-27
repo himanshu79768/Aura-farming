@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Loader, Sparkles, Wind } from 'lucide-react';
 import { useAppContext } from '../App';
@@ -18,7 +18,6 @@ const HomePage: React.FC = () => {
   const [content, setContent] = useState({ greeting: '', thought: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [timeOfDay, setTimeOfDay] = useState(getTimeOfDay());
-  const initialFetchGuard = useRef(false);
 
   const loadContent = useCallback(async () => {
     setIsLoading(true);
@@ -36,24 +35,12 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     if (userProfile.name) {
-      // Use ref guard to prevent double fetch on mount in strict mode
-      if (!initialFetchGuard.current) {
-        initialFetchGuard.current = true;
-        loadContent();
-      }
+      loadContent();
     } else {
         setContent({ greeting: `Good ${timeOfDay}, friend.`, thought: 'Let\'s get you set up. Your name can be added in your profile.' });
         setIsLoading(false);
     }
   }, [loadContent, userProfile.name, timeOfDay]);
-
-
-  // Effect to refetch content when mood changes after initial load
-  useEffect(() => {
-    if (userProfile.name && initialFetchGuard.current) {
-        loadContent();
-    }
-  }, [mood])
 
   const handleRefresh = () => {
     vibrate();

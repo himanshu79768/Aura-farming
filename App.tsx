@@ -23,6 +23,7 @@ import FocusAnalyticsPage from './components/FocusAnalyticsPage';
 import SoundOptionsPage from './components/SoundOptionsPage';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard';
+import AlertModal from './components/AlertModal';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -65,6 +66,7 @@ interface AppContextType {
   logoutUser: () => void;
   loginUserByName: (name: string) => Promise<void>;
   showConfirmationModal: (options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => void;
+  showAlertModal: (options: { title: string; message: string; }) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -80,8 +82,10 @@ export const useAppContext = () => {
 // --- Motion Variants & Transitions ---
 const pageVariants = { initial: { opacity: 0, scale: 0.98 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.98 } };
 const modalVariants = { initial: { opacity: 0, y: '100%' }, in: { opacity: 1, y: '0%' }, out: { opacity: 0, y: '100%' } };
-const pageTransition = { type: 'tween', ease: 'easeInOut', duration: 0.3 };
-const modalTransition = { type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.35 };
+// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
+const pageTransition = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.3 };
+// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
+const modalTransition = { type: 'tween' as const, ease: [0.32, 0.72, 0, 1] as const, duration: 0.35 };
 const moodFromColors: Record<Mood, string> = {
   [Mood.Calm]: 'from-blue-400/25',
   [Mood.Focus]: 'from-purple-400/25',
@@ -137,6 +141,26 @@ export default function App() {
     onConfirm: () => {},
     confirmText: 'Confirm'
   });
+
+  const [alertModalState, setAlertModalState] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
+  
+  useEffect(() => {
+    const loadInitialData = async () => {
+        const geminiQuotes = await fetchQuotes();
+        if (geminiQuotes && geminiQuotes.length > 0) {
+            // Combine initial quotes with fetched quotes, giving priority to fetched ones
+            const combined = [...geminiQuotes, ...INITIAL_QUOTES];
+            // Remove duplicates based on text content
+            const uniqueQuotes = Array.from(new Map(combined.map(q => [q.text.toLowerCase(), q])).values());
+            setQuotes(uniqueQuotes);
+        }
+    };
+    loadInitialData();
+  }, []); // Empty dependency array means this runs once on mount.
 
   // --- Firebase Auth & Data Sync ---
   useEffect(() => {
@@ -381,7 +405,7 @@ export default function App() {
         return true;
     } catch (error) {
         console.error("Error adding journal entry:", error);
-        alert("Could not save your entry. Please try again.");
+        showAlertModal({ title: "Save Failed", message: "Could not save your entry. Please try again." });
         return false;
     }
   };
@@ -394,7 +418,7 @@ export default function App() {
         return true;
     } catch (error) {
         console.error("Error updating journal entry:", error);
-        alert("Could not update your entry. Please try again.");
+        showAlertModal({ title: "Update Failed", message: "Could not update your entry. Please try again." });
         return false;
     }
   };
@@ -406,7 +430,7 @@ export default function App() {
         return true;
     } catch (error) {
         console.error("Error deleting journal entry:", error);
-        alert("Could not delete your entry. Please try again.");
+        showAlertModal({ title: "Delete Failed", message: "Could not delete your entry. Please try again." });
         return false;
     }
   };
@@ -444,6 +468,14 @@ export default function App() {
     });
   }, []);
 
+  const showAlertModal = useCallback((options: { title: string; message: string; }) => {
+    setAlertModalState({
+        isOpen: true,
+        title: options.title,
+        message: options.message,
+    });
+  }, []);
+
   const handleConfirm = () => {
       confirmationModalState.onConfirm();
       setConfirmationModalState(s => ({ ...s, isOpen: false }));
@@ -451,6 +483,10 @@ export default function App() {
 
   const handleCancel = () => {
       setConfirmationModalState(s => ({ ...s, isOpen: false }));
+  };
+
+  const handleAlertClose = () => {
+      setAlertModalState(s => ({ ...s, isOpen: false }));
   };
   
   // --- Render Logic ---
@@ -495,7 +531,7 @@ export default function App() {
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
         focusSearchQuery, setFocusSearchQuery,
         logoutUser, loginUserByName,
-        showConfirmationModal
+        showConfirmationModal, showAlertModal
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
@@ -550,6 +586,12 @@ export default function App() {
             onConfirm={handleConfirm}
             onCancel={handleCancel}
             confirmText={confirmationModalState.confirmText}
+        />
+        <AlertModal
+            isOpen={alertModalState.isOpen}
+            title={alertModalState.title}
+            message={alertModalState.message}
+            onClose={handleAlertClose}
         />
       </main>
     </AppContext.Provider>

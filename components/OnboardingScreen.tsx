@@ -44,7 +44,8 @@ const screenVariants = {
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -300 },
 };
-const transition = { type: 'tween', ease: 'easeInOut', duration: 0.5 };
+// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
+const transition = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.5 };
 
 const contentContainerVariants = {
     hidden: { opacity: 0 },
@@ -63,8 +64,9 @@ const contentItemVariants = {
         opacity: 1,
         y: 0,
         transition: {
-            type: 'tween',
-            ease: 'easeOut',
+            // Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
+            type: 'tween' as const,
+            ease: 'easeOut' as const,
             duration: 0.5,
         },
     },

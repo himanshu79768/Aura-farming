@@ -6,7 +6,7 @@ export const fetchQuotes = async (): Promise<Quote[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: "Generate a list of 20 short, powerful, and uplifting quotes or affirmations for focus, calm, and motivation. Authors can be famous figures or 'Anonymous'. Return as a JSON array.",
+      contents: "Generate a list of 50 short, powerful, and uplifting quotes or affirmations for focus, calm, and motivation. Please include a diverse range of authors, with a significant portion from Indian philosophers, leaders, and texts (like Vivekananda, Gandhi, the Upanishads, etc.). Authors can be famous figures or 'Anonymous'. Return as a JSON array.",
       config: {
         responseMimeType: "application/json",
         responseSchema: {

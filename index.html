@@ -131,15 +131,6 @@
   <body>
     <div id="root"></div>
     <script type="module">
-      // In a real-world app, this would be handled by a build process
-      // and not exposed in the client-side code directly.
-      window.process = {
-        env: {
-          API_KEY: 'AIzaSyCIJzOiMuA740PQXZolLqk5WcBb0Zc02ZM'
-        }
-      };
-    </script>
-    <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
       import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
       import { getDatabase, ref, onValue, set, update, push, remove, serverTimestamp, query, orderByChild, equalTo, get } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
