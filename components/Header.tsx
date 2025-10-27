@@ -9,6 +9,7 @@ interface HeaderProps {
     showBackButton?: boolean;
     onBack?: () => void;
     rightAction?: React.ReactNode;
+    showCenteredMoodSelector?: boolean;
 }
 
 const moodIcons: Record<Mood, React.ReactNode> = {
@@ -53,7 +54,7 @@ const MoodSelector: React.FC = () => {
     )
 }
 
-const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, rightAction }) => {
+const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, rightAction, showCenteredMoodSelector = false }) => {
     return (
         <header className="relative w-full h-20 flex items-center justify-center p-4 z-20 flex-shrink-0">
             <div className="absolute left-4">
@@ -71,17 +72,21 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                 )}
             </div>
             
-            <motion.h1 
-                key={title}
-                className="text-lg font-semibold"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
-                {title}
-            </motion.h1>
+            {showCenteredMoodSelector ? (
+                <MoodSelector />
+            ) : (
+                <motion.h1 
+                    key={title}
+                    className="text-lg font-semibold"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                >
+                    {title}
+                </motion.h1>
+            )}
 
             <div className="absolute right-4">
-                 {rightAction ? rightAction : (!showBackButton && <MoodSelector />)}
+                 {!showCenteredMoodSelector && (rightAction ? rightAction : (!showBackButton && <MoodSelector />))}
             </div>
         </header>
     );

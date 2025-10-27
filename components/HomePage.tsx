@@ -63,7 +63,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <Header />
+      <Header showCenteredMoodSelector={true} />
       <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
         <AnimatePresence mode="wait">
           {isLoading ? (
