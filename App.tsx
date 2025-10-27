@@ -21,6 +21,7 @@ import FavoritesPage from './components/FavoritesPage';
 import FocusHistoryPage from './components/FocusHistoryPage';
 import FocusAnalyticsPage from './components/FocusAnalyticsPage';
 import SoundOptionsPage from './components/SoundOptionsPage';
+import ConfirmationModal from './components/ConfirmationModal';
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard';
 
 const { 
@@ -63,6 +64,7 @@ interface AppContextType {
   setFocusSearchQuery: (query: string) => void;
   logoutUser: () => void;
   loginUserByName: (name: string) => Promise<void>;
+  showConfirmationModal: (options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -126,6 +128,14 @@ export default function App() {
   const [isPillDragging, setIsPillDragging] = useState(false);
   const constraintsRef = useRef(null);
   const isKeyboardOpen = useVirtualKeyboard();
+
+  const [confirmationModalState, setConfirmationModalState] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    confirmText: 'Confirm'
+  });
 
   // --- Firebase Auth & Data Sync ---
   useEffect(() => {
@@ -408,6 +418,25 @@ export default function App() {
     setIsTimerFinished(false);
     setSessionName('');
   };
+
+  const showConfirmationModal = useCallback((options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => {
+    setConfirmationModalState({
+        isOpen: true,
+        title: options.title,
+        message: options.message,
+        onConfirm: options.onConfirm,
+        confirmText: options.confirmText || 'Confirm',
+    });
+  }, []);
+
+  const handleConfirm = () => {
+      confirmationModalState.onConfirm();
+      setConfirmationModalState(s => ({ ...s, isOpen: false }));
+  };
+
+  const handleCancel = () => {
+      setConfirmationModalState(s => ({ ...s, isOpen: false }));
+  };
   
   // --- Render Logic ---
   const renderView = () => {
@@ -450,7 +479,8 @@ export default function App() {
         timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
         focusSearchQuery, setFocusSearchQuery,
-        logoutUser, loginUserByName
+        logoutUser, loginUserByName,
+        showConfirmationModal
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
@@ -495,6 +525,14 @@ export default function App() {
                 </AnimatePresence>
             </>
         )}
+        <ConfirmationModal
+            isOpen={confirmationModalState.isOpen}
+            title={confirmationModalState.title}
+            message={confirmationModalState.message}
+            onConfirm={handleConfirm}
+            onCancel={handleCancel}
+            confirmText={confirmationModalState.confirmText}
+        />
       </main>
     </AppContext.Provider>
   );

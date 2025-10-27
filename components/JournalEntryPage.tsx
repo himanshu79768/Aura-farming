@@ -11,7 +11,7 @@ interface JournalEntryPageProps {
 }
 
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
-    const { navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, vibrate } = useAppContext();
+    const { navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, vibrate, showConfirmationModal } = useAppContext();
     const [content, setContent] = useState('');
     const [isPromptLoading, setIsPromptLoading] = useState(false);
 
@@ -38,12 +38,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     };
     
     const handleDelete = async () => {
-        if (entry && window.confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
-            vibrate('heavy');
-            const success = await deleteJournalEntry(entry.id);
-            if (success) {
-                navigateBack();
-            }
+        if (entry) {
+            showConfirmationModal({
+                title: 'Delete Entry?',
+                message: 'This action cannot be undone. Are you sure you want to permanently delete this journal entry?',
+                confirmText: 'Delete',
+                onConfirm: async () => {
+                    vibrate('heavy');
+                    const success = await deleteJournalEntry(entry.id);
+                    if (success) {
+                        navigateBack();
+                    }
+                }
+            });
         }
     };
     
