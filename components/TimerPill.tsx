@@ -99,8 +99,8 @@ const TimerPill: React.FC<TimerPillProps> = ({ constraintsRef }) => {
             animate={{ 
                 opacity: 1, 
                 scale: 1,
-                width: 144,
-                height: 48,
+                width: '9rem',
+                height: '3rem',
                 left: '50%',
                 x: '-50%',
                 borderRadius: '9999px',
