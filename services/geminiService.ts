@@ -5,7 +5,7 @@ export const fetchQuotes = async (): Promise<Quote[]> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       contents: "Generate a list of 20 short, powerful, and uplifting quotes or affirmations for focus, calm, and motivation. Authors can be famous figures or 'Anonymous'. Return as a JSON array.",
       config: {
         responseMimeType: "application/json",
@@ -47,7 +47,7 @@ export const fetchHomepageContent = async (mood: Mood, name: string, timeOfDay: 
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             contents: `Generate a short, fresh, and welcoming homepage message for a wellness app. It's currently the ${timeOfDay}. The user's name is ${name} and their current mood is set to '${mood}'. Provide a friendly, time-appropriate greeting and a very short (1-2 sentence) "thought for the day" that matches the mood.`,
             config: {
                 responseMimeType: "application/json",
@@ -81,7 +81,7 @@ export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'mor
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             contents: `You are an AI wellness guide for an app called Aura. The user, ${name}, has selected their current mood as '${mood}'. It's currently the ${timeOfDay}. Generate a personalized 'Aura Check-in'. Provide a response in JSON format with three keys: "auraReading" (a short, 1-2 sentence encouraging paragraph about their current energy), "affirmation" (a single, powerful affirmation sentence), and "suggestion" (a short, actionable suggestion, like 'Try a 5-minute breathing exercise' or 'Stretch for 2 minutes'). The tone should be positive, insightful, and slightly mystical, fitting the 'Aura' theme.`,
             config: {
                 responseMimeType: "application/json",
@@ -110,7 +110,7 @@ export const fetchJournalPrompt = async (): Promise<string> => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             contents: "Generate a short, insightful, and open-ended journal prompt to encourage self-reflection. It should be a single question or a short statement to ponder.",
         });
         
