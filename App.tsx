@@ -306,27 +306,50 @@ export default function App() {
     }
   }, [settings.theme, userProfile.name]);
 
-  useEffect(() => {
-    let animationFrameId: number;
-    const updateTimer = () => {
-      if (timerState.isActive && timerState.endTime > 0) {
-        const remaining = Math.round((timerState.endTime - Date.now()) / 1000);
-        if (remaining <= 0) {
-          setTimeLeft(0);
-          setTimerState(s => ({ ...s, isActive: false }));
-          setIsTimerFinished(true);
-          addFocusSession(timerState.duration, sessionName);
-        } else {
-          setTimeLeft(remaining);
-        }
-      }
-      animationFrameId = requestAnimationFrame(updateTimer);
-    };
-    animationFrameId = requestAnimationFrame(updateTimer);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [timerState]);
-
   const playSound = useCallback((sound: string) => settings.sound && console.log(`Playing sound: ${sound}`), [settings.sound]);
+
+  const addFocusSession = useCallback((durationInSeconds: number, name?: string) => {
+    playSound(settings.focusSound);
+    vibrate('heavy');
+    if (!currentUser) return;
+    const historyRef = ref(db, `users/${currentUser.uid}/focusHistory`);
+    const newSessionRef = push(historyRef);
+    set(newSessionRef, {
+      date: new Date().toISOString(), duration: durationInSeconds, name: name || '', createdAt: serverTimestamp()
+    });
+    updateUserData({ completedSessions: (userProfile.completedSessions || 0) + 1 });
+  }, [currentUser, playSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
+
+  useEffect(() => {
+    // This effect handles the timer countdown.
+    if (!timerState.isActive || timerState.endTime <= 0) {
+      return; // Timer is not running, do nothing.
+    }
+
+    let animationFrameId: number;
+
+    const tick = () => {
+      const remaining = Math.round((timerState.endTime - Date.now()) / 1000);
+
+      if (remaining > 0) {
+        setTimeLeft(remaining);
+        animationFrameId = requestAnimationFrame(tick);
+      } else {
+        // Time is up.
+        setTimeLeft(0);
+        setTimerState(s => ({ ...s, isActive: false }));
+        setIsTimerFinished(true);
+        // This is now guaranteed to run only once per session completion.
+        addFocusSession(timerState.duration, sessionName);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [timerState, sessionName, addFocusSession]);
   
   const navigateTo = (view: View, params?: any) => {
     if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions'].includes(view)) {
@@ -387,17 +410,7 @@ export default function App() {
         return false;
     }
   };
-  const addFocusSession = (durationInSeconds: number, name?: string) => {
-    playSound(settings.focusSound);
-    vibrate('heavy');
-    if (!currentUser) return;
-    const historyRef = ref(db, `users/${currentUser.uid}/focusHistory`);
-    const newSessionRef = push(historyRef);
-    set(newSessionRef, {
-      date: new Date().toISOString(), duration: durationInSeconds, name: name || '', createdAt: serverTimestamp()
-    });
-    updateUserData({ completedSessions: (userProfile.completedSessions || 0) + 1 });
-  };
+
   const selectTimerDuration = (minutes: number) => {
       vibrate();
       const newDuration = minutes * 60;
