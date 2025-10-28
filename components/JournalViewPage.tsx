@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MoreVertical, Edit, Share2, Trash2, Download, FileText, Copy, Loader } from 'lucide-react';
+import { MoreVertical, Edit, Share2, Trash2, Download, FileText, Copy, Loader, FileImage, FileQuestion } from 'lucide-react';
 import { useAppContext } from '../App';
-import { JournalEntry, Mood, Theme } from '../types';
+import { JournalEntry, Mood, Theme, Attachment } from '../types';
 import Header from './Header';
-import AttachmentPreview from './AttachmentPreview';
+import PdfViewer from './PdfViewer';
 
 const moodColors: Record<Mood, { gradient: [string, string, string] }> = {
     [Mood.Calm]: { gradient: ['#3b82f6', '#60a5fa', '#818cf8'] },
@@ -175,6 +175,12 @@ const generateShareableImage = async (entry: JournalEntry, theme: Theme.Light | 
 interface JournalViewPageProps {
     entry: JournalEntry;
 }
+
+const AttachmentIcon = ({ type }: { type: string }) => {
+    if (type.startsWith('image/')) return <FileImage size={24} className="text-purple-400 shrink-0" />;
+    if (type === 'application/pdf') return <FileText size={24} className="text-red-400 shrink-0" />;
+    return <FileQuestion size={24} className="text-gray-400 shrink-0" />;
+};
 
 const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }) => {
     const { 
@@ -443,13 +449,43 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                     {entry.attachments && entry.attachments.length > 0 && (
                         <div className="mt-8 pt-6 border-t border-white/10">
                             <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="space-y-3">
                                 {entry.attachments.map((att, index) => (
-                                    <AttachmentPreview
+                                    <motion.div
                                         key={att.id}
-                                        attachment={att}
-                                        onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
-                                    />
+                                        className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden"
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.1 }}
+                                    >
+                                        <div className="flex items-center justify-between p-3 border-b border-white/10">
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <AttachmentIcon type={att.type} />
+                                                <span className="font-semibold truncate pr-2">{att.name}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
+                                                className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm"
+                                            >
+                                                View
+                                            </button>
+                                        </div>
+                                        <div 
+                                            onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
+                                            className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer"
+                                        >
+                                            {att.type.startsWith('image/') ? (
+                                                <img src={att.data} alt={att.name} className="max-w-full max-h-full object-contain" />
+                                            ) : att.type === 'application/pdf' ? (
+                                                <PdfViewer dataUrl={att.data} isThumbnail={true} />
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary">
+                                                    <AttachmentIcon type={att.type} />
+                                                    <span>Click to View</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
                                 ))}
                             </div>
                         </div>

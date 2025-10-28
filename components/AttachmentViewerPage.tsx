@@ -4,6 +4,7 @@ import Header from './Header';
 import { useAppContext } from '../App';
 import { Attachment } from '../types';
 import { FileQuestion, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import PdfViewer from './PdfViewer';
 
 interface AttachmentViewerPageProps {
     attachments: Attachment[];
@@ -59,7 +60,7 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
             return <img src={attachment.data} alt={attachment.name} className="max-w-full max-h-full object-contain" />;
         }
         if (type === 'application/pdf') {
-            return <iframe src={attachment.data} className="w-full h-full border-none" title={attachment.name} />;
+            return <PdfViewer dataUrl={attachment.data} />;
         }
         
         return (
