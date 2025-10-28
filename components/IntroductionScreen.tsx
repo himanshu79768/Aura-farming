@@ -42,7 +42,7 @@ const IntroductionScreen: React.FC<IntroductionScreenProps> = ({ onComplete, use
             exit="exit"
             transition={transition}
         >
-            <div className="flex-grow flex flex-col items-center justify-center text-center w-full max-w-md">
+            <div className="flex-grow flex flex-col items-center justify-center text-center w-full max-w-md md:max-w-2xl">
                 <motion.div variants={screenVariants} initial="initial" animate="animate" transition={{ staggerChildren: 0.2 }}>
                     <motion.h1 
                         className="text-4xl font-bold tracking-tight"
@@ -73,7 +73,7 @@ const IntroductionScreen: React.FC<IntroductionScreenProps> = ({ onComplete, use
             </div>
             <motion.button
                 onClick={onComplete}
-                className="w-full max-w-md flex items-center justify-center gap-2 py-4 text-lg font-semibold bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full shadow-lg"
+                className="w-full max-w-md md:max-w-2xl flex items-center justify-center gap-2 py-4 text-lg font-semibold bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full shadow-lg"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1, duration: 0.5 }}

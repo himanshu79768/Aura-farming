@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Zap, Droplet, Sun } from 'lucide-react';
 import { useAppContext } from '../App';
@@ -56,9 +56,32 @@ const MoodSelector: React.FC = () => {
 }
 
 const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
+    const measureRef = useRef<HTMLHeadingElement>(null);
+    const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-lg');
+
+    useLayoutEffect(() => {
+        const checkWrap = () => {
+            const element = measureRef.current;
+            if (element) {
+                const originalClass = titleClassName || 'text-lg';
+                const smallerClass = originalClass === 'text-base' ? 'text-sm' : 'text-base';
+    
+                const style = getComputedStyle(element);
+                const lineHeight = parseFloat(style.lineHeight);
+                const isWrapped = element.clientHeight > lineHeight + 2;
+    
+                setEffectiveTitleClass(isWrapped ? smallerClass : originalClass);
+            }
+        };
+
+        checkWrap();
+        window.addEventListener('resize', checkWrap);
+        return () => window.removeEventListener('resize', checkWrap);
+    }, [title, titleClassName]);
+    
     return (
-        <header className="relative w-full h-20 flex items-center justify-center p-4 z-20 flex-shrink-0">
-            <div className="absolute left-4">
+        <header className="relative w-full min-h-[5rem] h-auto flex items-center justify-center p-4 z-20 flex-shrink-0">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2">
                 {showBackButton && (
                     <motion.button 
                         onClick={onBack} 
@@ -68,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                         exit={{ opacity: 0, x: -10 }}
                     >
                         <ChevronLeft className="w-6 h-6" />
-                        <span className="text-lg">Back</span>
+                        <span className="text-lg hidden sm:inline">Back</span>
                     </motion.button>
                 )}
             </div>
@@ -76,17 +99,23 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
             {showCenteredMoodSelector ? (
                 <MoodSelector />
             ) : (
-                <motion.h1 
-                    key={title}
-                    className={`font-semibold text-center px-20 ${titleClassName || 'text-lg'}`}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                >
-                    <span className="truncate block">{title}</span>
-                </motion.h1>
+                <div className="relative flex items-center justify-center max-w-full px-20">
+                    {/* The actual visible title */}
+                    <motion.h1 
+                        key={title}
+                        className={`font-semibold text-center max-w-full ${effectiveTitleClass}`}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                    >
+                        {title}
+                    </motion.h1>
+
+                    {/* A hidden element used ONLY for measuring if the title *would* wrap with the original font size */}
+                    <h1 ref={measureRef} className={`font-semibold text-center max-w-full absolute invisible -z-10 ${titleClassName || 'text-lg'}`}>{title}</h1>
+                </div>
             )}
 
-            <div className="absolute right-4">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2">
                  {!showCenteredMoodSelector && (rightAction ? rightAction : (!showBackButton && <MoodSelector />))}
             </div>
         </header>

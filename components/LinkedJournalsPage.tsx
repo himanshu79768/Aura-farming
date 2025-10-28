@@ -23,12 +23,12 @@ const LinkedJournalsPage: React.FC<LinkedJournalsPageProps> = ({ session }) => {
                 showBackButton
                 onBack={navigateBack}
             />
-            <div className="flex-grow w-full max-w-md mx-auto p-4 overflow-y-auto">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
                 {linkedJournals.length === 0 ? (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
+                        className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24 md:pb-8"
                     >
                         <BookOpen className="w-12 h-12 mb-4" />
                         <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No Linked Journals</h2>
@@ -36,7 +36,7 @@ const LinkedJournalsPage: React.FC<LinkedJournalsPageProps> = ({ session }) => {
                     </motion.div>
                 ) : (
                     <motion.div
-                        className="space-y-3 pt-8 pb-24"
+                        className="space-y-3 pt-8 pb-24 md:pb-8"
                         initial="hidden"
                         animate="visible"
                         variants={{

@@ -146,7 +146,7 @@ const JournalPage: React.FC = () => {
                     </motion.button>
                 }
             />
-            <div className="w-full max-w-md mx-auto px-4 flex-shrink-0">
+            <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 flex-shrink-0">
                 <AnimatePresence>
                     {showCalendar && (
                         <motion.div
@@ -186,13 +186,13 @@ const JournalPage: React.FC = () => {
                     </div>
                 )}
             </div>
-            <div className="flex-grow w-full max-w-md mx-auto overflow-y-auto">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto overflow-y-auto">
                 <AnimatePresence>
                     {journalEntries.length === 0 ? (
                          <motion.div 
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
+                            className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-28 md:pb-8"
                         >
                             <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">Your space is clear.</h2>
                             <p>Tap the '+' button to capture your first thought.</p>
@@ -201,7 +201,7 @@ const JournalPage: React.FC = () => {
                         <motion.div 
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
+                            className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-28 md:pb-8"
                         >
                              <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">
                                 {selectedDate ? 'No entries for this day' : 'No entries found'}
@@ -211,7 +211,7 @@ const JournalPage: React.FC = () => {
                             </p>
                         </motion.div>
                     ) : (
-                        <div className="pt-2 pb-28 px-4">
+                        <div className="pt-2 pb-28 md:pb-8 px-4">
                         {/* Fix: Use Object.keys to iterate over grouped entries, ensuring proper type inference. */}
                         {Object.keys(groupedEntries).map((date) => (
                             <div key={date} className="mb-6">
@@ -245,7 +245,7 @@ const JournalPage: React.FC = () => {
             </div>
              <motion.button
                 onClick={() => navigateTo('journalEntry')}
-                className="absolute bottom-28 right-6 w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg z-20"
+                className="absolute bottom-28 md:bottom-8 right-6 w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg z-20"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 aria-label="New journal entry"

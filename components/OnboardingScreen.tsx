@@ -158,7 +158,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete, isLoadi
                                 <p className="mt-2 text-lg text-light-text-secondary dark:text-dark-text-secondary">Find your focus, calm your mind.</p>
                             </motion.div>
                             
-                            <motion.form onSubmit={handleSubmit} className="w-full max-w-xs mt-12" variants={contentItemVariants}>
+                            <motion.form onSubmit={handleSubmit} className="w-full max-w-xs md:max-w-sm mt-12" variants={contentItemVariants}>
                                 <div className="relative">
                                     <input
                                         type="text"

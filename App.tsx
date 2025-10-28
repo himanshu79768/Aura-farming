@@ -10,6 +10,7 @@ import BreathingPage from './components/BreathingPage';
 import OnboardingScreen from './components/OnboardingScreen';
 import IntroductionScreen from './components/IntroductionScreen';
 import BottomNav from './components/BottomNav';
+import SideNav from './components/SideNav';
 import AuraCheckinPage from './components/AuraCheckinPage';
 import JournalPage from './components/JournalPage';
 import JournalEntryPage from './components/JournalEntryPage';
@@ -86,11 +87,11 @@ export const useAppContext = () => {
 
 // --- Motion Variants & Transitions ---
 const pageVariants = { initial: { opacity: 0, scale: 0.98 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.98 } };
-const modalVariants = { initial: { opacity: 0, y: '100%' }, in: { opacity: 1, y: '0%' }, out: { opacity: 0, y: '100%' } };
-// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
+const mobileModalVariants = { initial: { opacity: 0, y: '100%' }, in: { opacity: 1, y: '0%' }, out: { opacity: 0, y: '100%' } };
+const desktopModalVariants = { initial: { opacity: 0, scale: 0.95 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.95 } };
 const pageTransition = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.3 };
-// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
-const modalTransition = { type: 'tween' as const, ease: [0.32, 0.72, 0, 1] as const, duration: 0.35 };
+const mobileModalTransition = { type: 'tween' as const, ease: [0.32, 0.72, 0, 1] as const, duration: 0.35 };
+const desktopModalTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 const moodFromColors: Record<Mood, string> = {
   [Mood.Calm]: 'from-blue-400/25',
   [Mood.Focus]: 'from-purple-400/25',
@@ -109,6 +110,20 @@ const DEFAULT_USER_DATA: UserData = {
     ...DEFAULT_PROFILE,
     mood: Mood.Calm,
     favoriteQuotes: {},
+};
+
+const useMediaQuery = (query: string) => {
+    const [matches, setMatches] = useState(false);
+    useEffect(() => {
+        const media = window.matchMedia(query);
+        if (media.matches !== matches) {
+            setMatches(media.matches);
+        }
+        const listener = () => setMatches(media.matches);
+        window.addEventListener('resize', listener);
+        return () => window.removeEventListener('resize', listener);
+    }, [matches, query]);
+    return matches;
 };
 
 export default function App() {
@@ -139,6 +154,7 @@ export default function App() {
   const [isPillDragging, setIsPillDragging] = useState(false);
   const constraintsRef = useRef(null);
   const isKeyboardOpen = useVirtualKeyboard();
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   const [confirmationModalState, setConfirmationModalState] = useState({
     isOpen: false,
@@ -523,6 +539,9 @@ export default function App() {
   
   const shouldOnboard = !masterUid;
   const shouldShowIntro = showIntro && userProfile.name;
+  
+  const modalVariants = isDesktop ? desktopModalVariants : mobileModalVariants;
+  const modalTransition = isDesktop ? desktopModalTransition : mobileModalTransition;
 
   return (
     <AppContext.Provider value={{ 
@@ -536,7 +555,7 @@ export default function App() {
         showConfirmationModal, showAlertModal,
         currentUser,
     }}>
-      <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
+      <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
             {shouldOnboard ? (
                 <OnboardingScreen 
@@ -551,74 +570,61 @@ export default function App() {
                     userName={userProfile.name}
                 />
             ) : (
-                <motion.div key="main-app" className="w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-                    <div 
-                        className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 pointer-events-none`}
-                        style={{ opacity: (settings.gradientIntensity ?? 75) / 100 }}
-                    ></div>
-                    
-                    <AnimatePresence mode="wait"><motion.div key={currentView} variants={pageVariants} initial="initial" animate="in" exit="out" transition={pageTransition} className="w-full h-full">{renderView()}</motion.div></AnimatePresence>
-                    
-                    <AnimatePresence>
-                        {modalStack.map((modal, index) => {
-                            let modalContent = null;
-                            switch (modal.view) {
-                                case 'settings':
-                                    modalContent = <SettingsPage />;
-                                    break;
-                                case 'breathing':
-                                    modalContent = <BreathingPage />;
-                                    break;
-                                case 'auraCheckin':
-                                    modalContent = <AuraCheckinPage />;
-                                    break;
-                                case 'journalEntry':
-                                    modalContent = <JournalEntryPage {...modal.params} />;
-                                    break;
-                                case 'journalView':
-                                    modalContent = <JournalViewPage {...modal.params} />;
-                                    break;
-                                case 'favorites':
-                                    modalContent = <FavoritesPage />;
-                                    break;
-                                case 'focusHistory':
-                                    modalContent = <FocusHistoryPage />;
-                                    break;
-                                case 'focusAnalytics':
-                                    modalContent = <FocusAnalyticsPage />;
-                                    break;
-                                case 'soundOptions':
-                                    modalContent = <SoundOptionsPage />;
-                                    break;
-                                case 'sessionLinking':
-                                    modalContent = <SessionLinkingPage {...modal.params} />;
-                                    break;
-                                case 'linkedJournals':
-                                    modalContent = <LinkedJournalsPage {...modal.params} />;
-                                    break;
-                                case 'attachmentViewer':
-                                    modalContent = <AttachmentViewerPage {...modal.params} />;
-                                    break;
-                            }
+                <motion.div key="main-app" className="w-full h-full flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                    <SideNav currentView={currentView} navigateTo={navigateTo} />
+                    <div className="flex-grow h-full relative">
+                        <div 
+                            className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 pointer-events-none`}
+                            style={{ opacity: (settings.gradientIntensity ?? 75) / 100 }}
+                        ></div>
+                        
+                        <AnimatePresence mode="wait"><motion.div key={currentView} variants={pageVariants} initial="initial" animate="in" exit="out" transition={pageTransition} className="w-full h-full">{renderView()}</motion.div></AnimatePresence>
+                        
+                        <AnimatePresence>
+                            {modalStack.map((modal, index) => {
+                                let modalContent = null;
+                                switch (modal.view) {
+                                    case 'settings': modalContent = <SettingsPage />; break;
+                                    case 'breathing': modalContent = <BreathingPage />; break;
+                                    case 'auraCheckin': modalContent = <AuraCheckinPage />; break;
+                                    case 'journalEntry': modalContent = <JournalEntryPage {...modal.params} />; break;
+                                    case 'journalView': modalContent = <JournalViewPage {...modal.params} />; break;
+                                    case 'favorites': modalContent = <FavoritesPage />; break;
+                                    case 'focusHistory': modalContent = <FocusHistoryPage />; break;
+                                    case 'focusAnalytics': modalContent = <FocusAnalyticsPage />; break;
+                                    case 'soundOptions': modalContent = <SoundOptionsPage />; break;
+                                    case 'sessionLinking': modalContent = <SessionLinkingPage {...modal.params} />; break;
+                                    case 'linkedJournals': modalContent = <LinkedJournalsPage {...modal.params} />; break;
+                                    case 'attachmentViewer': modalContent = <AttachmentViewerPage {...modal.params} />; break;
+                                }
 
-                            if (!modalContent) return null;
+                                if (!modalContent) return null;
 
-                            return (
-                                <motion.div
-                                    key={modal.view + index}
-                                    className="absolute inset-0 bg-light-bg dark:bg-dark-bg"
-                                    variants={modalVariants}
-                                    initial="initial"
-                                    animate="in"
-                                    exit="out"
-                                    transition={modalTransition}
-                                    style={{ zIndex: 30 + index }}
-                                >
-                                    {modalContent}
-                                </motion.div>
-                            );
-                        })}
-                    </AnimatePresence>
+                                return (
+                                    <motion.div
+                                        key={modal.view + index}
+                                        className="fixed inset-0 bg-black/30 backdrop-blur-sm md:flex md:items-center md:justify-center"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        style={{ zIndex: 30 + index }}
+                                    >
+                                        <motion.div
+                                            className="w-full h-full bg-light-bg dark:bg-dark-bg md:w-full md:max-w-2xl md:h-auto md:max-h-[90vh] md:rounded-2xl md:border md:border-white/10 md:shadow-2xl overflow-hidden"
+                                            variants={modalVariants}
+                                            initial="initial"
+                                            animate="in"
+                                            exit="out"
+                                            transition={modalTransition}
+                                        >
+                                            {modalContent}
+                                        </motion.div>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
+                    </div>
                 </motion.div>
             )}
         </AnimatePresence>
@@ -634,7 +640,7 @@ export default function App() {
                       animate={{ y: '0%' }}
                       exit={{ y: '100%' }}
                       transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}
-                      className="absolute bottom-0 left-0 right-0 w-full"
+                      className="absolute bottom-0 left-0 right-0 w-full md:hidden"
                     >
                       <BottomNav currentView={currentView} navigateTo={navigateTo} />
                     </motion.div>

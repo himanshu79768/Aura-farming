@@ -17,8 +17,8 @@ const SoundOptionsPage: React.FC = () => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Sound Options" showBackButton onBack={navigateBack} />
-            <div className="flex-grow w-full max-w-md mx-auto p-4 overflow-y-auto">
-                <div className="space-y-4 pt-8 pb-24">
+            <div className="flex-grow w-full max-w-md md:max-w-xl mx-auto p-4 overflow-y-auto">
+                <div className="space-y-4 pt-8 pb-24 md:pb-8">
                     <div className="px-4 flex justify-between items-center">
                         <h3 className="font-semibold">Master Sound</h3>
                         <label htmlFor="sound-toggle" className="relative inline-flex items-center cursor-pointer">
