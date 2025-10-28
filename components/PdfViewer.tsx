@@ -97,15 +97,27 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
                         return;
                     }
                 } else if (scale === 0) { // Auto-calculate initial scale for full view
-                    if (container.clientWidth > 0) {
+                    if (container.clientWidth > 0 && container.clientHeight > 0) {
                         const viewport = page.getViewport({ scale: 1 });
-                        // Container has `p-4` (1rem padding on all sides). 1rem = 16px. Total horizontal padding is 32px.
-                        const calculatedScale = (container.clientWidth - 32) / viewport.width;
+                        
+                        const isPortrait = container.clientHeight > container.clientWidth;
+                        let calculatedScale;
+
+                        if (isPortrait) {
+                            // Mobile view: fit-to-width
+                            // Container has `p-4` (1rem padding on all sides). Total horizontal padding is 32px.
+                            calculatedScale = (container.clientWidth - 32) / viewport.width;
+                        } else {
+                            // Desktop view: fit-to-height
+                            // Container has `p-4` (1rem padding on all sides). Total vertical padding is 32px.
+                            calculatedScale = (container.clientHeight - 32) / viewport.height;
+                        }
+                        
                         setScale(calculatedScale);
                         // The state update will trigger a re-render, so we can exit.
                         return;
                     } else {
-                        // Wait for container to have a width
+                        // Wait for container to have dimensions
                         setTimeout(render, 50);
                         return;
                     }
