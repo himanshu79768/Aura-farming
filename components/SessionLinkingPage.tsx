@@ -49,14 +49,14 @@ const SessionLinkingPage: React.FC<SessionLinkingPageProps> = ({ selectedIds, on
     };
 
     const HeaderActions = (
-        <button onClick={handleDone} className="px-4 py-1.5 text-base font-semibold bg-blue-500 text-white rounded-full shadow-sm">
+        <button onClick={handleDone} className="px-4 py-1.5 text-base font-semibold bg-light-primary dark:bg-dark-primary text-white rounded-full shadow-sm">
             Done
         </button>
     );
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
-            <Header title="Link Sessions" showBackButton onBack={navigateBack} rightAction={HeaderActions} />
+            <Header title="Connections" showBackButton onBack={navigateBack} rightAction={HeaderActions} />
              <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 pt-2 flex-shrink-0">
                 <SearchBar
                     placeholder="Search sessions..."
@@ -65,14 +65,15 @@ const SessionLinkingPage: React.FC<SessionLinkingPageProps> = ({ selectedIds, on
                 />
             </div>
             <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
-                <div className="flex justify-start mb-2 px-1">
-                    <button onClick={handleSelectAll} className="px-4 py-1.5 text-sm font-semibold text-blue-500 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                        {allFilteredSelected ? 'Deselect All' : 'Select All'}
-                    </button>
-                </div>
                 <div className="space-y-3 pb-24">
                     {filteredHistory.length > 0 ? (
-                        filteredHistory.map(session => (
+                        <>
+                             <div className="flex justify-start mb-2 px-1">
+                                <button onClick={handleSelectAll} className="px-4 py-1.5 text-sm font-semibold text-light-primary dark:text-dark-primary rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                    {allFilteredSelected ? 'Deselect All Visible' : 'Select All Visible'}
+                                </button>
+                            </div>
+                            {filteredHistory.map(session => (
                             <motion.button
                                 key={session.id}
                                 onClick={() => handleToggleSession(session.id)}
@@ -88,7 +89,7 @@ const SessionLinkingPage: React.FC<SessionLinkingPageProps> = ({ selectedIds, on
                                         {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {Math.round(session.duration / 60)} min
                                     </p>
                                 </div>
-                                <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border-2 transition-all duration-200 ease-in-out ${currentSelectedIds.includes(session.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-500'}`}>
+                                <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border-2 transition-all duration-200 ease-in-out ${currentSelectedIds.includes(session.id) ? 'bg-light-primary dark:bg-dark-primary border-light-primary dark:border-dark-primary' : 'border-gray-500'}`}>
                                     <AnimatePresence>
                                     {currentSelectedIds.includes(session.id) && (
                                         <motion.div
@@ -102,7 +103,8 @@ const SessionLinkingPage: React.FC<SessionLinkingPageProps> = ({ selectedIds, on
                                     </AnimatePresence>
                                 </div>
                             </motion.button>
-                        ))
+                        ))}
+                        </>
                     ) : (
                         <div className="text-center text-light-text-secondary dark:text-dark-text-secondary py-16">
                             <p>No focus sessions found.</p>

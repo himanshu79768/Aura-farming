@@ -77,12 +77,12 @@ const BreathingPage: React.FC = () => {
             <div className="flex-grow flex flex-col items-center justify-center p-4 pb-24 text-center">
                 <div className="relative w-64 h-64 flex items-center justify-center">
                     <motion.div 
-                        className="absolute w-full h-full bg-blue-500/20 rounded-full"
+                        className="absolute w-full h-full bg-light-primary/20 dark:bg-dark-primary/20 rounded-full"
                         variants={circleVariants}
                         animate={phase}
                     />
                     <motion.div 
-                        className="w-48 h-48 bg-blue-500/30 rounded-full" 
+                        className="w-48 h-48 bg-light-primary/30 dark:bg-dark-primary/30 rounded-full" 
                         variants={circleVariants}
                         animate={phase}
                         transition={{ delay: 0.1 }}
@@ -113,7 +113,7 @@ const BreathingPage: React.FC = () => {
                     ) : (
                         <motion.button
                             onClick={handleStart}
-                            className="px-8 py-3 bg-blue-500/80 text-white font-semibold rounded-full shadow-lg"
+                            className="px-8 py-3 bg-light-primary/80 dark:bg-dark-primary/80 text-white font-semibold rounded-full shadow-lg"
                             whileTap={{ scale: 0.95 }}
                         >
                             Start

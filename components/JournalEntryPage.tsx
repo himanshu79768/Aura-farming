@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -87,7 +86,7 @@ const AttachmentIcon = ({ type }: { type: string }) => {
 
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
-        navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry, vibrate, 
+        settings, navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry, vibrate, 
         showConfirmationModal, navigateTo, showAlertModal, userProfile
     } = useAppContext();
 
@@ -390,7 +389,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         const plainText = htmlToPlainText(currentContent);
         const textToCopy = `${title.trim() || 'Untitled Entry'}\n\n${plainText}`;
         navigator.clipboard.writeText(textToCopy).then(() => {
-            showAlertModal({ title: "Copied!", message: "Journal content copied to clipboard." });
+            showAlertModal({ title: "Copied!", message: "Journal content copied to clipboard.", type: 'success' });
             setIsOptionsMenuOpen(false);
         });
     };
@@ -504,7 +503,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         const spring = { type: "spring", stiffness: 700, damping: 30 };
         return (
              <div 
-                className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ${checked ? 'bg-blue-500 justify-end' : 'bg-gray-200 dark:bg-gray-700 justify-start'}`}
+                className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ${checked ? 'bg-light-primary dark:bg-dark-primary justify-end' : 'bg-gray-200 dark:bg-gray-700 justify-start'}`}
                 onClick={onToggle}
             >
                 <motion.div
@@ -551,21 +550,35 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     );
 
     const HeaderActions = (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
             <SaveIndicator />
+            <AnimatePresence>
+                {linkedSessionIds.length > 0 && (
+                    <motion.div
+                        className="flex items-center gap-1.5 p-2 rounded-full text-light-primary dark:text-dark-primary"
+                        aria-label={`${linkedSessionIds.length} connections`}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                    >
+                        <LinkIcon size={18} />
+                        <span className="text-sm font-semibold">{linkedSessionIds.length}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             <motion.button 
                 onClick={() => {vibrate(); setIsOptionsMenuOpen(o => !o);}} 
                 className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
                 whileTap={{ scale: 0.9 }} aria-label="More options"
             >
-                <MoreHorizontal size={24} />
+                <MoreHorizontal size={20} />
             </motion.button>
         </div>
     );
 
     return (
-        <div className={`w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg ${fontClasses[fontStyle]}`}>
-            <Header title="" showBackButton onBack={navigateBack} rightAction={HeaderActions} />
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+            <Header title={entry ? 'Edit Entry' : 'New Entry'} showBackButton onBack={navigateBack} rightAction={HeaderActions} />
              <AnimatePresence>
                 {isOptionsMenuOpen && (
                      <motion.div
@@ -632,27 +645,29 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                          <MenuDivider/>
                          <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length})`} onClick={handleLinkSession}/>
                          <MenuDivider/>
-                         <div className="text-xs text-light-text-secondary dark:text-dark-text-secondary px-2 pt-2 space-y-1">
+                         <div className="text-xs text-gray-500 dark:text-gray-400 px-2 pt-2 space-y-1">
                              <p>Word count: {wordCount}</p>
                              <p>Last edited by {userProfile.name}</p>
-                             <p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(lastModified)}</p>
+                             <p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', hour12: true }).format(lastModified)}</p>
                          </div>
                       </div>
                     </motion.div>
                 )}
             </AnimatePresence>
             <div className={`flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col overflow-hidden transition-all duration-300`}>
-                <input
-                    type="text" value={title} onChange={(e) => {setTitle(e.target.value); markAsChanged();}}
-                    placeholder="Title..."
-                    className="w-full bg-transparent text-3xl font-bold focus:outline-none mb-4 pb-2 border-b border-white/10 placeholder:text-light-text-secondary/50 dark:placeholder:text-dark-text-secondary/50"
-                    autoFocus={!entry} readOnly={isLocked}
-                />
+                <div className={`${fontClasses[fontStyle]}`}>
+                    <input
+                        type="text" value={title} onChange={(e) => {setTitle(e.target.value); markAsChanged();}}
+                        placeholder="Title..."
+                        className="w-full bg-transparent text-3xl font-bold focus:outline-none mb-4 pb-2 border-b border-white/10 placeholder:text-light-text-secondary/50 dark:placeholder:text-dark-text-secondary/50"
+                        autoFocus={!entry} readOnly={isLocked}
+                    />
+                </div>
                 <div className="relative flex-grow w-full journal-editor-container overflow-y-auto">
                     <div
                         ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
                         data-placeholder="Start writing..."
-                        className={`w-full h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'}`}
+                        className={`w-full h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
                         autoFocus={!entry}
                     />
                 </div>

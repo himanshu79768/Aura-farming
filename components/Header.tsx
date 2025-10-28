@@ -85,7 +85,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                 {showBackButton && (
                     <motion.button 
                         onClick={onBack} 
-                        className="flex items-center gap-1 text-blue-500"
+                        className="flex items-center gap-1 text-light-primary dark:text-dark-primary"
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -10 }}

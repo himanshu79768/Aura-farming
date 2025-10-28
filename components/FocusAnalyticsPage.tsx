@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart2, TrendingUp } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
+import { ACCENT_COLORS } from '../constants';
 
 // Helper function to format date for grouping (YYYY-MM-DD)
 const getDayKey = (date: Date) => date.toISOString().split('T')[0];
@@ -10,8 +11,16 @@ const getDayKey = (date: Date) => date.toISOString().split('T')[0];
 type FilterRange = '7d' | '30d';
 
 const FocusAnalyticsPage: React.FC = () => {
-    const { focusHistory, navigateBack, focusSearchQuery } = useAppContext();
+    const { focusHistory, navigateBack, focusSearchQuery, settings } = useAppContext();
     const [filter, setFilter] = useState<FilterRange>('7d');
+    const [gradientEndColor, setGradientEndColor] = useState('hsl(217, 91%, 60%)');
+
+    useEffect(() => {
+        const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        const colorKey = settings.accentColor || 'blue';
+        const accentHsl = ACCENT_COLORS[colorKey][isDark ? 'dark' : 'light'];
+        setGradientEndColor(`hsl(${accentHsl.replace(/ /g, ',')})`);
+    }, [settings.theme, settings.accentColor]);
 
     const chartData = useMemo(() => {
         const searchFilteredHistory = focusSearchQuery.trim()
@@ -112,7 +121,7 @@ const FocusAnalyticsPage: React.FC = () => {
                                 {chartData.data.map((minutes, index) => (
                                     <div key={index} className="flex flex-col items-center h-full flex-grow relative pt-5">
                                         <motion.div
-                                            className="w-full bg-blue-500 rounded-t-md"
+                                            className="w-full bg-light-primary dark:bg-dark-primary rounded-t-md"
                                             initial={{ height: 0 }}
                                             animate={{ height: `${(minutes / maxMinutes) * 100}%` }}
                                             transition={{ type: 'spring', stiffness: 100, damping: 15, delay: index * 0.02 }}
@@ -152,8 +161,8 @@ const FocusAnalyticsPage: React.FC = () => {
                                     />
                                     <defs>
                                         <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                            <stop offset="0%" stopColor="#818cf8" />
-                                            <stop offset="100%" stopColor="#3b82f6" />
+                                            <stop offset="0%" stopColor={gradientEndColor} stopOpacity="0.7" />
+                                            <stop offset="100%" stopColor={gradientEndColor} />
                                         </linearGradient>
                                     </defs>
                                  </svg>

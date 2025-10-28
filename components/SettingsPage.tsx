@@ -1,9 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star } from 'lucide-react';
-import { Theme, Mood, FocusSound, AppIcon, HapticIntensity } from '../types';
+import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette } from 'lucide-react';
+import { Theme, Mood, FocusSound, AppIcon, HapticIntensity, AccentColor } from '../types';
 import { useAppContext } from '../App';
 import Header from './Header';
+import { ACCENT_COLORS } from '../constants';
 
 interface SegmentedControlProps<T extends string> {
     options: { value: T; label: React.ReactNode; }[];
@@ -56,6 +57,25 @@ const SettingsPage: React.FC = () => {
                                     layoutId="theme-selector"
                                 />
                             </div>
+                             <div>
+                                <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">Accent Color</h3>
+                                <div className="grid grid-cols-5 gap-5 px-5">
+                                    {Object.entries(ACCENT_COLORS).map(([key, color]) => (
+                                        <motion.button
+                                            key={key}
+                                            onClick={() => setSettings(s => ({ ...s, accentColor: key as AccentColor }))}
+                                            className="w-full aspect-square rounded-full flex items-center justify-center transition-all border-2 border-transparent hover:border-white/50"
+                                            style={{ backgroundColor: `hsl(${color.light})` }}
+                                            aria-label={color.name}
+                                            animate={(settings.accentColor || 'blue') === key ? { scale: 1.1 } : { scale: 1 }}
+                                        >
+                                            {(settings.accentColor || 'blue') === key && (
+                                                <motion.div layoutId="accent-color-check" className="w-3 h-3 bg-white rounded-full shadow-md" />
+                                            )}
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            </div>
                             <div>
                                 <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">App Icon</h3>
                                 <SegmentedControl<AppIcon>
@@ -93,7 +113,7 @@ const SettingsPage: React.FC = () => {
                                     max="100"
                                     value={settings.gradientIntensity ?? 75}
                                     onChange={(e) => setSettings(s => ({ ...s, gradientIntensity: Number(e.target.value) }))}
-                                    className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-light-primary dark:accent-dark-primary"
                                 />
                             </div>
                         </div>
@@ -133,7 +153,7 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-             <div className="w-full text-center pb-28 pt-4">
+             <div className="w-full text-center py-4">
                 <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
                     Designed & Developed by Himanshu
                 </p>

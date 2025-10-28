@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MoreVertical, Edit, Share2, Trash2, Download, FileText, Copy, Loader, FileImage, FileQuestion } from 'lucide-react';
+import { MoreVertical, Edit, Share2, Trash2, Download, FileText, Copy, Loader, FileImage, FileQuestion, Link as LinkIcon } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Mood, Theme, Attachment } from '../types';
 import Header from './Header';
@@ -365,72 +365,88 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
     };
 
     const HeaderActions = (
-        <div className="relative">
-            <motion.button 
-                onClick={toggleMenu} 
-                className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
-                whileTap={{ scale: 0.9 }}
-                aria-label="More options"
-            >
-                <MoreVertical size={20} />
-            </motion.button>
+        <div className="flex items-center gap-1">
             <AnimatePresence>
-                {isMenuOpen && (
+                {entry.linkedSessionIds && entry.linkedSessionIds.length > 0 && (
                     <motion.div
-                        ref={menuRef}
-                        className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
-                        variants={menuVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="hidden"
-                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        className="flex items-center gap-1.5 p-2 rounded-full text-light-primary dark:text-dark-primary"
+                        aria-label={`${entry.linkedSessionIds.length} connections`}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
                     >
-                        <div className="p-2">
-                             <button onClick={handleEdit} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                <Edit size={16} />
-                                <span>Edit</span>
-                            </button>
-                             <button onClick={handleShare} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                <Share2 size={16} />
-                                <span>Share...</span>
-                            </button>
-                            <div className="h-[1px] bg-black/10 dark:bg-white/10 my-1 mx-2"></div>
-                             <button onClick={handleDelete} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md text-red-500 hover:bg-red-500/10 transition-colors">
-                                <Trash2 size={16} />
-                                <span>Delete</span>
-                            </button>
-                        </div>
+                        <LinkIcon size={18} />
+                        <span className="text-sm font-semibold">{entry.linkedSessionIds.length}</span>
                     </motion.div>
                 )}
             </AnimatePresence>
-             <AnimatePresence>
-                {isShareMenuOpen && (
-                    <motion.div
-                        ref={shareMenuRef}
-                        className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
-                        variants={menuVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="hidden"
-                        transition={{ duration: 0.2, ease: 'easeOut' }}
-                    >
-                        <div className="p-2">
-                             <button onClick={handleDownloadImage} disabled={isGenerating} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50">
-                                {isGenerating ? <Loader size={16} className="animate-spin" /> : <Download size={16} />}
-                                <span>Save as JPG</span>
-                            </button>
-                             <button onClick={handleSavePdf} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                <FileText size={16} />
-                                <span>Save as PDF</span>
-                            </button>
-                             <button onClick={handleCopyText} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                <Copy size={16} />
-                                <span>{isCopied ? 'Copied!' : 'Copy Text'}</span>
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <div className="relative">
+                <motion.button 
+                    onClick={toggleMenu} 
+                    className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
+                    whileTap={{ scale: 0.9 }}
+                    aria-label="More options"
+                >
+                    <MoreVertical size={20} />
+                </motion.button>
+                <AnimatePresence>
+                    {isMenuOpen && (
+                        <motion.div
+                            ref={menuRef}
+                            className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
+                            variants={menuVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                        >
+                            <div className="p-2">
+                                 <button onClick={handleEdit} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                    <Edit size={16} />
+                                    <span>Edit</span>
+                                </button>
+                                 <button onClick={handleShare} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                    <Share2 size={16} />
+                                    <span>Share...</span>
+                                </button>
+                                <div className="h-[1px] bg-black/10 dark:bg-white/10 my-1 mx-2"></div>
+                                 <button onClick={handleDelete} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md text-red-500 hover:bg-red-500/10 transition-colors">
+                                    <Trash2 size={16} />
+                                    <span>Delete</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+                 <AnimatePresence>
+                    {isShareMenuOpen && (
+                        <motion.div
+                            ref={shareMenuRef}
+                            className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
+                            variants={menuVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                        >
+                            <div className="p-2">
+                                 <button onClick={handleDownloadImage} disabled={isGenerating} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50">
+                                    {isGenerating ? <Loader size={16} className="animate-spin" /> : <Download size={16} />}
+                                    <span>Save as JPG</span>
+                                </button>
+                                 <button onClick={handleSavePdf} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                    <FileText size={16} />
+                                    <span>Save as PDF</span>
+                                </button>
+                                 <button onClick={handleCopyText} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                    <Copy size={16} />
+                                    <span>{isCopied ? 'Copied!' : 'Copy Text'}</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     );
 
@@ -441,15 +457,17 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
     return (
         <div className={`w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg ${fontClasses[selectedFontStyle]}`}>
             <Header 
-                title=""
+                title={entry.title || 'Untitled Entry'}
                 showBackButton 
                 onBack={navigateBack}
                 rightAction={HeaderActions}
             />
             <div className={`flex-grow w-full ${useFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} overflow-y-auto transition-all duration-300`}>
                 <div className="pb-24">
+                    <h1 className="text-3xl font-bold mt-4 mb-2 break-words">
+                        {entry.title || 'Untitled Entry'}
+                    </h1>
                     <div className="mb-6 border-b border-white/10 pb-4">
-                        <h1 className="text-3xl font-bold mb-2">{entry.title || 'Untitled Entry'}</h1>
                         <p className="font-medium text-light-text-secondary dark:text-dark-text-secondary">{formattedDate}</p>
                         <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{formattedTime}</p>
                     </div>
@@ -503,7 +521,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                     )}
                      {linkedSessions.length > 0 && (
                         <div className="mt-8 pt-6 border-t border-white/10">
-                            <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Linked Sessions</h2>
+                            <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Connections</h2>
                             <div className="space-y-3">
                                 {linkedSessions.map(session => (
                                     <div key={session.id} className="flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl">

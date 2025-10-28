@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TriangleAlert } from 'lucide-react';
+import { TriangleAlert, CheckCircle } from 'lucide-react';
 
 interface AlertModalProps {
   isOpen: boolean;
@@ -9,6 +8,7 @@ interface AlertModalProps {
   message: string;
   onClose: () => void;
   closeText?: string;
+  type?: 'alert' | 'success';
 }
 
 const AlertModal: React.FC<AlertModalProps> = ({
@@ -17,7 +17,22 @@ const AlertModal: React.FC<AlertModalProps> = ({
   message,
   onClose,
   closeText = 'OK',
+  type = 'alert',
 }) => {
+
+  const iconConfig = {
+    alert: {
+      icon: <TriangleAlert className="w-8 h-8 text-yellow-500" />,
+      bg: 'bg-yellow-500/10'
+    },
+    success: {
+      icon: <CheckCircle className="w-8 h-8 text-green-500" />,
+      bg: 'bg-green-500/10'
+    }
+  };
+
+  const currentConfig = iconConfig[type];
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -46,8 +61,8 @@ const AlertModal: React.FC<AlertModalProps> = ({
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
             <div className="flex justify-center mb-4">
-              <div className="p-3 bg-yellow-500/10 rounded-full">
-                <TriangleAlert className="w-8 h-8 text-yellow-500" />
+              <div className={`p-3 rounded-full ${currentConfig.bg}`}>
+                {currentConfig.icon}
               </div>
             </div>
             <h2 className="text-xl font-bold mb-2">{title}</h2>

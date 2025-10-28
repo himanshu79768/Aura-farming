@@ -61,6 +61,8 @@ export type HapticIntensity = 'off' | 'light' | 'medium';
 
 export type FocusMusic = 'None' | 'Rain Drops' | 'Cafe Murmur' | 'Forest Creek' | 'Ocean Waves' | 'Lofi Beats' | 'Singing Bowl' | 'Thunderstorm' | 'Wind Chimes' | 'Fireplace' | 'White Noise' | 'Zen Garden';
 
+export type AccentColor = 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'cyan' | 'indigo';
+
 export interface Settings {
   theme: Theme;
   sound: boolean;
@@ -71,6 +73,7 @@ export interface Settings {
   hapticIntensity: HapticIntensity;
   focusMusic: FocusMusic;
   gradientIntensity: number;
+  accentColor?: AccentColor;
 }
 
 export interface UserData extends Settings, UserProfile {

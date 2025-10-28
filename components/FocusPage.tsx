@@ -159,7 +159,7 @@ const FocusPage: React.FC = () => {
                         <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
                     </div>
                     <div className="w-full max-w-xs my-6">
-                        <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session (e.g., Chapter 1)" className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary"/>
+                        <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session (e.g., Chapter 1)" className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary"/>
                     </div>
                     <div className="flex space-x-2 mb-8 items-center justify-center h-10">
                         <AnimatePresence mode="wait">

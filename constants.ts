@@ -1,4 +1,4 @@
-import { Quote, FocusMusic } from './types';
+import { Quote, FocusMusic, AccentColor } from './types';
 
 export const INITIAL_QUOTES: Quote[] = [
   { id: '1', text: "You have the right to work, but never to the fruit of work.", author: "Bhagavad Gita" },
@@ -73,3 +73,17 @@ export const MUSIC_PRESETS: { name: FocusMusic, src: string }[] = [
     { name: 'White Noise', src: 'https://www.soundjay.com/misc/sounds/white-noise-1.mp3' },
     { name: 'Zen Garden', src: 'https://www.soundjay.com/nature/sounds/birds-1.mp3' },
 ];
+
+// Using HSL values for easy manipulation if needed. Format: 'H S% L%'
+export const ACCENT_COLORS: Record<AccentColor, { name: string; light: string; dark: string }> = {
+    blue: { name: 'Ocean Blue', light: '221 83% 53%', dark: '217 91% 60%' },
+    purple: { name: 'Amethyst', light: '262 82% 58%', dark: '262 82% 64%' },
+    pink: { name: 'Rose', light: '322 81% 55%', dark: '322 73% 62%' },
+    red: { name: 'Crimson', light: '0 84% 60%', dark: '0 84% 67%' },
+    orange: { name: 'Sunset', light: '25 95% 53%', dark: '25 95% 58%' },
+    yellow: { name: 'Marigold', light: '48 96% 53%', dark: '48 96% 58%' },
+    green: { name: 'Emerald', light: '142 71% 45%', dark: '142 63% 52%' },
+    teal: { name: 'Aqua', light: '162 80% 40%', dark: '162 72% 48%' },
+    cyan: { name: 'Sky', light: '184 89% 40%', dark: '184 89% 48%' },
+    indigo: { name: 'Twilight', light: '250 75% 62%', dark: '250 70% 68%' },
+};

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon } from 'lucide-react';
@@ -120,11 +122,11 @@ const JournalPage: React.FC = () => {
                             key={day.toISOString()}
                             onClick={() => handleDateClick(day)}
                             className={`relative w-9 h-9 flex items-center justify-center rounded-full transition-colors text-sm ${
-                                isSelected ? 'bg-blue-500 text-white font-semibold' : isToday ? 'bg-black/5 dark:bg-white/5' : 'hover:bg-black/5 dark:hover:bg-white/5'
+                                isSelected ? 'bg-light-primary dark:bg-dark-primary text-white font-semibold' : isToday ? 'bg-black/5 dark:bg-white/5' : 'hover:bg-black/5 dark:hover:bg-white/5'
                             }`}
                         >
                             <span>{day.getDate()}</span>
-                            {hasEntry && !isSelected && <div className="absolute bottom-1.5 w-1 h-1 bg-blue-500 rounded-full"></div>}
+                            {hasEntry && !isSelected && <div className="absolute bottom-1.5 w-1 h-1 bg-light-primary dark:bg-dark-primary rounded-full"></div>}
                         </button>
                     );
                 })}
@@ -139,7 +141,7 @@ const JournalPage: React.FC = () => {
                 rightAction={
                     <motion.button 
                         onClick={() => setShowCalendar(s => !s)}
-                        className={`p-2 rounded-full transition-colors ${showCalendar ? 'bg-blue-500/20 text-blue-500' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                        className={`p-2 rounded-full transition-colors ${showCalendar ? 'bg-light-primary/20 dark:bg-dark-primary/20 text-light-primary dark:text-dark-primary' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                         whileTap={{ scale: 0.9 }}
                     >
                         <Calendar size={20} />
@@ -162,7 +164,7 @@ const JournalPage: React.FC = () => {
                 </AnimatePresence>
                 <div className="pt-2 pb-2">
                     <SearchBar
-                        placeholder="Search content or linked sessions..."
+                        placeholder="Search content or connections..."
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
                     />
@@ -226,7 +228,7 @@ const JournalPage: React.FC = () => {
                                         whileTap={{ scale: 0.98 }}
                                     >
                                         <div className="flex items-center justify-between">
-                                            <p className="font-semibold truncate pr-2">{entry.title || 'Untitled Entry'}</p>
+                                            <p className="font-semibold truncate pr-2 text-lg">{entry.title || 'Untitled Entry'}</p>
                                             {entry.linkedSessionIds && entry.linkedSessionIds.length > 0 && (
                                                 <LinkIcon size={14} className="text-light-text-secondary dark:text-dark-text-secondary shrink-0" />
                                             )}
@@ -245,7 +247,7 @@ const JournalPage: React.FC = () => {
             </div>
              <motion.button
                 onClick={() => navigateTo('journalEntry')}
-                className="absolute bottom-28 right-6 w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg z-20"
+                className="absolute bottom-28 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 aria-label="New journal entry"

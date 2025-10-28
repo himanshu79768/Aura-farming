@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen } from 'lucide-react';
@@ -19,7 +20,7 @@ const LinkedJournalsPage: React.FC<LinkedJournalsPageProps> = ({ session }) => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header
-                title={session.name || 'Linked Journals'}
+                title={session.name || 'Connections'}
                 showBackButton
                 onBack={navigateBack}
             />
@@ -31,8 +32,8 @@ const LinkedJournalsPage: React.FC<LinkedJournalsPageProps> = ({ session }) => {
                         className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
                     >
                         <BookOpen className="w-12 h-12 mb-4" />
-                        <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No Linked Journals</h2>
-                        <p>You haven't linked any journal entries to this session yet.</p>
+                        <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No Connections</h2>
+                        <p>You haven't connected any journal entries to this session yet.</p>
                     </motion.div>
                 ) : (
                     <motion.div

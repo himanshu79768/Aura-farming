@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment } from './types';
+import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor } from './types';
 import HomePage from './components/HomePage';
 import FocusPage from './components/FocusPage';
 import QuotesPage from './components/QuotesPage';
@@ -14,7 +14,7 @@ import AuraCheckinPage from './components/AuraCheckinPage';
 import JournalPage from './components/JournalPage';
 import JournalEntryPage from './components/JournalEntryPage';
 import JournalViewPage from './components/JournalViewPage';
-import { INITIAL_QUOTES } from './constants';
+import { INITIAL_QUOTES, ACCENT_COLORS } from './constants';
 import TimerPill from './components/TimerPill';
 import DeleteZone from './components/DeleteZone';
 import FavoritesPage from './components/FavoritesPage';
@@ -71,7 +71,7 @@ interface AppContextType {
   logoutUser: () => void;
   loginUserByName: (name: string) => Promise<void>;
   showConfirmationModal: (options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => void;
-  showAlertModal: (options: { title: string; message: string; }) => void;
+  showAlertModal: (options: { title: string; message: string; type?: 'alert' | 'success' }) => void;
   currentUser: any | null;
 }
 
@@ -103,6 +103,7 @@ const DEFAULT_SETTINGS: Settings = {
     theme: Theme.Auto, sound: true, haptics: true, minimalism: false,
     focusSound: 'chime', appIcon: 'default', hapticIntensity: 'medium', focusMusic: 'Rain Drops',
     gradientIntensity: 75,
+    accentColor: 'blue',
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -149,10 +150,16 @@ export default function App() {
     confirmText: 'Confirm'
   });
 
-  const [alertModalState, setAlertModalState] = useState({
+  const [alertModalState, setAlertModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'alert' | 'success';
+  }>({
     isOpen: false,
     title: '',
     message: '',
+    type: 'alert',
   });
 
   // Fix: Moved showAlertModal and showConfirmationModal before their usage to prevent a 'used before declaration' error.
@@ -166,11 +173,12 @@ export default function App() {
     });
   }, []);
 
-  const showAlertModal = useCallback((options: { title: string; message: string; }) => {
+  const showAlertModal = useCallback((options: { title: string; message: string; type?: 'alert' | 'success' }) => {
     setAlertModalState({
         isOpen: true,
         title: options.title,
         message: options.message,
+        type: options.type || 'alert',
     });
   }, []);
 
@@ -203,6 +211,7 @@ export default function App() {
                 minimalism: data.minimalism ?? false, focusSound: data.focusSound || 'chime', appIcon: data.appIcon || 'default',
                 hapticIntensity: data.hapticIntensity || 'medium', focusMusic: data.focusMusic || 'Rain Drops',
                 gradientIntensity: data.gradientIntensity ?? 75,
+                accentColor: data.accentColor || 'blue',
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
@@ -337,6 +346,13 @@ export default function App() {
         document.documentElement.classList.toggle('dark', settings.theme === Theme.Auto ? isSystemDark : settings.theme === Theme.Dark);
     }
   }, [settings.theme, masterUid]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const color = ACCENT_COLORS[settings.accentColor || 'blue'];
+    root.style.setProperty('--accent-light', color.light);
+    root.style.setProperty('--accent-dark', color.dark);
+  }, [settings.accentColor]);
 
   const playSound = useCallback((sound: string) => settings.sound && console.log(`Playing sound: ${sound}`), [settings.sound]);
 
@@ -491,7 +507,7 @@ export default function App() {
 
     const success = await addJournalEntry(newEntry);
     if (success) {
-        showAlertModal({ title: "Entry Duplicated", message: "A copy of the journal entry has been created."});
+        showAlertModal({ title: "Entry Duplicated", message: "A copy of the journal entry has been created.", type: 'success' });
     }
     return success;
   };
@@ -682,6 +698,7 @@ export default function App() {
             title={alertModalState.title}
             message={alertModalState.message}
             onClose={handleAlertClose}
+            type={alertModalState.type}
         />
       </main>
     </AppContext.Provider>

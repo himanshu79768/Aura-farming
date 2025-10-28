@@ -194,7 +194,7 @@ const FocusHistoryPage: React.FC = () => {
                                         <p className="font-medium flex items-center gap-2">
                                             <span>{session.name || 'Focus Session'}</span>
                                             {linkedSessionIds.has(session.id) && (
-                                                <BookOpen size={14} className="text-blue-500 shrink-0" />
+                                                <BookOpen size={14} className="text-light-primary dark:text-dark-primary shrink-0" />
                                             )}
                                         </p>
                                         <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">

@@ -23,7 +23,7 @@ const SoundOptionsPage: React.FC = () => {
                         <h3 className="font-semibold">Master Sound</h3>
                         <label htmlFor="sound-toggle" className="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="sound-toggle" className="sr-only peer" checked={settings.sound} onChange={() => setSettings(s => ({ ...s, sound: !s.sound }))} />
-                            <div className="w-11 h-6 bg-black/10 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"></div>
+                            <div className="w-11 h-6 bg-black/10 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-primary dark:peer-checked:bg-dark-primary"></div>
                         </label>
                     </div>
 
@@ -39,7 +39,7 @@ const SoundOptionsPage: React.FC = () => {
                             <motion.button
                                 key={music.name}
                                 onClick={() => handleMusicSelect(music.name)}
-                                className={`w-full flex justify-between items-center text-left px-4 py-3 rounded-xl text-lg transition-colors ${settings.focusMusic === music.name ? 'font-semibold text-blue-500' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                className={`w-full flex justify-between items-center text-left px-4 py-3 rounded-xl text-lg transition-colors ${settings.focusMusic === music.name ? 'font-semibold text-light-primary dark:text-dark-primary' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                                 variants={{
                                     hidden: { opacity: 0, y: 10 },
                                     visible: { opacity: 1, y: 0 }
@@ -48,7 +48,7 @@ const SoundOptionsPage: React.FC = () => {
                                 <span>{music.name}</span>
                                 {settings.focusMusic === music.name && (
                                     <motion.div layoutId="selected-sound-check">
-                                        <Check className="w-6 h-6 text-blue-500" />
+                                        <Check className="w-6 h-6 text-light-primary dark:text-dark-primary" />
                                     </motion.div>
                                 )}
                             </motion.button>
