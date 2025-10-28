@@ -116,7 +116,7 @@ const FocusHistoryPage: React.FC = () => {
     };
 
     return (
-        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Focus History" showBackButton onBack={navigateBack} />
             <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 pt-2 flex-shrink-0">
                 <SearchBar
@@ -125,18 +125,18 @@ const FocusHistoryPage: React.FC = () => {
                     setSearchQuery={setFocusSearchQuery}
                 />
             </div>
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
                 {focusHistory.length === 0 ? (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24 md:pb-8"
+                        className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
                     >
                         <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No sessions yet.</h2>
                         <p>Complete a focus timer to see your history.</p>
                     </motion.div>
                 ) : (
-                    <div className="pt-2 pb-24 md:pb-8">
+                    <div className="pt-2 pb-24">
                         <div className="flex justify-between items-center mb-4 px-1">
                             <div className="flex items-center bg-light-glass dark:bg-dark-glass p-1 rounded-full border border-white/10">
                                 {(['7d', '30d', 'all'] as FilterRange[]).map(f => (

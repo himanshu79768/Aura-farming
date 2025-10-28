@@ -72,7 +72,7 @@ const BreathingPage: React.FC = () => {
     }
 
     return (
-        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Breathe" showBackButton onBack={navigateBack} />
             <div className="flex-grow flex flex-col items-center justify-center p-4 pb-24 text-center">
                 <div className="relative w-64 h-64 flex items-center justify-center">

@@ -105,7 +105,7 @@ const AuraCheckinPage: React.FC = () => {
     }
 
     return (
-        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Your Aura" showBackButton onBack={navigateBack} />
             <div className="flex-grow flex flex-col items-center justify-center p-6 text-center">
                 <AnimatePresence mode="wait">

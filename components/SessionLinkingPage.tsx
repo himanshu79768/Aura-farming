@@ -55,7 +55,7 @@ const SessionLinkingPage: React.FC<SessionLinkingPageProps> = ({ selectedIds, on
     );
 
     return (
-        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Link Sessions" showBackButton onBack={navigateBack} rightAction={HeaderActions} />
              <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 pt-2 flex-shrink-0">
                 <SearchBar
@@ -64,13 +64,13 @@ const SessionLinkingPage: React.FC<SessionLinkingPageProps> = ({ selectedIds, on
                     setSearchQuery={setSearchQuery}
                 />
             </div>
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
                 <div className="flex justify-start mb-2 px-1">
                     <button onClick={handleSelectAll} className="px-4 py-1.5 text-sm font-semibold text-blue-500 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                         {allFilteredSelected ? 'Deselect All' : 'Select All'}
                     </button>
                 </div>
-                <div className="space-y-3 pb-24 md:pb-8">
+                <div className="space-y-3 pb-24">
                     {filteredHistory.length > 0 ? (
                         filteredHistory.map(session => (
                             <motion.button

@@ -214,7 +214,7 @@ const QuotesPage: React.FC = () => {
                 <p className="mt-4 text-lg text-light-text-secondary dark:text-dark-text-secondary">- {currentQuote.author}</p>
                 </motion.div>
             </AnimatePresence>
-            <div className="absolute bottom-28 md:bottom-8 flex items-center justify-center w-full px-8 gap-4">
+            <div className="absolute bottom-28 flex items-center justify-center w-full px-8 gap-4">
                 <motion.button onClick={() => paginate(-1)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg" whileTap={{ scale: 0.9 }}><ChevronLeft /></motion.button>
                 
                 <div className="flex items-center bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg overflow-hidden">

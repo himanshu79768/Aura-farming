@@ -375,7 +375,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     );
 
     return (
-        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header 
                 title=""
                 showBackButton 
@@ -391,7 +391,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     className="w-full bg-transparent text-3xl font-bold focus:outline-none mb-4 pb-2 border-b border-white/10 placeholder:text-light-text-secondary/50 dark:placeholder:text-dark-text-secondary/50"
                     autoFocus={!!entry}
                 />
-                <div className="relative flex-grow w-full journal-editor-container">
+                <div className="relative flex-grow w-full journal-editor-container overflow-y-auto">
                     <div
                         ref={editorRef}
                         contentEditable={true}

@@ -91,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                         exit={{ opacity: 0, x: -10 }}
                     >
                         <ChevronLeft className="w-6 h-6" />
-                        <span className="text-lg hidden sm:inline">Back</span>
+                        <span className="text-lg">Back</span>
                     </motion.button>
                 )}
             </div>
@@ -99,7 +99,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
             {showCenteredMoodSelector ? (
                 <MoodSelector />
             ) : (
-                <div className="relative flex items-center justify-center max-w-full px-20">
+                <div className="relative flex items-center justify-center max-w-full">
                     {/* The actual visible title */}
                     <motion.h1 
                         key={title}

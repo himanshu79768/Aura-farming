@@ -150,7 +150,7 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
     );
 
     return (
-        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header 
                 title={currentAttachment.name} 
                 showBackButton 

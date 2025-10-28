@@ -428,15 +428,15 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
     );
 
     return (
-        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header 
                 title=""
                 showBackButton 
                 onBack={navigateBack}
                 rightAction={HeaderActions}
             />
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4">
-                <div className="pb-24 md:pb-8">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
+                <div className="pb-24">
                     <div className="mb-6 border-b border-white/10 pb-4">
                         <h1 className="text-3xl font-bold mb-2">{entry.title || 'Untitled Entry'}</h1>
                         <p className="font-medium text-light-text-secondary dark:text-dark-text-secondary">{formattedDate}</p>
