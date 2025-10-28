@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aura-cache-v2'; // Bumped version
+const CACHE_NAME = 'aura-cache-v3'; // Bumped version
 const urlsToCache = [
   '/',
   '/index.html',
@@ -8,6 +8,7 @@ const urlsToCache = [
 ];
 const API_HOSTS = [
     'generativelanguage.googleapis.com',
+    'firebasestorage.googleapis.com',
     'aura-1cc21-default-rtdb.firebaseio.com',
     'firebase.googleapis.com',
     'securetoken.googleapis.com',

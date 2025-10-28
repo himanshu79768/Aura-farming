@@ -18,23 +18,32 @@ export interface Quote {
   author: string;
 }
 
+export interface Attachment {
+  name: string;
+  type: string;
+  url: string;
+  storagePath: string;
+}
+
 export interface JournalEntry {
   id: string;
   date: string;
   title: string;
   content: string;
   createdAt?: any; // For Firestore serverTimestamp
+  linkedSessionIds?: string[];
+  attachments?: Attachment[];
 }
 
 export interface FocusSession {
-  id: string;
+  id:string;
   date: string;
   duration: number; // in seconds
   name?: string;
   createdAt?: any; // For Firestore serverTimestamp
 }
 
-export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'auraCheckin' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView';
+export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'auraCheckin' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView' | 'sessionLinking' | 'linkedJournals' | 'attachmentViewer';
 
 export interface UserProfile {
   name: string;

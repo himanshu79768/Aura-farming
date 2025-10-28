@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData } from './types';
+import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment } from './types';
 import HomePage from './components/HomePage';
 import FocusPage from './components/FocusPage';
 import QuotesPage from './components/QuotesPage';
@@ -24,10 +24,14 @@ import SoundOptionsPage from './components/SoundOptionsPage';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useVirtualKeyboard } from './hooks/useVirtualKeyboard';
 import AlertModal from './components/AlertModal';
+import SessionLinkingPage from './components/SessionLinkingPage';
+import LinkedJournalsPage from './components/LinkedJournalsPage';
+import AttachmentViewerPage from './components/AttachmentViewerPage';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
-    set, update, push, remove, serverTimestamp, query, orderByChild, equalTo, get
+    set, update, push, remove, serverTimestamp, query, orderByChild, equalTo, get,
+    storage, storageRef, deleteObject
 } = (window as any).firebase;
 
 interface AppContextType {
@@ -67,6 +71,8 @@ interface AppContextType {
   loginUserByName: (name: string) => Promise<void>;
   showConfirmationModal: (options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => void;
   showAlertModal: (options: { title: string; message: string; }) => void;
+  currentUser: any | null;
+  deleteAttachment: (attachment: Attachment) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -114,7 +120,7 @@ export default function App() {
 
   // App State
   const [currentView, setCurrentView] = useState<View>('home');
-  const [activeModal, setActiveModal] = useState<{ view: View; params?: any } | null>(null);
+  const [modalStack, setModalStack] = useState<{ view: View; params?: any }[]>([]);
   const [mood, setMood] = useState<Mood>(Mood.Calm);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -362,16 +368,28 @@ export default function App() {
   }, [timerState, sessionName, addFocusSession]);
   
   const navigateTo = (view: View, params?: any) => {
-    if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions'].includes(view)) {
-        setActiveModal({ view, params });
+    if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'].includes(view)) {
+        setModalStack(stack => [...stack, { view, params }]);
     } else {
+        setModalStack([]);
         setCurrentView(view);
     }
   };
+
   const navigateBack = () => {
-    if (activeModal?.view === 'focusAnalytics') setActiveModal({ view: 'focusHistory' });
-    else setActiveModal(null);
+      const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
+
+      if (currentModal?.view === 'focusAnalytics') {
+          setModalStack(stack => {
+              const newStack = stack.slice(0, -1);
+              newStack.push({ view: 'focusHistory' });
+              return newStack;
+          });
+      } else {
+           setModalStack(stack => stack.slice(0, -1));
+      }
   };
+
   const toggleFavorite = (id: string) => {
     if (!currentUser) return;
     vibrate();
@@ -397,6 +415,12 @@ export default function App() {
   };
   const updateJournalEntry = async (updatedEntry: JournalEntry): Promise<boolean> => {
     if (!currentUser) return false;
+    
+    // Optimistically update local state for instant UI feedback
+    setJournalEntries(prevEntries =>
+        prevEntries.map(e => e.id === updatedEntry.id ? updatedEntry : e)
+    );
+
     try {
         const { id, ...data } = updatedEntry;
         const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
@@ -405,12 +429,37 @@ export default function App() {
     } catch (error) {
         console.error("Error updating journal entry:", error);
         showAlertModal({ title: "Update Failed", message: "Could not update your entry. Please try again." });
+        // Note: The onValue listener will eventually correct the state if the update fails,
+        // so no explicit rollback is implemented here for simplicity.
         return false;
     }
   };
+
+  const deleteAttachment = async (attachment: Attachment) => {
+    try {
+        const fileRef = storageRef(storage, attachment.storagePath);
+        await deleteObject(fileRef);
+        return true;
+    } catch (error: any) {
+        if (error.code !== 'storage/object-not-found') {
+            console.error("Error deleting attachment from storage:", error);
+        }
+        // It's okay if it's already gone, so we don't show an error.
+        return true; 
+    }
+  };
+
   const deleteJournalEntry = async (id: string): Promise<boolean> => {
     if (!currentUser) return false;
+
+    const entryToDelete = journalEntries.find(e => e.id === id);
+
     try {
+        if (entryToDelete && entryToDelete.attachments) {
+            const deletePromises = entryToDelete.attachments.map(att => deleteAttachment(att));
+            await Promise.all(deletePromises);
+        }
+
         const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
         await remove(entryRef);
         return true;
@@ -486,21 +535,6 @@ export default function App() {
       default: return <HomePage />;
     }
   };
-  const renderModal = () => {
-    if (!activeModal) return null;
-    switch (activeModal.view) {
-      case 'settings': return <SettingsPage />;
-      case 'breathing': return <BreathingPage />;
-      case 'auraCheckin': return <AuraCheckinPage />;
-      case 'journalEntry': return <JournalEntryPage {...activeModal.params} />;
-      case 'journalView': return <JournalViewPage {...activeModal.params} />;
-      case 'favorites': return <FavoritesPage />;
-      case 'focusHistory': return <FocusHistoryPage />;
-      case 'focusAnalytics': return <FocusAnalyticsPage />;
-      case 'soundOptions': return <SoundOptionsPage />;
-      default: return null;
-    }
-  }
 
   if (isLoading) {
     return <div className="w-screen h-screen bg-light-bg dark:bg-dark-bg" />;
@@ -518,7 +552,8 @@ export default function App() {
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
         focusSearchQuery, setFocusSearchQuery,
         logoutUser, loginUserByName,
-        showConfirmationModal, showAlertModal
+        showConfirmationModal, showAlertModal,
+        currentUser, deleteAttachment,
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
@@ -542,7 +577,67 @@ export default function App() {
                     ></div>
                     
                     <AnimatePresence mode="wait"><motion.div key={currentView} variants={pageVariants} initial="initial" animate="in" exit="out" transition={pageTransition} className="w-full h-full">{renderView()}</motion.div></AnimatePresence>
-                    <AnimatePresence>{activeModal && (<motion.div key={activeModal.view} variants={modalVariants} initial="initial" animate="in" exit="out" transition={modalTransition} className="absolute inset-0 z-30 bg-light-bg dark:bg-dark-bg">{renderModal()}</motion.div>)}</AnimatePresence>
+                    
+                    <AnimatePresence>
+                        {modalStack.map((modal, index) => {
+                            let modalContent = null;
+                            switch (modal.view) {
+                                case 'settings':
+                                    modalContent = <SettingsPage />;
+                                    break;
+                                case 'breathing':
+                                    modalContent = <BreathingPage />;
+                                    break;
+                                case 'auraCheckin':
+                                    modalContent = <AuraCheckinPage />;
+                                    break;
+                                case 'journalEntry':
+                                    modalContent = <JournalEntryPage {...modal.params} />;
+                                    break;
+                                case 'journalView':
+                                    modalContent = <JournalViewPage {...modal.params} />;
+                                    break;
+                                case 'favorites':
+                                    modalContent = <FavoritesPage />;
+                                    break;
+                                case 'focusHistory':
+                                    modalContent = <FocusHistoryPage />;
+                                    break;
+                                case 'focusAnalytics':
+                                    modalContent = <FocusAnalyticsPage />;
+                                    break;
+                                case 'soundOptions':
+                                    modalContent = <SoundOptionsPage />;
+                                    break;
+                                case 'sessionLinking':
+                                    modalContent = <SessionLinkingPage {...modal.params} />;
+                                    break;
+                                case 'linkedJournals':
+                                    modalContent = <LinkedJournalsPage {...modal.params} />;
+                                    break;
+                                case 'attachmentViewer':
+                                    modalContent = <AttachmentViewerPage {...modal.params} />;
+                                    break;
+                            }
+
+                            if (!modalContent) return null;
+
+                            return (
+                                <motion.div
+                                    key={modal.view + index}
+                                    className="absolute inset-0 bg-light-bg dark:bg-dark-bg"
+                                    variants={modalVariants}
+                                    initial="initial"
+                                    animate="in"
+                                    exit="out"
+                                    transition={modalTransition}
+                                    style={{ zIndex: 30 + index }}
+                                >
+                                    {modalContent}
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
                 </motion.div>
             )}
         </AnimatePresence>
@@ -552,7 +647,7 @@ export default function App() {
                 <AnimatePresence>{timerState.isActive && currentView !== 'focus' && (<TimerPill constraintsRef={constraintsRef} />)}</AnimatePresence>
                 <AnimatePresence>{isPillDragging && <DeleteZone />}</AnimatePresence>
                 <AnimatePresence>
-                  {!isKeyboardOpen && !activeModal && (
+                  {!isKeyboardOpen && modalStack.length === 0 && (
                     <motion.div
                       initial={{ y: '100%' }}
                       animate={{ y: '0%' }}

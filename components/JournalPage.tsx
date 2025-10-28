@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry } from '../types';
 import Header from './Header';
+import SearchBar from './SearchBar';
 
 const JournalPage: React.FC = () => {
-    const { journalEntries, navigateTo } = useAppContext();
+    const { journalEntries, navigateTo, focusHistory } = useAppContext();
     const [searchQuery, setSearchQuery] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
@@ -26,11 +27,36 @@ const JournalPage: React.FC = () => {
         if (!searchQuery.trim()) {
             return entries;
         }
-        return entries.filter(entry =>
-            entry.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (entry.title && entry.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-    }, [journalEntries, searchQuery, selectedDate]);
+
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        
+        // Create a map of session IDs to session names for efficient lookup
+        const sessionNameMap = new Map<string, string>();
+        focusHistory.forEach(session => {
+            if (session.name) {
+                sessionNameMap.set(session.id, session.name.toLowerCase());
+            }
+        });
+
+        return entries.filter(entry => {
+            // 1. Check title and content
+            if (entry.title?.toLowerCase().includes(lowerCaseQuery) || entry.content.toLowerCase().includes(lowerCaseQuery)) {
+                return true;
+            }
+
+            // 2. Check linked session names
+            if (entry.linkedSessionIds) {
+                for (const sessionId of entry.linkedSessionIds) {
+                    const sessionName = sessionNameMap.get(sessionId);
+                    if (sessionName && sessionName.includes(lowerCaseQuery)) {
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        });
+    }, [journalEntries, searchQuery, selectedDate, focusHistory]);
     
     // Fix: Use a generic argument with `reduce` to correctly type the accumulator and ensure proper type inference for `groupedEntries`.
     const groupedEntries = filteredEntries.reduce<Record<string, JournalEntry[]>>((acc, entry) => {
@@ -120,49 +146,46 @@ const JournalPage: React.FC = () => {
                     </motion.button>
                 }
             />
-            <AnimatePresence>
-                {showCalendar && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}
-                        className="overflow-hidden w-full max-w-md mx-auto px-4"
-                    >
-                       {calendarView}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-            <div className="w-full max-w-md mx-auto px-4 pt-2 pb-2">
-                <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-light-text-secondary dark:text-dark-text-secondary pointer-events-none" />
-                    <input
-                        type="text"
-                        placeholder="Search journal..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-11 pr-4 py-2.5 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary"
+            <div className="w-full max-w-md mx-auto px-4 flex-shrink-0">
+                <AnimatePresence>
+                    {showCalendar && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}
+                            className="overflow-hidden"
+                        >
+                           {calendarView}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+                <div className="pt-2 pb-2">
+                    <SearchBar
+                        placeholder="Search content or linked sessions..."
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
                     />
                 </div>
+                 {selectedDate && (
+                    <div className="pt-1 pb-1">
+                        <motion.div 
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center justify-center"
+                        >
+                            <div className="flex items-center gap-2 px-3 py-1 bg-light-glass dark:bg-dark-glass rounded-full border border-white/10 text-xs">
+                                <span>
+                                    Showing entries for {selectedDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                                </span>
+                                <button onClick={() => setSelectedDate(null)} className="p-0.5 rounded-full bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20">
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
             </div>
-             {selectedDate && (
-                <div className="w-full max-w-md mx-auto px-4 pt-1 pb-1">
-                    <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center justify-center"
-                    >
-                        <div className="flex items-center gap-2 px-3 py-1 bg-light-glass dark:bg-dark-glass rounded-full border border-white/10 text-xs">
-                            <span>
-                                Showing entries for {selectedDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
-                            </span>
-                            <button onClick={() => setSelectedDate(null)} className="p-0.5 rounded-full bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20">
-                                <X size={12} />
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
             <div className="flex-grow w-full max-w-md mx-auto overflow-y-auto">
                 <AnimatePresence>
                     {journalEntries.length === 0 ? (
@@ -202,9 +225,14 @@ const JournalPage: React.FC = () => {
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
                                     >
-                                        <p className="font-semibold truncate">{entry.title || 'Untitled Entry'}</p>
+                                        <div className="flex items-center justify-between">
+                                            <p className="font-semibold truncate pr-2">{entry.title || 'Untitled Entry'}</p>
+                                            {entry.linkedSessionIds && entry.linkedSessionIds.length > 0 && (
+                                                <LinkIcon size={14} className="text-light-text-secondary dark:text-dark-text-secondary shrink-0" />
+                                            )}
+                                        </div>
                                         <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
-                                            {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                            {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}
                                         </p>
                                     </motion.button>
                                 ))}

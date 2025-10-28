@@ -134,12 +134,13 @@
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
       import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
       import { getDatabase, ref, onValue, set, update, push, remove, serverTimestamp, query, orderByChild, equalTo, get } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+      import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBoNMQW3bHxQ_tLBOQBPsS7y7QFlGr77eA",
         authDomain: "aura-1cc21.firebaseapp.com",
         projectId: "aura-1cc21",
-        storageBucket: "aura-1cc21.firebasestorage.app",
+        storageBucket: "aura-1cc21.appspot.com",
         messagingSenderId: "881767410249",
         appId: "1:881767410249:web:ef5409c264bbd70d67ad98",
         measurementId: "G-PE2WBETQDB",
@@ -152,6 +153,7 @@
       window.firebase = {
         auth: auth,
         db: getDatabase(app),
+        storage: getStorage(app),
         signInAnonymously: () => signInAnonymously(auth),
         signOut: () => signOut(auth),
         onAuthStateChanged,
@@ -165,7 +167,11 @@
         query,
         orderByChild,
         equalTo,
-        get
+        get,
+        storageRef,
+        uploadBytes,
+        getDownloadURL,
+        deleteObject,
       };
     </script>
     <script type="module" src="/index.tsx"></script>

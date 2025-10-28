@@ -1,19 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Trash2, Loader, Heading2, List, ListOrdered, Minus } from 'lucide-react';
+import { Sparkles, Trash2, Loader, Heading2, List, ListOrdered, Minus, Link as LinkIcon, Paperclip, LoaderCircle } from 'lucide-react';
 import { useAppContext } from '../App';
-import { JournalEntry } from '../types';
+import { JournalEntry, Attachment } from '../types';
 import { fetchJournalPrompt } from '../services/geminiService';
 import Header from './Header';
+import AttachmentPreview from './AttachmentPreview';
 
 interface JournalEntryPageProps {
     entry?: JournalEntry;
 }
 
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
-    const { navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, vibrate, showConfirmationModal } = useAppContext();
+    const { 
+        navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, vibrate, 
+        showConfirmationModal, navigateTo, currentUser, showAlertModal, deleteAttachment 
+    } = useAppContext();
+
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [linkedSessionIds, setLinkedSessionIds] = useState<string[]>([]);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
     const [isPromptLoading, setIsPromptLoading] = useState(false);
     
     const [showCommandPopup, setShowCommandPopup] = useState(false);
@@ -21,11 +29,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
     const editorRef = useRef<HTMLDivElement>(null);
     const hasSetInitialContent = useRef(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
 
     useEffect(() => {
         if (entry) {
             setTitle(entry.title || '');
             setContent(entry.content);
+            setLinkedSessionIds(entry.linkedSessionIds || []);
+            setAttachments(entry.attachments || []);
         }
     }, [entry]);
 
@@ -39,20 +51,35 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
     const handleSave = async () => {
         vibrate('medium');
-        const currentContent = editorRef.current?.innerHTML || '';
-        const currentText = editorRef.current?.innerText || '';
+        const currentContent = editorRef.current?.innerHTML.trim() || '';
+        const currentText = editorRef.current?.innerText.trim() || '';
         
-        if (currentText.trim() || title.trim()) {
-            const entryTitle = title.trim() || currentText.trim().split('\n')[0].substring(0, 50);
+        if (currentText || title.trim() || attachments.length > 0) {
+            const entryTitle = title.trim() || currentText.split('\n')[0].substring(0, 50) || "Journal Entry";
+            let success = false;
 
-            const success = entry
-                ? await updateJournalEntry({ ...entry, title: entryTitle, content: currentContent.trim() })
-                : await addJournalEntry({
+            if (entry) {
+                // Update existing entry
+                const updatedEntry: JournalEntry = {
+                    ...entry,
+                    title: entryTitle,
+                    content: currentContent,
+                    linkedSessionIds: linkedSessionIds,
+                    attachments: attachments,
+                };
+                success = await updateJournalEntry(updatedEntry);
+            } else {
+                // Add new entry
+                const newEntry: Omit<JournalEntry, 'id' | 'createdAt'> = {
                     date: new Date().toISOString(),
                     title: entryTitle,
-                    content: currentContent.trim()
-                });
-
+                    content: currentContent,
+                    linkedSessionIds: linkedSessionIds,
+                    attachments: attachments,
+                };
+                success = await addJournalEntry(newEntry);
+            }
+            
             if (success) {
                 navigateBack();
             }
@@ -63,7 +90,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         if (entry) {
             showConfirmationModal({
                 title: 'Delete Entry?',
-                message: 'This action cannot be undone. Are you sure you want to permanently delete this journal entry?',
+                message: 'This action cannot be undone. Are you sure you want to permanently delete this journal entry and all its attachments?',
                 confirmText: 'Delete',
                 onConfirm: async () => {
                     vibrate('heavy');
@@ -74,6 +101,56 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     }
                 }
             });
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            handleUpload(file);
+        }
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+    
+    const handleUpload = async (file: File) => {
+        if (!currentUser) return;
+        setIsUploading(true);
+    
+        const { storage, storageRef, uploadBytes, getDownloadURL } = (window as any).firebase;
+    
+        const entryId = entry?.id || Date.now().toString();
+        const storagePath = `attachments/${currentUser.uid}/${entryId}/${Date.now()}-${file.name}`;
+        const fileRef = storageRef(storage, storagePath);
+    
+        try {
+            const snapshot = await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(snapshot.ref);
+    
+            const newAttachment: Attachment = {
+                name: file.name,
+                type: file.type || 'application/octet-stream',
+                url: url,
+                storagePath: storagePath,
+            };
+    
+            setAttachments(prev => [...prev, newAttachment]);
+    
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            showAlertModal({ title: "Upload Failed", message: "Could not upload your file. Please try again." });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleRemoveAttachment = async (attachmentToRemove: Attachment) => {
+        setAttachments(prev => prev.filter(att => att.storagePath !== attachmentToRemove.storagePath));
+        const success = await deleteAttachment(attachmentToRemove);
+        if (!success) {
+            setAttachments(prev => [...prev, attachmentToRemove]);
+            showAlertModal({ title: "Delete Failed", message: "Could not remove the attachment. Please try again." });
         }
     };
     
@@ -193,9 +270,22 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         { cmd: 'numlist', icon: ListOrdered, label: 'Numbered List', desc: 'Create a numbered list' },
         { cmd: 'hr', icon: Minus, label: 'Divider', desc: 'Insert a horizontal line' },
     ];
+    
+    const handleLinkSession = () => {
+        navigateTo('sessionLinking', {
+            selectedIds: linkedSessionIds,
+            onSave: (newSelectedIds: string[]) => {
+                setLinkedSessionIds(newSelectedIds);
+            },
+        });
+    };
 
     const HeaderActions = (
         <div className="flex items-center gap-2">
+             <button onClick={handleLinkSession} className="flex items-center gap-1.5 p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+                <LinkIcon className="w-5 h-5" />
+                {linkedSessionIds.length > 0 && <span className="text-xs font-semibold">({linkedSessionIds.length})</span>}
+            </button>
             {entry && (
                 <button onClick={handleDelete} className="p-2 text-red-500 rounded-full hover:bg-red-500/10 transition-colors">
                    <Trash2 className="w-5 h-5" />
@@ -203,7 +293,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             )}
             <button
                 onClick={handleSave}
-                disabled={!content.trim() && !title.trim()}
+                disabled={!content.trim() && !title.trim() && attachments.length === 0}
                 className="px-4 py-1.5 text-base font-semibold bg-blue-500 text-white rounded-full shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
                 Save
@@ -214,7 +304,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header 
-                title={entry ? 'Edit Entry' : 'New Entry'}
+                title=""
                 showBackButton 
                 onBack={navigateBack}
                 rightAction={HeaderActions}
@@ -265,7 +355,33 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         )}
                     </AnimatePresence>
                 </div>
-                <div className="flex items-center justify-start py-4 flex-shrink-0">
+
+                <div className="flex-shrink-0 pt-4">
+                    <AnimatePresence>
+                        {attachments.length > 0 && (
+                            <motion.div
+                                className="flex flex-wrap gap-2"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                            >
+                                {attachments.map(att => <AttachmentPreview key={att.storagePath} attachment={att} onRemove={handleRemoveAttachment} />)}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                    <AnimatePresence>
+                        {isUploading && (
+                            <motion.div
+                                className="flex items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary mt-2"
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            >
+                                <LoaderCircle size={16} className="animate-spin" />
+                                <span>Uploading...</span>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                <div className="relative flex-shrink-0 py-4 flex items-center justify-between">
                     <button
                         onClick={handleGetPrompt}
                         disabled={isPromptLoading}
@@ -274,6 +390,18 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         {isPromptLoading ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-400" />}
                         Get a prompt
                     </button>
+
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".jpg,.jpeg,.png,.pdf,.ppt,.pptx" style={{ display: 'none' }} />
+                    <motion.button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="w-12 h-12 bg-light-glass dark:bg-dark-glass rounded-full flex items-center justify-center shadow-lg border border-white/20 disabled:opacity-50"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        aria-label="Attach file"
+                    >
+                        <Paperclip size={24} />
+                    </motion.button>
                 </div>
             </div>
             <style>{`

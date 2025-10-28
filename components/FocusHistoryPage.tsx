@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Timer, BarChart, Clock, Download, Search } from 'lucide-react';
+import { Timer, BarChart, Clock, Download, BookOpen } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
+import SearchBar from './SearchBar';
 
 interface SummaryCardProps {
     icon: React.ReactNode;
@@ -51,8 +52,16 @@ const formatTotalTime = (totalSeconds: number) => {
 type FilterRange = '7d' | '30d' | 'all';
 
 const FocusHistoryPage: React.FC = () => {
-    const { focusHistory, navigateBack, navigateTo, focusSearchQuery, setFocusSearchQuery } = useAppContext();
+    const { focusHistory, navigateBack, navigateTo, focusSearchQuery, setFocusSearchQuery, journalEntries } = useAppContext();
     const [filter, setFilter] = useState<FilterRange>('all');
+
+    const linkedSessionIds = useMemo(() => {
+        const ids = new Set<string>();
+        journalEntries.forEach(entry => {
+            entry.linkedSessionIds?.forEach(id => ids.add(id));
+        });
+        return ids;
+    }, [journalEntries]);
 
     const filteredHistory = useMemo(() => {
         let dateFiltered = focusHistory;
@@ -109,17 +118,12 @@ const FocusHistoryPage: React.FC = () => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Focus History" showBackButton onBack={navigateBack} />
-            <div className="w-full max-w-md mx-auto px-4 pt-2">
-                <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-light-text-secondary dark:text-dark-text-secondary pointer-events-none" />
-                    <input
-                        type="text"
-                        placeholder="Search sessions..."
-                        value={focusSearchQuery}
-                        onChange={(e) => setFocusSearchQuery(e.target.value)}
-                        className="w-full pl-11 pr-4 py-2.5 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary"
-                    />
-                </div>
+            <div className="w-full max-w-md mx-auto px-4 pt-2 flex-shrink-0">
+                <SearchBar
+                    placeholder="Search sessions..."
+                    searchQuery={focusSearchQuery}
+                    setSearchQuery={setFocusSearchQuery}
+                />
             </div>
             <div className="flex-grow w-full max-w-md mx-auto p-4 overflow-y-auto">
                 {focusHistory.length === 0 ? (
@@ -175,17 +179,24 @@ const FocusHistoryPage: React.FC = () => {
                             variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
                         >
                             {filteredHistory.map(session => (
-                                <motion.div
+                                <motion.button
                                     key={session.id}
-                                    className="flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl"
+                                    onClick={() => navigateTo('linkedJournals', { session })}
+                                    className="w-full flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl text-left"
                                     variants={{
                                         hidden: { opacity: 0, x: -20 },
                                         visible: { opacity: 1, x: 0 }
                                     }}
+                                    whileTap={{ scale: 0.98 }}
                                     layout
                                 >
                                     <div>
-                                        <p className="font-medium">{session.name || 'Focus Session'}</p>
+                                        <p className="font-medium flex items-center gap-2">
+                                            <span>{session.name || 'Focus Session'}</span>
+                                            {linkedSessionIds.has(session.id) && (
+                                                <BookOpen size={14} className="text-blue-500 shrink-0" />
+                                            )}
+                                        </p>
                                         <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
                                             {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, {new Date(session.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                                         </p>
@@ -193,7 +204,7 @@ const FocusHistoryPage: React.FC = () => {
                                     <div className="font-medium text-right">
                                         {Math.round(session.duration / 60)} min
                                     </div>
-                                </motion.div>
+                                </motion.button>
                             ))}
                         </motion.div>
                     </div>

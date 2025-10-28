@@ -4,6 +4,7 @@ import { MoreVertical, Edit, Share2, Trash2, Download, FileText, Copy, Loader } 
 import { useAppContext } from '../App';
 import { JournalEntry, Mood, Theme } from '../types';
 import Header from './Header';
+import AttachmentPreview from './AttachmentPreview';
 
 const moodColors: Record<Mood, { gradient: [string, string, string] }> = {
     [Mood.Calm]: { gradient: ['#3b82f6', '#60a5fa', '#818cf8'] },
@@ -175,8 +176,26 @@ interface JournalViewPageProps {
     entry: JournalEntry;
 }
 
-const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry }) => {
-    const { navigateBack, navigateTo, deleteJournalEntry, showConfirmationModal, vibrate, mood, settings, showAlertModal } = useAppContext();
+const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }) => {
+    const { 
+        navigateBack, 
+        navigateTo, 
+        deleteJournalEntry, 
+        showConfirmationModal, 
+        vibrate, 
+        mood, 
+        settings, 
+        showAlertModal, 
+        focusHistory,
+        journalEntries
+    } = useAppContext();
+
+    // Find the most up-to-date version of the entry from the global state to prevent stale data.
+    const entry = useMemo(() => 
+        journalEntries.find(e => e.id === initialEntry.id) || initialEntry,
+        [journalEntries, initialEntry]
+    );
+
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -184,6 +203,11 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry }) => {
 
     const menuRef = useRef<HTMLDivElement>(null);
     const shareMenuRef = useRef<HTMLDivElement>(null);
+
+    const linkedSessions = useMemo(() => {
+        if (!entry.linkedSessionIds || !focusHistory) return [];
+        return focusHistory.filter(session => entry.linkedSessionIds!.includes(session.id));
+    }, [entry.linkedSessionIds, focusHistory]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -416,6 +440,40 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry }) => {
                         className="journal-view-content text-lg leading-relaxed"
                         dangerouslySetInnerHTML={{ __html: entry.content }}
                     />
+                    {entry.attachments && entry.attachments.length > 0 && (
+                        <div className="mt-8 pt-6 border-t border-white/10">
+                            <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
+                            <div className="flex flex-wrap gap-2">
+                                {entry.attachments.map(att => (
+                                    <AttachmentPreview
+                                        key={att.storagePath}
+                                        attachment={att}
+                                        onClick={() => navigateTo('attachmentViewer', { attachment: att })}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                     {linkedSessions.length > 0 && (
+                        <div className="mt-8 pt-6 border-t border-white/10">
+                            <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Linked Sessions</h2>
+                            <div className="space-y-3">
+                                {linkedSessions.map(session => (
+                                    <div key={session.id} className="flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl">
+                                        <div>
+                                            <p className="font-medium">{session.name || 'Focus Session'}</p>
+                                            <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
+                                                {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                            </p>
+                                        </div>
+                                        <div className="font-medium text-right">
+                                            {Math.round(session.duration / 60)} min
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
              <style>{`
