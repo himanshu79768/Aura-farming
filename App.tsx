@@ -13,7 +13,7 @@ import BottomNav from './components/BottomNav';
 import AuraCheckinPage from './components/AuraCheckinPage';
 import JournalPage from './components/JournalPage';
 import JournalEntryPage from './components/JournalEntryPage';
-import { fetchQuotes } from './services/geminiService';
+import JournalViewPage from './components/JournalViewPage';
 import { INITIAL_QUOTES } from './constants';
 import TimerPill from './components/TimerPill';
 import DeleteZone from './components/DeleteZone';
@@ -147,20 +147,6 @@ export default function App() {
     title: '',
     message: '',
   });
-  
-  useEffect(() => {
-    const loadInitialData = async () => {
-        const geminiQuotes = await fetchQuotes();
-        if (geminiQuotes && geminiQuotes.length > 0) {
-            // Combine initial quotes with fetched quotes, giving priority to fetched ones
-            const combined = [...geminiQuotes, ...INITIAL_QUOTES];
-            // Remove duplicates based on text content
-            const uniqueQuotes = Array.from(new Map(combined.map(q => [q.text.toLowerCase(), q])).values());
-            setQuotes(uniqueQuotes);
-        }
-    };
-    loadInitialData();
-  }, []); // Empty dependency array means this runs once on mount.
 
   // --- Firebase Auth & Data Sync ---
   useEffect(() => {
@@ -376,7 +362,7 @@ export default function App() {
   }, [timerState, sessionName, addFocusSession]);
   
   const navigateTo = (view: View, params?: any) => {
-    if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions'].includes(view)) {
+    if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions'].includes(view)) {
         setActiveModal({ view, params });
     } else {
         setCurrentView(view);
@@ -507,6 +493,7 @@ export default function App() {
       case 'breathing': return <BreathingPage />;
       case 'auraCheckin': return <AuraCheckinPage />;
       case 'journalEntry': return <JournalEntryPage {...activeModal.params} />;
+      case 'journalView': return <JournalViewPage {...activeModal.params} />;
       case 'favorites': return <FavoritesPage />;
       case 'focusHistory': return <FocusHistoryPage />;
       case 'focusAnalytics': return <FocusAnalyticsPage />;
@@ -565,7 +552,7 @@ export default function App() {
                 <AnimatePresence>{timerState.isActive && currentView !== 'focus' && (<TimerPill constraintsRef={constraintsRef} />)}</AnimatePresence>
                 <AnimatePresence>{isPillDragging && <DeleteZone />}</AnimatePresence>
                 <AnimatePresence>
-                  {!isKeyboardOpen && (
+                  {!isKeyboardOpen && !activeModal && (
                     <motion.div
                       initial={{ y: '100%' }}
                       animate={{ y: '0%' }}

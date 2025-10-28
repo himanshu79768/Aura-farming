@@ -21,6 +21,7 @@ export interface Quote {
 export interface JournalEntry {
   id: string;
   date: string;
+  title: string;
   content: string;
   createdAt?: any; // For Firestore serverTimestamp
 }
@@ -33,7 +34,7 @@ export interface FocusSession {
   createdAt?: any; // For Firestore serverTimestamp
 }
 
-export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'auraCheckin' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions';
+export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'auraCheckin' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView';
 
 export interface UserProfile {
   name: string;
