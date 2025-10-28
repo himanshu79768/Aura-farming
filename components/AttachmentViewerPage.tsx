@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Header from './Header';
 import { useAppContext } from '../App';
@@ -32,7 +32,10 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
     const { navigateBack } = useAppContext();
     const [[page, direction], setPage] = useState([startIndex, 0]);
     const [imageScale, setImageScale] = useState(1);
+    
     const containerRef = useRef<HTMLDivElement>(null);
+    const imageRef = useRef<HTMLImageElement>(null);
+    const [dragConstraints, setDragConstraints] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
     
     const currentIndex = page;
     const currentAttachment = attachments[currentIndex];
@@ -40,6 +43,47 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
     useEffect(() => {
         setImageScale(1); // Reset scale on page change
     }, [page]);
+
+    const calculateConstraints = useCallback(() => {
+        if (imageScale <= 1 || !containerRef.current || !imageRef.current) {
+            setDragConstraints({ top: 0, left: 0, right: 0, bottom: 0 });
+            return;
+        }
+
+        const container = containerRef.current;
+        const image = imageRef.current;
+
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+
+        // Get the rendered size of the image, which accounts for `object-contain`
+        const displayedWidth = image.clientWidth;
+        const displayedHeight = image.clientHeight;
+
+        const scaledWidth = displayedWidth * imageScale;
+        const scaledHeight = displayedHeight * imageScale;
+
+        const overflowX = Math.max(0, (scaledWidth - containerWidth) / 2);
+        const overflowY = Math.max(0, (scaledHeight - containerHeight) / 2);
+
+        setDragConstraints({
+            left: -overflowX,
+            right: overflowX,
+            top: -overflowY,
+            bottom: overflowY,
+        });
+    }, [imageScale]);
+
+    useEffect(() => {
+        // A timeout ensures the DOM is updated before we measure.
+        const timeoutId = setTimeout(calculateConstraints, 0);
+        
+        window.addEventListener('resize', calculateConstraints);
+        return () => {
+            clearTimeout(timeoutId);
+            window.removeEventListener('resize', calculateConstraints);
+        };
+    }, [calculateConstraints, page]);
 
     const zoomInImage = () => setImageScale(s => s + 0.2);
     const zoomOutImage = () => setImageScale(s => Math.max(0.2, s - 0.2));
@@ -69,7 +113,8 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
         if (type.startsWith('image/')) {
             return (
                 <div ref={containerRef} className="w-full h-full flex items-center justify-center overflow-hidden">
-                    <motion.img 
+                    <motion.img
+                        ref={imageRef}
                         src={attachment.data} 
                         alt={attachment.name} 
                         className="max-w-full max-h-full object-contain"
@@ -79,7 +124,7 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
                         }}
                         whileTap={{ cursor: imageScale > 1 ? 'grabbing' : 'auto' }}
                         drag={imageScale > 1}
-                        dragConstraints={containerRef}
+                        dragConstraints={dragConstraints}
                         dragElastic={0.1}
                     />
                 </div>
@@ -96,7 +141,7 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
                 <p className="text-light-text-secondary dark:text-dark-text-secondary">{attachment.name}</p>
             </div>
         );
-    }, [page, attachments, imageScale]);
+    }, [page, attachments, imageScale, dragConstraints]);
     
     const DownloadButton = (
          <a href={currentAttachment.data} download={currentAttachment.name} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
