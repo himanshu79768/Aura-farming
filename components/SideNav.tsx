@@ -51,7 +51,7 @@ const SideNav: React.FC<SideNavProps> = ({ currentView, navigateTo }) => {
 
   return (
     <motion.nav 
-      className="hidden md:flex flex-col fixed top-0 left-0 h-full w-64 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-lg border-r border-white/20 dark:border-white/10 p-4 z-20"
+      className="hidden md:flex flex-col h-full w-64 flex-shrink-0 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-lg border-r border-white/20 dark:border-white/10 p-4 z-20"
       initial={{ x: '-100%' }}
       animate={{ x: '0%' }}
       transition={{ type: 'tween', ease: 'easeInOut', duration: 0.4 }}

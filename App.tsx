@@ -579,10 +579,10 @@ export default function App() {
                     userName={userProfile.name}
                 />
             ) : (
-                <motion.div key="main-app" className="w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                <motion.div key="main-app" className="w-full h-full md:flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
                     <SideNav currentView={currentView} navigateTo={navigateTo} />
 
-                    <div className="relative w-full h-full md:ml-64">
+                    <div className="relative w-full h-full">
                         <div 
                             className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 pointer-events-none`}
                             style={{ opacity: (settings.gradientIntensity ?? 75) / 100 }}
