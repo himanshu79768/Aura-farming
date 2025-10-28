@@ -27,6 +27,7 @@ import AlertModal from './components/AlertModal';
 import SessionLinkingPage from './components/SessionLinkingPage';
 import LinkedJournalsPage from './components/LinkedJournalsPage';
 import AttachmentViewerPage from './components/AttachmentViewerPage';
+import { useLocalStorage } from './hooks/useLocalStorage';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -112,6 +113,7 @@ const DEFAULT_USER_DATA: UserData = {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [masterUid, setMasterUid] = useLocalStorage<string | null>('masterUid', null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
@@ -152,6 +154,25 @@ export default function App() {
     message: '',
   });
 
+  // Fix: Moved showAlertModal and showConfirmationModal before their usage to prevent a 'used before declaration' error.
+  const showConfirmationModal = useCallback((options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => {
+    setConfirmationModalState({
+        isOpen: true,
+        title: options.title,
+        message: options.message,
+        onConfirm: options.onConfirm,
+        confirmText: options.confirmText || 'Confirm',
+    });
+  }, []);
+
+  const showAlertModal = useCallback((options: { title: string; message: string; }) => {
+    setAlertModalState({
+        isOpen: true,
+        title: options.title,
+        message: options.message,
+    });
+  }, []);
+
   // --- Firebase Auth & Data Sync ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user: any) => {
@@ -165,9 +186,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser) return;
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) {
+      if(!masterUid) setIsLoading(false); // If no masterUid, we are ready for onboarding
+      return;
+    };
 
-    const userRef = ref(db, 'users/' + currentUser.uid);
+    const userRef = ref(db, 'users/' + dataPathUid);
     const unsubscribeUser = onValue(userRef, (snapshot) => {
         if (snapshot.exists()) {
             const data = snapshot.val() as UserData & { journalEntries?: Record<string, any>, focusHistory?: Record<string, any> };
@@ -191,14 +216,15 @@ export default function App() {
                 : [];
             setFocusHistory(focusHistoryArray);
 
-        } else {
-            set(userRef, DEFAULT_USER_DATA);
+        } else if (masterUid) {
+            // This can happen if data is deleted from DB but masterUid remains in localStorage
+            set(userRef, { ...DEFAULT_USER_DATA, name: 'User' });
         }
         setIsLoading(false);
     });
 
     return () => unsubscribeUser();
-  }, [currentUser]);
+  }, [currentUser, masterUid]);
   
   const vibrate = useCallback((style: 'light' | 'medium' | 'heavy' = 'light') => {
     if (navigator.vibrate && settings.hapticIntensity !== 'off') {
@@ -212,9 +238,10 @@ export default function App() {
   }, [settings.hapticIntensity]);
 
   const updateUserData = useCallback((data: Partial<UserData>) => {
-    if (!currentUser) return;
-    update(ref(db, 'users/' + currentUser.uid), data);
-  }, [currentUser]);
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return;
+    update(ref(db, 'users/' + dataPathUid), data);
+  }, [currentUser, masterUid]);
 
   const handleSetMood = (newMood: Mood) => updateUserData({ mood: newMood });
   const handleSetSettings = (value: Settings | ((s: Settings) => Settings)) => {
@@ -223,7 +250,8 @@ export default function App() {
   };
 
   const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean; message?: string }> => {
-    if (!currentUser) return { success: false, message: 'Not authenticated.' };
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return { success: false, message: 'Not authenticated.' };
 
     const trimmedNewName = newName.trim();
     if (!trimmedNewName) return { success: false, message: 'Name cannot be empty.' };
@@ -236,13 +264,13 @@ export default function App() {
 
     const newUsernameRef = ref(db, `usernames/${sanitizedNewName}`);
     const snapshot = await get(newUsernameRef);
-    if (snapshot.exists() && snapshot.val() !== currentUser.uid) {
+    if (snapshot.exists() && snapshot.val() !== dataPathUid) {
       return { success: false, message: 'This name is already taken.' };
     }
 
     const updates: { [key: string]: any } = {};
-    updates[`/users/${currentUser.uid}/name`] = trimmedNewName;
-    updates[`/usernames/${sanitizedNewName}`] = currentUser.uid;
+    updates[`/users/${dataPathUid}/name`] = trimmedNewName;
+    updates[`/usernames/${sanitizedNewName}`] = dataPathUid;
     if (sanitizedOldName && sanitizedOldName !== sanitizedNewName) {
       updates[`/usernames/${sanitizedOldName}`] = null;
     }
@@ -254,85 +282,75 @@ export default function App() {
       console.error("Error updating username:", error);
       return { success: false, message: 'An error occurred.' };
     }
-  }, [currentUser, userProfile.name]);
+  }, [currentUser, userProfile.name, masterUid]);
   
    const loginUserByName = useCallback(async (name: string) => {
-    if (!currentUser) return;
-    setIsLoggingIn(true);
-    const trimmedName = name.trim();
-    const sanitizedName = trimmedName.toLowerCase();
-    const usernameRef = ref(db, `usernames/${sanitizedName}`);
-    
-    try {
-        const snapshot = await get(usernameRef);
-        if (snapshot.exists()) {
-            const existingUserUid = snapshot.val();
-            if (existingUserUid !== currentUser.uid) {
-                const oldUserRef = ref(db, `users/${existingUserUid}`);
-                const oldUserDataSnapshot = await get(oldUserRef);
-                
-                if (oldUserDataSnapshot.exists()) {
-                    const oldUserData = oldUserDataSnapshot.val();
-                    const updates: { [key: string]: any } = {};
-                    updates[`/users/${currentUser.uid}`] = { ...oldUserData, name: trimmedName };
-                    updates[`/users/${existingUserUid}`] = null;
-                    updates[`/usernames/${sanitizedName}`] = currentUser.uid;
-                    await update(ref(db), updates);
-                }
-            }
-            setShowIntro(false);
-        } else {
-            const updates: { [key: string]: any } = {};
-            updates[`/users/${currentUser.uid}`] = { ...DEFAULT_USER_DATA, name: trimmedName };
-            updates[`/usernames/${sanitizedName}`] = currentUser.uid;
-            await update(ref(db), updates);
-            setShowIntro(true);
-        }
-    } catch (error) {
-        console.error("Error during login by name:", error);
-        const updates: { [key: string]: any } = {};
-        updates[`/users/${currentUser.uid}/name`] = trimmedName;
-        await update(ref(db), updates);
-        setShowIntro(true);
-    } finally {
-        setIsLoggingIn(false);
-    }
-  }, [currentUser]);
+        if (!currentUser) return;
+        setIsLoggingIn(true);
+        const trimmedName = name.trim();
+        const sanitizedName = trimmedName.toLowerCase();
+        const usernameRef = ref(db, `usernames/${sanitizedName}`);
 
-  const logoutUser = useCallback(async () => {
-      vibrate();
-      await signOut(auth);
-      setCurrentUser(null);
-      setIsLoading(true);
-      setUserProfile(DEFAULT_PROFILE);
-      setSettings(DEFAULT_SETTINGS);
-      setMood(Mood.Calm);
-      setFavoriteQuotes([]);
-      setJournalEntries([]);
-      setFocusHistory([]);
-      setShowIntro(false);
-  }, [vibrate]);
+        try {
+            const snapshot = await get(usernameRef);
+            if (snapshot.exists()) {
+                const existingUid = snapshot.val();
+                setMasterUid(existingUid);
+                setShowIntro(false);
+            } else {
+                const newMasterUid = currentUser.uid;
+                setMasterUid(newMasterUid);
+
+                const updates: { [key: string]: any } = {};
+                updates[`/users/${newMasterUid}`] = { ...DEFAULT_USER_DATA, name: trimmedName };
+                updates[`/usernames/${sanitizedName}`] = newMasterUid;
+                await update(ref(db), updates);
+                
+                setShowIntro(true);
+            }
+        } catch (error) {
+            console.error("Error during login by name:", error);
+            showAlertModal({ title: "Login Failed", message: "An error occurred during login. Please try again." });
+        } finally {
+            setIsLoggingIn(false);
+        }
+    }, [currentUser, setMasterUid, showAlertModal]);
+
+    const logoutUser = useCallback(async () => {
+        vibrate();
+        await signOut(auth);
+        setCurrentUser(null);
+        setMasterUid(null);
+        setUserProfile(DEFAULT_PROFILE);
+        setSettings(DEFAULT_SETTINGS);
+        setMood(Mood.Calm);
+        setFavoriteQuotes([]);
+        setJournalEntries([]);
+        setFocusHistory([]);
+        setShowIntro(false);
+    }, [vibrate, setMasterUid]);
 
   useEffect(() => {
-    if (userProfile.name) {
+    if (masterUid) {
         const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.classList.toggle('dark', settings.theme === Theme.Auto ? isSystemDark : settings.theme === Theme.Dark);
     }
-  }, [settings.theme, userProfile.name]);
+  }, [settings.theme, masterUid]);
 
   const playSound = useCallback((sound: string) => settings.sound && console.log(`Playing sound: ${sound}`), [settings.sound]);
 
   const addFocusSession = useCallback((durationInSeconds: number, name?: string) => {
     playSound(settings.focusSound);
     vibrate('heavy');
-    if (!currentUser) return;
-    const historyRef = ref(db, `users/${currentUser.uid}/focusHistory`);
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return;
+    const historyRef = ref(db, `users/${dataPathUid}/focusHistory`);
     const newSessionRef = push(historyRef);
     set(newSessionRef, {
       date: new Date().toISOString(), duration: durationInSeconds, name: name || '', createdAt: serverTimestamp()
     });
     updateUserData({ completedSessions: (userProfile.completedSessions || 0) + 1 });
-  }, [currentUser, playSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
+  }, [currentUser, masterUid, playSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
 
   useEffect(() => {
     // This effect handles the timer countdown.
@@ -389,9 +407,10 @@ export default function App() {
   };
 
   const toggleFavorite = (id: string) => {
-    if (!currentUser) return;
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return;
     vibrate();
-    const favRef = ref(db, `users/${currentUser.uid}/favoriteQuotes/${id}`);
+    const favRef = ref(db, `users/${dataPathUid}/favoriteQuotes/${id}`);
     if (favoriteQuotes.includes(id)) {
         remove(favRef);
     } else {
@@ -399,9 +418,10 @@ export default function App() {
     }
   };
   const addJournalEntry = async (entry: Omit<JournalEntry, 'id' | 'createdAt'>): Promise<boolean> => {
-    if (!currentUser) return false;
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return false;
     try {
-        const journalRef = ref(db, `users/${currentUser.uid}/journalEntries`);
+        const journalRef = ref(db, `users/${dataPathUid}/journalEntries`);
         const newEntryRef = push(journalRef);
         await set(newEntryRef, { ...entry, createdAt: serverTimestamp() });
         return true;
@@ -412,7 +432,8 @@ export default function App() {
     }
   };
   const updateJournalEntry = async (updatedEntry: JournalEntry): Promise<boolean> => {
-    if (!currentUser) return false;
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return false;
     
     // Optimistically update local state for instant UI feedback
     setJournalEntries(prevEntries =>
@@ -421,7 +442,7 @@ export default function App() {
 
     try {
         const { id, ...data } = updatedEntry;
-        const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
+        const entryRef = ref(db, `users/${dataPathUid}/journalEntries/${id}`);
         await update(entryRef, data);
         return true;
     } catch (error) {
@@ -434,10 +455,11 @@ export default function App() {
   };
 
   const deleteJournalEntry = async (id: string): Promise<boolean> => {
-    if (!currentUser) return false;
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return false;
 
     try {
-        const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
+        const entryRef = ref(db, `users/${dataPathUid}/journalEntries/${id}`);
         await remove(entryRef);
         return true;
     } catch (error) {
@@ -470,24 +492,6 @@ export default function App() {
     setSessionName('');
   };
 
-  const showConfirmationModal = useCallback((options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => {
-    setConfirmationModalState({
-        isOpen: true,
-        title: options.title,
-        message: options.message,
-        onConfirm: options.onConfirm,
-        confirmText: options.confirmText || 'Confirm',
-    });
-  }, []);
-
-  const showAlertModal = useCallback((options: { title: string; message: string; }) => {
-    setAlertModalState({
-        isOpen: true,
-        title: options.title,
-        message: options.message,
-    });
-  }, []);
-
   const handleConfirm = () => {
       confirmationModalState.onConfirm();
       setConfirmationModalState(s => ({ ...s, isOpen: false }));
@@ -517,7 +521,7 @@ export default function App() {
     return <div className="w-screen h-screen bg-light-bg dark:bg-dark-bg" />;
   }
   
-  const shouldOnboard = !userProfile.name;
+  const shouldOnboard = !masterUid;
   const shouldShowIntro = showIntro && userProfile.name;
 
   return (
