@@ -31,20 +31,22 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
     const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [numPages, setNumPages] = useState(0);
-    // Initialize scale to 0 to indicate it needs to be auto-calculated for full view
     const [scale, setScale] = useState(isThumbnail ? 1 : 0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [dragConstraints, setDragConstraints] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
+    
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const canvasContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const loadPdf = async () => {
             setIsLoading(true);
             setError(null);
-            setPdf(null); // Reset pdf on dataUrl change
-            setCurrentPage(1); // Reset to first page
-            setScale(isThumbnail ? 1 : 0); // Reset scale for recalculation
+            setPdf(null);
+            setCurrentPage(1);
+            setScale(isThumbnail ? 1 : 0);
 
             const pdfData = dataURLToUint8Array(dataUrl);
             if (pdfData.length === 0) {
@@ -67,11 +69,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
         if (dataUrl) {
             loadPdf();
         }
-
-        return () => {
-            // pdf.destroy() is called in the component unmount, but also needs to be available if the component re-renders with a new pdf.
-            // The current implementation re-initializes pdf state so the old one is garbage collected.
-        };
     }, [dataUrl, isThumbnail]);
 
     useEffect(() => {
@@ -96,35 +93,25 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
                         setTimeout(render, 50);
                         return;
                     }
-                } else if (scale === 0) { // Auto-calculate initial scale for full view
+                } else if (scale === 0) {
                     if (container.clientWidth > 0 && container.clientHeight > 0) {
                         const viewport = page.getViewport({ scale: 1 });
-                        
                         const isPortrait = container.clientHeight > container.clientWidth;
                         let calculatedScale;
-
                         if (isPortrait) {
-                            // Mobile view: fit-to-width
-                            // Container has `p-4` (1rem padding on all sides). Total horizontal padding is 32px.
                             calculatedScale = (container.clientWidth - 32) / viewport.width;
                         } else {
-                            // Desktop view: fit-to-height
-                            // Container has `p-4` (1rem padding on all sides). Total vertical padding is 32px.
                             calculatedScale = (container.clientHeight - 32) / viewport.height;
                         }
-                        
                         setScale(calculatedScale);
-                        // The state update will trigger a re-render, so we can exit.
                         return;
                     } else {
-                        // Wait for container to have dimensions
                         setTimeout(render, 50);
                         return;
                     }
                 }
 
                 if (renderScale <= 0) {
-                    // Don't render if scale is not yet calculated
                     setIsLoading(false);
                     return;
                 }
@@ -144,6 +131,30 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
                 setError("Could not render PDF page.");
             } finally {
                 setIsLoading(false);
+
+                if (!isThumbnail) {
+                    const canvasEl = canvasRef.current;
+                    const containerEl = canvasContainerRef.current;
+                    if (canvasEl && containerEl) {
+                        const containerWidth = containerEl.clientWidth;
+                        const containerHeight = containerEl.clientHeight;
+
+                        const canvasWidth = canvasEl.width;
+                        const canvasHeight = canvasEl.height;
+
+                        const overflowX = Math.max(0, (canvasWidth - containerWidth) / 2);
+                        const overflowY = Math.max(0, (canvasHeight - containerHeight) / 2);
+
+                        setDragConstraints({
+                            left: -overflowX,
+                            right: overflowX,
+                            top: -overflowY,
+                            bottom: overflowY,
+                        });
+                    }
+                } else {
+                    setDragConstraints({ top: 0, left: 0, right: 0, bottom: 0 });
+                }
             }
         };
 
@@ -163,6 +174,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
         </div>;
     }
 
+    const isDraggable = !isThumbnail && (dragConstraints.left < 0 || dragConstraints.top < 0);
+
     return (
         <div ref={containerRef} className={`relative w-full h-full flex flex-col items-center justify-center ${isThumbnail ? '' : 'bg-black/10 dark:bg-white/5'}`}>
             <AnimatePresence>
@@ -177,8 +190,17 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
                     </motion.div>
                 )}
             </AnimatePresence>
-            <div className={`flex-grow w-full flex items-center justify-center overflow-auto ${isThumbnail ? '' : 'p-4'}`}>
-                <canvas ref={canvasRef} className={`${isThumbnail ? '' : 'shadow-lg'}`}/>
+            <div ref={canvasContainerRef} className={`flex-grow w-full flex items-center justify-center overflow-hidden ${isThumbnail ? '' : 'p-4'}`}>
+                 <motion.div
+                    drag={isDraggable}
+                    dragConstraints={dragConstraints}
+                    dragElastic={0.1}
+                    style={{ cursor: isDraggable ? 'grab' : 'auto' }}
+                    whileTap={{ cursor: isDraggable ? 'grabbing' : 'auto' }}
+                    className="flex items-center justify-center"
+                >
+                    <canvas ref={canvasRef} className={`${isThumbnail ? '' : 'shadow-lg'}`}/>
+                </motion.div>
             </div>
             {!isThumbnail && numPages > 0 && (
                 <div className="flex-shrink-0 flex items-center justify-center gap-4 p-2 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-full border border-white/10 shadow-lg my-2 z-10">
