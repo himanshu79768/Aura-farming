@@ -146,7 +146,7 @@ const JournalPage: React.FC = () => {
                     </motion.button>
                 }
             />
-            <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 flex-shrink-0">
+            <div className="w-full max-w-md md:max-w-3xl mx-auto px-4 flex-shrink-0">
                 <AnimatePresence>
                     {showCalendar && (
                         <motion.div
@@ -186,7 +186,7 @@ const JournalPage: React.FC = () => {
                     </div>
                 )}
             </div>
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto overflow-y-auto">
+            <div className="flex-grow w-full max-w-md md:max-w-3xl mx-auto overflow-y-auto">
                 <AnimatePresence>
                     {journalEntries.length === 0 ? (
                          <motion.div 

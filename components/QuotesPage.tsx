@@ -208,7 +208,7 @@ const QuotesPage: React.FC = () => {
                     paginate(-1);
                     }
                 }}
-                className="absolute h-auto w-full max-w-lg flex flex-col items-center justify-center p-8 text-center"
+                className="absolute h-auto w-full max-w-md md:max-w-2xl flex flex-col items-center justify-center p-8 text-center"
                 >
                 <p className="text-2xl md:text-3xl font-medium">"{currentQuote.text}"</p>
                 <p className="mt-4 text-lg text-light-text-secondary dark:text-dark-text-secondary">- {currentQuote.author}</p>

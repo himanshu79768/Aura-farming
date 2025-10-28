@@ -75,7 +75,7 @@ const ProfilePage: React.FC = () => {
     return (
         <div className="w-full h-full flex flex-col">
             <Header title="Profile" />
-            <div className="flex-grow w-full max-w-md md:max-w-lg mx-auto p-4 flex flex-col justify-center">
+            <div className="flex-grow w-full max-w-md md:max-w-3xl mx-auto p-4 flex flex-col justify-center">
                 <div className="flex flex-col items-center text-center">
                     <div className="w-24 h-24 rounded-full bg-light-glass dark:bg-dark-glass flex items-center justify-center border border-white/20 dark:border-white/10 mb-4">
                         <User className="w-12 h-12" />
