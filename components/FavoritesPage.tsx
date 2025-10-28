@@ -137,9 +137,9 @@ const FavoritesPage: React.FC = () => {
       };
 
     return (
-        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className="w-full min-h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Favorite Quotes" showBackButton onBack={navigateBack} />
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4">
                 <AnimatePresence>
                     {favoriteQuoteObjects.length === 0 ? (
                         <motion.div

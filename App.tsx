@@ -126,6 +126,8 @@ const useMediaQuery = (query: string) => {
     return matches;
 };
 
+const MODAL_VIEWS: View[] = ['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'];
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [masterUid, setMasterUid] = useLocalStorage<string | null>('masterUid', null);
@@ -136,6 +138,8 @@ export default function App() {
   // App State
   const [currentView, setCurrentView] = useState<View>('home');
   const [modalStack, setModalStack] = useState<{ view: View; params?: any }[]>([]);
+  const [viewHistory, setViewHistory] = useState<View[]>([]);
+  const [currentParams, setCurrentParams] = useState<any>(null);
   const [mood, setMood] = useState<Mood>(Mood.Calm);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -170,7 +174,6 @@ export default function App() {
     message: '',
   });
 
-  // Fix: Moved showAlertModal and showConfirmationModal before their usage to prevent a 'used before declaration' error.
   const showConfirmationModal = useCallback((options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => {
     setConfirmationModalState({
         isOpen: true,
@@ -233,7 +236,6 @@ export default function App() {
             setFocusHistory(focusHistoryArray);
 
         } else if (masterUid) {
-            // This can happen if data is deleted from DB but masterUid remains in localStorage
             set(userRef, { ...DEFAULT_USER_DATA, name: 'User' });
         }
         setIsLoading(false);
@@ -369,56 +371,58 @@ export default function App() {
   }, [currentUser, masterUid, playSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
 
   useEffect(() => {
-    // This effect handles the timer countdown.
-    if (!timerState.isActive || timerState.endTime <= 0) {
-      return; // Timer is not running, do nothing.
-    }
-
+    if (!timerState.isActive || timerState.endTime <= 0) return;
     let animationFrameId: number;
-
     const tick = () => {
       const remaining = Math.round((timerState.endTime - Date.now()) / 1000);
-
       if (remaining > 0) {
         setTimeLeft(remaining);
         animationFrameId = requestAnimationFrame(tick);
       } else {
-        // Time is up.
         setTimeLeft(0);
         setTimerState(s => ({ ...s, isActive: false }));
         setIsTimerFinished(true);
-        // This is now guaranteed to run only once per session completion.
         addFocusSession(timerState.duration, sessionName);
       }
     };
-
     animationFrameId = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
+    return () => cancelAnimationFrame(animationFrameId);
   }, [timerState, sessionName, addFocusSession]);
   
   const navigateTo = (view: View, params?: any) => {
-    if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'].includes(view)) {
-        setModalStack(stack => [...stack, { view, params }]);
-    } else {
-        setModalStack([]);
+    if (isDesktop) {
+        setViewHistory(stack => [...stack, currentView]);
+        setCurrentParams(params);
         setCurrentView(view);
+    } else {
+        if (MODAL_VIEWS.includes(view)) {
+            setModalStack(stack => [...stack, { view, params }]);
+        } else {
+            setModalStack([]);
+            setCurrentView(view);
+        }
     }
   };
 
   const navigateBack = () => {
-      const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
-
-      if (currentModal?.view === 'focusAnalytics') {
-          setModalStack(stack => {
-              const newStack = stack.slice(0, -1);
-              newStack.push({ view: 'focusHistory' });
-              return newStack;
-          });
+      if (isDesktop) {
+          const lastView = viewHistory.pop();
+          if (lastView) {
+              setCurrentView(lastView);
+              setViewHistory([...viewHistory]);
+              setCurrentParams(null);
+          }
       } else {
-           setModalStack(stack => stack.slice(0, -1));
+          const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
+          if (currentModal?.view === 'focusAnalytics') {
+              setModalStack(stack => {
+                  const newStack = stack.slice(0, -1);
+                  newStack.push({ view: 'focusHistory' });
+                  return newStack;
+              });
+          } else {
+              setModalStack(stack => stack.slice(0, -1));
+          }
       }
   };
 
@@ -450,12 +454,7 @@ export default function App() {
   const updateJournalEntry = async (updatedEntry: JournalEntry): Promise<boolean> => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return false;
-    
-    // Optimistically update local state for instant UI feedback
-    setJournalEntries(prevEntries =>
-        prevEntries.map(e => e.id === updatedEntry.id ? updatedEntry : e)
-    );
-
+    setJournalEntries(prevEntries => prevEntries.map(e => e.id === updatedEntry.id ? updatedEntry : e));
     try {
         const { id, ...data } = updatedEntry;
         const entryRef = ref(db, `users/${dataPathUid}/journalEntries/${id}`);
@@ -464,16 +463,12 @@ export default function App() {
     } catch (error) {
         console.error("Error updating journal entry:", error);
         showAlertModal({ title: "Update Failed", message: "Could not update your entry. Please try again." });
-        // Note: The onValue listener will eventually correct the state if the update fails,
-        // so no explicit rollback is implemented here for simplicity.
         return false;
     }
   };
-
   const deleteJournalEntry = async (id: string): Promise<boolean> => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return false;
-
     try {
         const entryRef = ref(db, `users/${dataPathUid}/journalEntries/${id}`);
         await remove(entryRef);
@@ -512,23 +507,33 @@ export default function App() {
       confirmationModalState.onConfirm();
       setConfirmationModalState(s => ({ ...s, isOpen: false }));
   };
-
   const handleCancel = () => {
       setConfirmationModalState(s => ({ ...s, isOpen: false }));
   };
-
   const handleAlertClose = () => {
       setAlertModalState(s => ({ ...s, isOpen: false }));
   };
   
-  // --- Render Logic ---
   const renderView = () => {
+    const props = isDesktop ? currentParams : {};
     switch (currentView) {
       case 'home': return <HomePage />;
       case 'focus': return <FocusPage />;
       case 'quotes': return <QuotesPage />;
       case 'profile': return <ProfilePage />;
       case 'journal': return <JournalPage />;
+      case 'settings': return <SettingsPage {...props} />;
+      case 'breathing': return <BreathingPage {...props} />;
+      case 'auraCheckin': return <AuraCheckinPage {...props} />;
+      case 'journalEntry': return <JournalEntryPage {...props} />;
+      case 'journalView': return <JournalViewPage {...props} />;
+      case 'favorites': return <FavoritesPage {...props} />;
+      case 'focusHistory': return <FocusHistoryPage {...props} />;
+      case 'focusAnalytics': return <FocusAnalyticsPage {...props} />;
+      case 'soundOptions': return <SoundOptionsPage {...props} />;
+      case 'sessionLinking': return <SessionLinkingPage {...props} />;
+      case 'linkedJournals': return <LinkedJournalsPage {...props} />;
+      case 'attachmentViewer': return <AttachmentViewerPage {...props} />;
       default: return <HomePage />;
     }
   };
@@ -572,58 +577,72 @@ export default function App() {
             ) : (
                 <motion.div key="main-app" className="w-full h-full flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
                     <SideNav currentView={currentView} navigateTo={navigateTo} />
-                    <div className="flex-grow h-full relative">
+                    <div className="flex-grow h-full relative md:overflow-y-auto">
                         <div 
                             className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 pointer-events-none`}
                             style={{ opacity: (settings.gradientIntensity ?? 75) / 100 }}
                         ></div>
                         
-                        <AnimatePresence mode="wait"><motion.div key={currentView} variants={pageVariants} initial="initial" animate="in" exit="out" transition={pageTransition} className="w-full h-full">{renderView()}</motion.div></AnimatePresence>
-                        
-                        <AnimatePresence>
-                            {modalStack.map((modal, index) => {
-                                let modalContent = null;
-                                switch (modal.view) {
-                                    case 'settings': modalContent = <SettingsPage />; break;
-                                    case 'breathing': modalContent = <BreathingPage />; break;
-                                    case 'auraCheckin': modalContent = <AuraCheckinPage />; break;
-                                    case 'journalEntry': modalContent = <JournalEntryPage {...modal.params} />; break;
-                                    case 'journalView': modalContent = <JournalViewPage {...modal.params} />; break;
-                                    case 'favorites': modalContent = <FavoritesPage />; break;
-                                    case 'focusHistory': modalContent = <FocusHistoryPage />; break;
-                                    case 'focusAnalytics': modalContent = <FocusAnalyticsPage />; break;
-                                    case 'soundOptions': modalContent = <SoundOptionsPage />; break;
-                                    case 'sessionLinking': modalContent = <SessionLinkingPage {...modal.params} />; break;
-                                    case 'linkedJournals': modalContent = <LinkedJournalsPage {...modal.params} />; break;
-                                    case 'attachmentViewer': modalContent = <AttachmentViewerPage {...modal.params} />; break;
-                                }
-
-                                if (!modalContent) return null;
-
-                                return (
-                                    <motion.div
-                                        key={modal.view + index}
-                                        className="fixed inset-0 bg-black/30 backdrop-blur-sm md:flex md:items-center md:justify-center"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.3 }}
-                                        style={{ zIndex: 30 + index }}
-                                    >
-                                        <motion.div
-                                            className="w-full h-full bg-light-bg dark:bg-dark-bg md:w-full md:max-w-2xl md:h-auto md:max-h-[90vh] md:rounded-2xl md:border md:border-white/10 md:shadow-2xl overflow-hidden"
-                                            variants={modalVariants}
-                                            initial="initial"
-                                            animate="in"
-                                            exit="out"
-                                            transition={modalTransition}
-                                        >
-                                            {modalContent}
-                                        </motion.div>
-                                    </motion.div>
-                                );
-                            })}
+                        <AnimatePresence mode="wait">
+                            <motion.div 
+                                key={currentView} 
+                                variants={pageVariants} 
+                                initial="initial" 
+                                animate="in" 
+                                exit="out" 
+                                transition={pageTransition} 
+                                className="w-full min-h-full"
+                            >
+                                {renderView()}
+                            </motion.div>
                         </AnimatePresence>
+                        
+                        {!isDesktop && (
+                            <AnimatePresence>
+                                {modalStack.map((modal, index) => {
+                                    let modalContent = null;
+                                    switch (modal.view) {
+                                        case 'settings': modalContent = <SettingsPage />; break;
+                                        case 'breathing': modalContent = <BreathingPage />; break;
+                                        case 'auraCheckin': modalContent = <AuraCheckinPage />; break;
+                                        case 'journalEntry': modalContent = <JournalEntryPage {...modal.params} />; break;
+                                        case 'journalView': modalContent = <JournalViewPage {...modal.params} />; break;
+                                        case 'favorites': modalContent = <FavoritesPage />; break;
+                                        case 'focusHistory': modalContent = <FocusHistoryPage />; break;
+                                        case 'focusAnalytics': modalContent = <FocusAnalyticsPage />; break;
+                                        case 'soundOptions': modalContent = <SoundOptionsPage />; break;
+                                        case 'sessionLinking': modalContent = <SessionLinkingPage {...modal.params} />; break;
+                                        case 'linkedJournals': modalContent = <LinkedJournalsPage {...modal.params} />; break;
+                                        case 'attachmentViewer': modalContent = <AttachmentViewerPage {...modal.params} />; break;
+                                    }
+
+                                    if (!modalContent) return null;
+
+                                    return (
+                                        <motion.div
+                                            key={modal.view + index}
+                                            className="fixed inset-0 bg-black/30 backdrop-blur-sm md:flex md:items-center md:justify-center"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                            style={{ zIndex: 30 + index }}
+                                        >
+                                            <motion.div
+                                                className="w-full h-full bg-light-bg dark:bg-dark-bg md:w-full md:max-w-2xl md:h-auto md:max-h-[90vh] md:rounded-2xl md:border md:border-white/10 md:shadow-2xl overflow-hidden"
+                                                variants={modalVariants}
+                                                initial="initial"
+                                                animate="in"
+                                                exit="out"
+                                                transition={modalTransition}
+                                            >
+                                                {modalContent}
+                                            </motion.div>
+                                        </motion.div>
+                                    );
+                                })}
+                            </AnimatePresence>
+                        )}
                     </div>
                 </motion.div>
             )}

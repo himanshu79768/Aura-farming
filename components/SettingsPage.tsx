@@ -34,9 +34,9 @@ const SettingsPage: React.FC = () => {
     const { settings, setSettings, mood, setMood, navigateBack } = useAppContext();
 
     return (
-        <div className="w-full h-full flex flex-col">
+        <div className="w-full min-h-full flex flex-col">
             <Header title="Settings" showBackButton onBack={navigateBack} />
-            <div className="flex-grow w-full max-w-md md:max-w-xl mx-auto p-4 overflow-y-auto">
+            <div className="flex-grow w-full max-w-md md:max-w-xl mx-auto p-4">
                 <div className="space-y-6 pt-8 pb-24 md:pb-8">
                     
                     {/* Appearance Section */}
