@@ -49,6 +49,7 @@ interface AppContextType {
   addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => Promise<boolean>;
   updateJournalEntry: (entry: JournalEntry) => Promise<boolean>;
   deleteJournalEntry: (id: string) => Promise<boolean>;
+  duplicateJournalEntry: (id: string) => Promise<boolean>;
   focusHistory: FocusSession[];
   addFocusSession: (durationInSeconds: number, name?: string) => void;
   playSound: (sound: string) => void;
@@ -468,6 +469,32 @@ export default function App() {
         return false;
     }
   };
+  
+  const duplicateJournalEntry = async (id: string): Promise<boolean> => {
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return false;
+
+    const entryToDuplicate = journalEntries.find(e => e.id === id);
+    if (!entryToDuplicate) {
+      showAlertModal({ title: "Duplicate Failed", message: "Could not find the original entry." });
+      return false;
+    }
+    
+    // Create a new entry object, omitting the original id and createdAt
+    const { id: originalId, createdAt, ...data } = entryToDuplicate;
+
+    const newEntry: Omit<JournalEntry, 'id' | 'createdAt'> = {
+      ...data,
+      title: `${data.title || 'Untitled'} (Copy)`,
+      date: new Date().toISOString(), // Use current date for the new entry
+    };
+
+    const success = await addJournalEntry(newEntry);
+    if (success) {
+        showAlertModal({ title: "Entry Duplicated", message: "A copy of the journal entry has been created."});
+    }
+    return success;
+  };
 
   const selectTimerDuration = (minutes: number) => {
       vibrate();
@@ -527,7 +554,7 @@ export default function App() {
   return (
     <AppContext.Provider value={{ 
         mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
-        userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry,
+        userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry,
         focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack,
         timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,

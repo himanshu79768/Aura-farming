@@ -11,7 +11,7 @@ const DeleteZone: React.FC = () => {
             exit={{ opacity: 0, y: 50 }}
             transition={{ type: 'spring', stiffness: 400, damping: 35 }}
         >
-            <div className="flex items-center justify-center w-20 h-20 bg-red-500/80 rounded-full border-2 border-white/50 shadow-2xl">
+            <div className="flex items-center justify-center w-20 h-20 bg-red-500/80 rounded-full border-2 border-white/50 shadow-3xl">
                 <Trash2 className="w-8 h-8 text-white" />
             </div>
             <p className="text-sm font-medium text-white/80">Drag here to reset</p>

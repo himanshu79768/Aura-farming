@@ -90,7 +90,7 @@ const TimerPill: React.FC<TimerPillProps> = ({ constraintsRef }) => {
 
     return (
         <motion.div
-            className="fixed z-50 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-lg border border-white/20 dark:border-white/10 shadow-lg flex items-center justify-center overflow-hidden tappable cursor-grab"
+            className="fixed z-50 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-lg border border-white/20 dark:border-white/10 shadow-xl flex items-center justify-center overflow-hidden tappable cursor-grab"
             style={{ 
                 top: 20,
                 scale, // Apply pinch-to-zoom scale

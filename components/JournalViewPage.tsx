@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreVertical, Edit, Share2, Trash2, Download, FileText, Copy, Loader, FileImage, FileQuestion } from 'lucide-react';
@@ -180,6 +181,12 @@ const AttachmentIcon = ({ type }: { type: string }) => {
     if (type.startsWith('image/')) return <FileImage size={24} className="text-purple-400 shrink-0" />;
     if (type === 'application/pdf') return <FileText size={24} className="text-red-400 shrink-0" />;
     return <FileQuestion size={24} className="text-gray-400 shrink-0" />;
+};
+
+const fontClasses: Record<'default' | 'serif' | 'mono', string> = {
+    default: 'font-sans',
+    serif: 'font-serif',
+    mono: 'font-mono'
 };
 
 const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }) => {
@@ -371,7 +378,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 {isMenuOpen && (
                     <motion.div
                         ref={menuRef}
-                        className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-lg origin-top-right z-10"
+                        className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
                         variants={menuVariants}
                         initial="hidden"
                         animate="visible"
@@ -400,7 +407,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 {isShareMenuOpen && (
                     <motion.div
                         ref={shareMenuRef}
-                        className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-lg origin-top-right z-10"
+                        className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
                         variants={menuVariants}
                         initial="hidden"
                         animate="visible"
@@ -427,15 +434,19 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
         </div>
     );
 
+    const selectedFontStyle = entry.fontStyle || 'default';
+    const useSmallText = entry.isSmallText || false;
+    const useFullWidth = entry.isFullWidth || false;
+
     return (
-        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+        <div className={`w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg ${fontClasses[selectedFontStyle]}`}>
             <Header 
                 title=""
                 showBackButton 
                 onBack={navigateBack}
                 rightAction={HeaderActions}
             />
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
+            <div className={`flex-grow w-full ${useFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} overflow-y-auto transition-all duration-300`}>
                 <div className="pb-24">
                     <div className="mb-6 border-b border-white/10 pb-4">
                         <h1 className="text-3xl font-bold mb-2">{entry.title || 'Untitled Entry'}</h1>
@@ -443,7 +454,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                         <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{formattedTime}</p>
                     </div>
                     <div
-                        className="journal-view-content text-lg leading-relaxed"
+                        className={`journal-view-content leading-relaxed ${useSmallText ? 'text-base' : 'text-lg'}`}
                         dangerouslySetInnerHTML={{ __html: entry.content }}
                     />
                     {entry.attachments && entry.attachments.length > 0 && (
@@ -520,6 +531,8 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 .journal-view-content li { margin-bottom: 0.25rem; }
                 .journal-view-content hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 1.5rem 0; }
                 html.light .journal-view-content hr { border-top-color: rgba(0, 0, 0, 0.1); }
+                .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
+                .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
             `}</style>
         </div>
     );

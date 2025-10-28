@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TriangleAlert } from 'lucide-react';
@@ -33,7 +34,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         >
           {/* Backdrop */}
           <motion.div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/10"
             onClick={onCancel}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -42,7 +43,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
           {/* Modal Content */}
           <motion.div
-            className="relative w-full max-w-sm p-6 bg-light-bg-secondary/80 dark:bg-dark-bg-secondary/80 backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-lg text-center"
+            className="relative w-full max-w-sm p-6 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-2xl border border-white/20 dark:border-white/10 shadow-3xl text-center"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}

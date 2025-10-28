@@ -33,6 +33,11 @@ export interface JournalEntry {
   createdAt?: any; // For Firestore serverTimestamp
   linkedSessionIds?: string[];
   attachments?: Attachment[];
+  // New editor settings
+  fontStyle?: 'default' | 'serif' | 'mono';
+  isSmallText?: boolean;
+  isFullWidth?: boolean;
+  isLocked?: boolean;
 }
 
 export interface FocusSession {
