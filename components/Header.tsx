@@ -10,6 +10,7 @@ interface HeaderProps {
     onBack?: () => void;
     rightAction?: React.ReactNode;
     showCenteredMoodSelector?: boolean;
+    titleClassName?: string;
 }
 
 const moodIcons: Record<Mood, React.ReactNode> = {
@@ -54,7 +55,7 @@ const MoodSelector: React.FC = () => {
     )
 }
 
-const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, rightAction, showCenteredMoodSelector = false }) => {
+const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
     return (
         <header className="relative w-full h-20 flex items-center justify-center p-4 z-20 flex-shrink-0">
             <div className="absolute left-4">
@@ -77,11 +78,11 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
             ) : (
                 <motion.h1 
                     key={title}
-                    className="text-lg font-semibold"
+                    className={`font-semibold text-center px-20 ${titleClassName || 'text-lg'}`}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                 >
-                    {title}
+                    <span className="truncate block">{title}</span>
                 </motion.h1>
             )}
 

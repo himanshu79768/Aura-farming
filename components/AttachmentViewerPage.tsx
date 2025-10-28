@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Header from './Header';
 import { useAppContext } from '../App';
 import { Attachment } from '../types';
-import { FileQuestion, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileQuestion, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import PdfViewer from './PdfViewer';
 
 interface AttachmentViewerPageProps {
@@ -31,9 +31,18 @@ const variants = {
 const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments, startIndex }) => {
     const { navigateBack } = useAppContext();
     const [[page, direction], setPage] = useState([startIndex, 0]);
-
+    const [imageScale, setImageScale] = useState(1);
+    const containerRef = useRef<HTMLDivElement>(null);
+    
     const currentIndex = page;
     const currentAttachment = attachments[currentIndex];
+    
+    useEffect(() => {
+        setImageScale(1); // Reset scale on page change
+    }, [page]);
+
+    const zoomInImage = () => setImageScale(s => s + 0.2);
+    const zoomOutImage = () => setImageScale(s => Math.max(0.2, s - 0.2));
 
     const paginate = (newDirection: number) => {
         let newIndex = page + newDirection;
@@ -45,7 +54,8 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
         setPage([newIndex, newDirection]);
     };
 
-    const renderContent = (attachment: Attachment) => {
+    const content = useMemo(() => {
+        const attachment = attachments[page];
         if (!attachment || !attachment.data) {
              return (
                 <div className="text-center p-8 flex flex-col items-center justify-center gap-4">
@@ -57,7 +67,23 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
 
         const type = attachment.type.toLowerCase();
         if (type.startsWith('image/')) {
-            return <img src={attachment.data} alt={attachment.name} className="max-w-full max-h-full object-contain" />;
+            return (
+                <div ref={containerRef} className="w-full h-full flex items-center justify-center overflow-hidden">
+                    <motion.img 
+                        src={attachment.data} 
+                        alt={attachment.name} 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                            scale: imageScale,
+                            cursor: imageScale > 1 ? 'grab' : 'auto'
+                        }}
+                        whileTap={{ cursor: imageScale > 1 ? 'grabbing' : 'auto' }}
+                        drag={imageScale > 1}
+                        dragConstraints={containerRef}
+                        dragElastic={0.1}
+                    />
+                </div>
+            );
         }
         if (type === 'application/pdf') {
             return <PdfViewer dataUrl={attachment.data} />;
@@ -70,7 +96,7 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
                 <p className="text-light-text-secondary dark:text-dark-text-secondary">{attachment.name}</p>
             </div>
         );
-    };
+    }, [page, attachments, imageScale]);
     
     const DownloadButton = (
          <a href={currentAttachment.data} download={currentAttachment.name} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
@@ -85,8 +111,9 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
                 showBackButton 
                 onBack={navigateBack}
                 rightAction={DownloadButton}
+                titleClassName="text-base"
             />
-            <div className="relative flex-grow w-full h-full flex items-center justify-center p-1 overflow-hidden">
+            <div className="relative flex-grow w-full flex items-center justify-center p-1 overflow-hidden">
                 <AnimatePresence initial={false} custom={direction}>
                     <motion.div
                         key={page}
@@ -101,7 +128,7 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
                             opacity: { duration: 0.2 },
                         }}
                     >
-                         {renderContent(currentAttachment)}
+                         {content}
                     </motion.div>
                 </AnimatePresence>
 
@@ -122,6 +149,15 @@ const AttachmentViewerPage: React.FC<AttachmentViewerPageProps> = ({ attachments
                     </>
                 )}
             </div>
+            {currentAttachment.type.startsWith('image/') && (
+                <div className="flex-shrink-0 flex items-center justify-center gap-4 p-2 z-10">
+                    <div className="flex items-center justify-center gap-4 p-2 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-full border border-white/10 shadow-lg my-2">
+                        <button onClick={zoomOutImage} disabled={imageScale <= 0.2} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"><ZoomOut size={20} /></button>
+                        <button onClick={() => setImageScale(1)} disabled={imageScale === 1} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-sm font-medium disabled:opacity-50">Reset</button>
+                        <button onClick={zoomInImage} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ZoomIn size={20} /></button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
