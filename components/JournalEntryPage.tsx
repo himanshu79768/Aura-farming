@@ -6,10 +6,65 @@ import { JournalEntry, Attachment } from '../types';
 import { fetchJournalPrompt } from '../services/geminiService';
 import Header from './Header';
 import AttachmentPreview from './AttachmentPreview';
+import AttachmentTypeModal from './AttachmentTypeModal';
 
 interface JournalEntryPageProps {
     entry?: JournalEntry;
 }
+
+const compressImage = (file: File, options: { quality?: number; maxWidth?: number; maxHeight?: number }): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const { quality = 0.85, maxWidth = 1920, maxHeight = 1920 } = options;
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new window.Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let { width, height } = img;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    return reject(new Error('Could not get canvas context'));
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob) {
+                            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            });
+                            resolve(newFile);
+                        } else {
+                            reject(new Error('Canvas to Blob conversion failed'));
+                        }
+                    },
+                    'image/jpeg',
+                    quality
+                );
+            };
+            img.onerror = (error) => reject(error);
+        };
+        reader.onerror = (error) => reject(error);
+    });
+};
 
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
@@ -23,6 +78,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [isPromptLoading, setIsPromptLoading] = useState(false);
+    const [showAttachmentModal, setShowAttachmentModal] = useState(false);
     
     const [showCommandPopup, setShowCommandPopup] = useState(false);
     const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
@@ -104,10 +160,29 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         }
     };
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAttachmentTypeSelect = (acceptType: string) => {
+        setShowAttachmentModal(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.accept = acceptType;
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            handleUpload(file);
+            let fileToUpload = file;
+            if (file.type.startsWith('image/')) {
+                setIsUploading(true); // Show loader for compression step
+                try {
+                    fileToUpload = await compressImage(file, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+                } catch (error) {
+                    console.error("Image compression failed, uploading original:", error);
+                    showAlertModal({ title: "Compression Failed", message: "Could not process the image, uploading original file." });
+                }
+                // isUploading is not set to false here, it transitions to the upload phase.
+            }
+            await handleUpload(fileToUpload);
         }
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
@@ -391,9 +466,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         Get a prompt
                     </button>
 
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".jpg,.jpeg,.png,.pdf,.ppt,.pptx" style={{ display: 'none' }} />
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
                     <motion.button
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => setShowAttachmentModal(true)}
                         disabled={isUploading}
                         className="w-12 h-12 bg-light-glass dark:bg-dark-glass rounded-full flex items-center justify-center shadow-lg border border-white/20 disabled:opacity-50"
                         whileHover={{ scale: 1.1 }}
@@ -404,6 +479,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     </motion.button>
                 </div>
             </div>
+            <AttachmentTypeModal
+                isOpen={showAttachmentModal}
+                onClose={() => setShowAttachmentModal(false)}
+                onSelect={handleAttachmentTypeSelect}
+            />
             <style>{`
                 .journal-editor-container [contentEditable=true]:empty:before {
                     content: attr(data-placeholder);
