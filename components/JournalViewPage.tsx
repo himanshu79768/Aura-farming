@@ -444,11 +444,11 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                         <div className="mt-8 pt-6 border-t border-white/10">
                             <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
                             <div className="flex flex-wrap gap-2">
-                                {entry.attachments.map(att => (
+                                {entry.attachments.map((att, index) => (
                                     <AttachmentPreview
-                                        key={att.storagePath}
+                                        key={att.id}
                                         attachment={att}
-                                        onClick={() => navigateTo('attachmentViewer', { attachment: att })}
+                                        onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
                                     />
                                 ))}
                             </div>

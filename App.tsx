@@ -31,7 +31,6 @@ import AttachmentViewerPage from './components/AttachmentViewerPage';
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
     set, update, push, remove, serverTimestamp, query, orderByChild, equalTo, get,
-    storage, storageRef, deleteObject
 } = (window as any).firebase;
 
 interface AppContextType {
@@ -72,7 +71,6 @@ interface AppContextType {
   showConfirmationModal: (options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => void;
   showAlertModal: (options: { title: string; message: string; }) => void;
   currentUser: any | null;
-  deleteAttachment: (attachment: Attachment) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -435,31 +433,10 @@ export default function App() {
     }
   };
 
-  const deleteAttachment = async (attachment: Attachment) => {
-    try {
-        const fileRef = storageRef(storage, attachment.storagePath);
-        await deleteObject(fileRef);
-        return true;
-    } catch (error: any) {
-        if (error.code !== 'storage/object-not-found') {
-            console.error("Error deleting attachment from storage:", error);
-        }
-        // It's okay if it's already gone, so we don't show an error.
-        return true; 
-    }
-  };
-
   const deleteJournalEntry = async (id: string): Promise<boolean> => {
     if (!currentUser) return false;
 
-    const entryToDelete = journalEntries.find(e => e.id === id);
-
     try {
-        if (entryToDelete && entryToDelete.attachments) {
-            const deletePromises = entryToDelete.attachments.map(att => deleteAttachment(att));
-            await Promise.all(deletePromises);
-        }
-
         const entryRef = ref(db, `users/${currentUser.uid}/journalEntries/${id}`);
         await remove(entryRef);
         return true;
@@ -553,7 +530,7 @@ export default function App() {
         focusSearchQuery, setFocusSearchQuery,
         logoutUser, loginUserByName,
         showConfirmationModal, showAlertModal,
-        currentUser, deleteAttachment,
+        currentUser,
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">

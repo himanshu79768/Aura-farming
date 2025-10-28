@@ -134,8 +134,7 @@
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
       import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
       import { getDatabase, ref, onValue, set, update, push, remove, serverTimestamp, query, orderByChild, equalTo, get } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
-      import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js";
-
+      
       const firebaseConfig = {
         apiKey: "AIzaSyBoNMQW3bHxQ_tLBOQBPsS7y7QFlGr77eA",
         authDomain: "aura-1cc21.firebaseapp.com",
@@ -153,7 +152,6 @@
       window.firebase = {
         auth: auth,
         db: getDatabase(app),
-        storage: getStorage(app),
         signInAnonymously: () => signInAnonymously(auth),
         signOut: () => signOut(auth),
         onAuthStateChanged,
@@ -168,10 +166,6 @@
         orderByChild,
         equalTo,
         get,
-        storageRef,
-        uploadBytes,
-        getDownloadURL,
-        deleteObject,
       };
     </script>
     <script type="module" src="/index.tsx"></script>

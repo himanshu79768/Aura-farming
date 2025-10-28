@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Trash2, Loader, Heading2, List, ListOrdered, Minus, Link as LinkIcon, Paperclip, LoaderCircle } from 'lucide-react';
+import { Sparkles, Trash2, Loader, Heading2, List, ListOrdered, Minus, Link as LinkIcon, Paperclip, LoaderCircle, FileImage, FileText, FileQuestion } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Attachment } from '../types';
 import { fetchJournalPrompt } from '../services/geminiService';
 import Header from './Header';
-import AttachmentPreview from './AttachmentPreview';
 import AttachmentTypeModal from './AttachmentTypeModal';
 
 interface JournalEntryPageProps {
@@ -66,10 +65,26 @@ const compressImage = (file: File, options: { quality?: number; maxWidth?: numbe
     });
 };
 
+const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
+const AttachmentIcon = ({ type }: { type: string }) => {
+    if (type.startsWith('image/')) return <FileImage size={24} className="text-purple-400 shrink-0" />;
+    if (type === 'application/pdf') return <FileText size={24} className="text-red-400 shrink-0" />;
+    return <FileQuestion size={24} className="text-gray-400 shrink-0" />;
+};
+
+
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
         navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, vibrate, 
-        showConfirmationModal, navigateTo, currentUser, showAlertModal, deleteAttachment 
+        showConfirmationModal, navigateTo, showAlertModal,
     } = useAppContext();
 
     const [title, setTitle] = useState('');
@@ -170,63 +185,46 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            let fileToUpload = file;
-            if (file.type.startsWith('image/')) {
-                setIsUploading(true); // Show loader for compression step
-                try {
-                    fileToUpload = await compressImage(file, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
-                } catch (error) {
-                    console.error("Image compression failed, uploading original:", error);
-                    showAlertModal({ title: "Compression Failed", message: "Could not process the image, uploading original file." });
-                }
-                // isUploading is not set to false here, it transitions to the upload phase.
-            }
-            await handleUpload(fileToUpload);
-        }
         if (fileInputRef.current) {
-            fileInputRef.current.value = "";
+            fileInputRef.current.value = ""; // Clear file input immediately
         }
-    };
+        if (!file) return;
     
-    const handleUpload = async (file: File) => {
-        if (!currentUser) return;
         setIsUploading(true);
     
-        const { storage, storageRef, uploadBytes, getDownloadURL } = (window as any).firebase;
-    
-        const entryId = entry?.id || Date.now().toString();
-        const storagePath = `attachments/${currentUser.uid}/${entryId}/${Date.now()}-${file.name}`;
-        const fileRef = storageRef(storage, storagePath);
-    
         try {
-            const snapshot = await uploadBytes(fileRef, file);
-            const url = await getDownloadURL(snapshot.ref);
-    
+            let fileToProcess = file;
+            
+            if (file.type.startsWith('image/')) {
+                try {
+                    fileToProcess = await compressImage(file, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+                } catch (compressionError) {
+                    console.error("Image compression failed, using original:", compressionError);
+                    showAlertModal({ title: "Compression Warning", message: "Could not process the image, attempting to use original file." });
+                }
+            }
+
+            const dataUrl = await fileToDataURL(fileToProcess);
+            
             const newAttachment: Attachment = {
-                name: file.name,
-                type: file.type || 'application/octet-stream',
-                url: url,
-                storagePath: storagePath,
+                id: crypto.randomUUID(),
+                name: fileToProcess.name,
+                type: fileToProcess.type || 'application/octet-stream',
+                data: dataUrl,
             };
-    
+        
             setAttachments(prev => [...prev, newAttachment]);
     
         } catch (error) {
-            console.error("Error uploading file:", error);
-            showAlertModal({ title: "Upload Failed", message: "Could not upload your file. Please try again." });
+            console.error("Error processing attachment:", error);
+            showAlertModal({ title: "Processing Failed", message: "Could not process the attachment. Please try again." });
         } finally {
             setIsUploading(false);
         }
     };
 
     const handleRemoveAttachment = async (attachmentToRemove: Attachment) => {
-        setAttachments(prev => prev.filter(att => att.storagePath !== attachmentToRemove.storagePath));
-        const success = await deleteAttachment(attachmentToRemove);
-        if (!success) {
-            setAttachments(prev => [...prev, attachmentToRemove]);
-            showAlertModal({ title: "Delete Failed", message: "Could not remove the attachment. Please try again." });
-        }
+        setAttachments(prev => prev.filter(att => att.id !== attachmentToRemove.id));
     };
     
     const handleGetPrompt = async () => {
@@ -393,7 +391,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     className="w-full bg-transparent text-3xl font-bold focus:outline-none mb-4 pb-2 border-b border-white/10 placeholder:text-light-text-secondary/50 dark:placeholder:text-dark-text-secondary/50"
                     autoFocus={!!entry}
                 />
-                <div className="relative flex-grow w-full journal-editor-container">
+                <div className="relative flex-grow w-full journal-editor-container overflow-y-auto">
                     <div
                         ref={editorRef}
                         contentEditable={true}
@@ -401,7 +399,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         onKeyDown={handleKeyDown}
                         onBlur={() => setTimeout(() => setShowCommandPopup(false), 200)}
                         data-placeholder="Start writing... type '/' for commands"
-                        className="w-full h-full bg-transparent text-lg focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 overflow-y-auto"
+                        className="w-full h-full bg-transparent text-lg focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7"
                         autoFocus={!entry}
                     />
                     <AnimatePresence>
@@ -432,14 +430,51 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 </div>
 
                 <div className="flex-shrink-0 pt-4">
-                    <AnimatePresence>
+                     <AnimatePresence>
                         {attachments.length > 0 && (
                             <motion.div
-                                className="flex flex-wrap gap-2"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
+                                layout
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mt-4"
                             >
-                                {attachments.map(att => <AttachmentPreview key={att.storagePath} attachment={att} onRemove={handleRemoveAttachment} />)}
+                                <div className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden">
+                                    <div className="flex items-center justify-between p-3 border-b border-white/10">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <AttachmentIcon type={attachments[0].type} />
+                                            <span className="font-semibold truncate pr-2">{attachments[0].name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <button 
+                                                onClick={() => handleRemoveAttachment(attachments[0])}
+                                                className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10"
+                                                aria-label="Remove attachment"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: 0 })}
+                                                className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm"
+                                            >
+                                                {attachments.length > 1 ? `View All (${attachments.length})` : 'View'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div 
+                                        onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: 0 })}
+                                        className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer"
+                                    >
+                                        {attachments[0].type.startsWith('image/') ? (
+                                            <img src={attachments[0].data} alt={attachments[0].name} className="max-w-full max-h-full object-contain" />
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary">
+                                                <AttachmentIcon type={attachments[0].type} />
+                                                <span>Click to View</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -450,7 +485,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             >
                                 <LoaderCircle size={16} className="animate-spin" />
-                                <span>Uploading...</span>
+                                <span>Compressing & preparing...</span>
                             </motion.div>
                         )}
                     </AnimatePresence>

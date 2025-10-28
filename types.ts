@@ -19,10 +19,10 @@ export interface Quote {
 }
 
 export interface Attachment {
+  id: string; // Unique ID for the attachment
   name: string;
   type: string;
-  url: string;
-  storagePath: string;
+  data: string; // Base64 encoded data URL for the file
 }
 
 export interface JournalEntry {

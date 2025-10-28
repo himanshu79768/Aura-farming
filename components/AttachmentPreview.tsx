@@ -10,9 +10,11 @@ interface AttachmentPreviewProps {
 }
 
 const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ attachment, onRemove, onClick }) => {
-    const getIcon = () => {
+    const getIconOrThumbnail = () => {
         const type = attachment.type.toLowerCase();
-        if (type.startsWith('image/')) return <FileImage size={20} className="text-blue-400" />;
+        if (type.startsWith('image/')) {
+            return <img src={attachment.data} alt={attachment.name} className="w-5 h-5 object-cover rounded-sm" />;
+        }
         if (type === 'application/pdf') return <FileText size={20} className="text-red-400" />;
         if (type.includes('powerpoint') || type.includes('presentation')) return <FileQuestion size={20} className="text-orange-400" />;
         return <FileQuestion size={20} />;
@@ -34,7 +36,7 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({ attachment, onRem
                 whileHover={onClick ? { scale: 1.05 } : {}}
                 whileTap={onClick ? { scale: 0.95 } : {}}
             >
-                {getIcon()}
+                {getIconOrThumbnail()}
                 <span className="text-sm max-w-[120px] truncate" title={attachment.name}>{attachment.name}</span>
             </Wrapper>
             {onRemove && (
