@@ -46,7 +46,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, navigateTo }) => {
   ];
 
   return (
-    <nav className="w-full flex justify-center pb-4 pt-2 z-50 absolute bottom-0 left-0 right-0 md:hidden">
+    <nav className="w-full flex justify-center pb-4 pt-2 z-50 absolute bottom-0 left-0 right-0">
       <div className="flex items-center justify-around w-full max-w-md h-20 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-lg rounded-3xl border border-white/20 dark:border-white/10 shadow-lg">
         {navItems.map(({ view, icon }) => (
           <NavItem

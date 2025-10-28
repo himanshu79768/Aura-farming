@@ -82,7 +82,7 @@ const HomePage: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      <div className="flex items-center justify-center gap-4 pb-28 md:pb-8">
+      <div className="flex items-center justify-center gap-4 pb-28">
          <motion.button 
             onClick={() => navigateTo('auraCheckin')}
             className="flex items-center gap-2 px-6 py-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"

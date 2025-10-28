@@ -99,11 +99,11 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
             {showCenteredMoodSelector ? (
                 <MoodSelector />
             ) : (
-                <div className="relative flex items-center justify-center max-w-full">
+                <div className="relative flex items-center justify-center">
                     {/* The actual visible title */}
                     <motion.h1 
                         key={title}
-                        className={`font-semibold text-center max-w-full ${effectiveTitleClass}`}
+                        className={`font-semibold text-center max-w-[calc(100vw-11rem)] ${effectiveTitleClass}`}
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                     >
@@ -111,7 +111,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                     </motion.h1>
 
                     {/* A hidden element used ONLY for measuring if the title *would* wrap with the original font size */}
-                    <h1 ref={measureRef} className={`font-semibold text-center max-w-full absolute invisible -z-10 ${titleClassName || 'text-lg'}`}>{title}</h1>
+                    <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-11rem)] absolute invisible -z-10 ${titleClassName || 'text-lg'}`}>{title}</h1>
                 </div>
             )}
 

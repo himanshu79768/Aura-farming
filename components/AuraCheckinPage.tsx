@@ -120,7 +120,7 @@ const AuraCheckinPage: React.FC = () => {
                         </motion.div>
                     ) : (
                         auraData && (
-                            <div className="relative w-full max-w-md md:max-w-3xl">
+                            <div className="relative w-full max-w-md md:max-w-lg">
                                 <motion.div 
                                     style={{ backgroundColor: moodStyles[mood].color }}
                                     className={`absolute -inset-16 rounded-full blur-3xl opacity-20 dark:opacity-15`}

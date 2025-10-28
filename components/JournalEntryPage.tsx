@@ -382,7 +382,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 onBack={navigateBack}
                 rightAction={HeaderActions}
             />
-            <div className="flex-grow w-full max-w-md md:max-w-3xl mx-auto p-4 flex flex-col overflow-hidden">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 flex flex-col overflow-hidden">
                 <input
                     type="text"
                     value={title}

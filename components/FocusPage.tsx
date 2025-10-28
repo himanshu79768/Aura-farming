@@ -141,22 +141,10 @@ const FocusPage: React.FC = () => {
        <audio ref={audioRef} loop />
        <Header title="Focus"/>
        <div className="flex-grow p-4 overflow-y-auto">
-        <div className="flex flex-col md:grid md:grid-cols-2 md:items-center md:gap-8 justify-center min-h-full py-4">
-            <motion.div 
-                className="flex items-center justify-center md:justify-end"
-                initial={{ opacity: 0, scale: 0.8 }} 
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1 }}
-            >
-                <div className="relative flex items-center justify-center">
-                    <TimerRing progress={progress} mood={mood} isShining={showShine} />
-                    <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
-                </div>
-            </motion.div>
-
+        <div className="flex flex-col items-center justify-center min-h-full py-4">
             <AnimatePresence mode="wait">
             {isTimerFinished ? (
-                <motion.div key="finished" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="text-center md:text-left">
+                <motion.div key="finished" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="text-center">
                 <h2 className="text-3xl font-bold">Done beautifully.</h2>
                 <p className="mt-2 text-light-text-secondary dark:text-dark-text-secondary">{sessionName}</p>
                 <button onClick={toggleTimer} className="mt-8 flex items-center gap-2 px-6 py-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg">
@@ -165,10 +153,13 @@ const FocusPage: React.FC = () => {
                 </button>
                 </motion.div>
             ) : (
-                <motion.div key="timer" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex flex-col items-center md:items-start justify-center w-full">
-                    
+                <motion.div key="timer" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex flex-col items-center justify-center w-full">
+                    <div className="relative flex items-center justify-center">
+                        <TimerRing progress={progress} mood={mood} isShining={showShine} />
+                        <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
+                    </div>
                     <div className="w-full max-w-xs my-6">
-                        <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session (e.g., Chapter 1)" className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center md:text-left placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary"/>
+                        <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session (e.g., Chapter 1)" className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary"/>
                     </div>
                     <div className="flex space-x-2 mb-8 items-center justify-center h-10">
                         <AnimatePresence mode="wait">

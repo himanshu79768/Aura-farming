@@ -118,14 +118,14 @@ const FocusHistoryPage: React.FC = () => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Focus History" showBackButton onBack={navigateBack} />
-            <div className="w-full max-w-md md:max-w-3xl mx-auto px-4 pt-2 flex-shrink-0">
+            <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 pt-2 flex-shrink-0">
                 <SearchBar
                     placeholder="Search sessions..."
                     searchQuery={focusSearchQuery}
                     setSearchQuery={setFocusSearchQuery}
                 />
             </div>
-            <div className="flex-grow w-full max-w-md md:max-w-3xl mx-auto p-4 overflow-y-auto">
+            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
                 {focusHistory.length === 0 ? (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
