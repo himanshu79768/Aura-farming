@@ -28,6 +28,7 @@ import SessionLinkingPage from './components/SessionLinkingPage';
 import LinkedJournalsPage from './components/LinkedJournalsPage';
 import AttachmentViewerPage from './components/AttachmentViewerPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import Toast from './components/Toast';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -161,6 +162,8 @@ export default function App() {
     message: '',
     type: 'alert',
   });
+
+  const [toastMessage, setToastMessage] = useState('');
 
   // Fix: Moved showAlertModal and showConfirmationModal before their usage to prevent a 'used before declaration' error.
   const showConfirmationModal = useCallback((options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => {
@@ -402,7 +405,12 @@ export default function App() {
   
   const navigateTo = (view: View, params?: any) => {
     if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'].includes(view)) {
-        setModalStack(stack => [...stack, { view, params }]);
+        setModalStack(stack => {
+            const newStack = [...stack, { view, params }];
+            // Push state to history for the new modal
+            window.history.pushState({ modalIndex: newStack.length }, "", `#${view}`);
+            return newStack;
+        });
     } else {
         setModalStack([]);
         setCurrentView(view);
@@ -410,18 +418,47 @@ export default function App() {
   };
 
   const navigateBack = () => {
-      const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
-
-      if (currentModal?.view === 'focusAnalytics') {
-          setModalStack(stack => {
-              const newStack = stack.slice(0, -1);
-              newStack.push({ view: 'focusHistory' });
-              return newStack;
-          });
-      } else {
-           setModalStack(stack => stack.slice(0, -1));
-      }
+    window.history.back();
   };
+  
+  const toastTimer = useRef<number | null>(null);
+  const canExit = useRef(false);
+  
+  const handlePopState = useCallback(() => {
+    if (toastTimer.current) {
+        clearTimeout(toastTimer.current);
+    }
+
+    if (modalStack.length > 0) {
+        setModalStack(stack => stack.slice(0, -1));
+        return;
+    }
+    
+    if (canExit.current) {
+        return;
+    }
+
+    setToastMessage('Press back again to exit');
+    canExit.current = true;
+    
+    history.pushState(null, '', location.href);
+
+    toastTimer.current = window.setTimeout(() => {
+        setToastMessage('');
+        canExit.current = false;
+    }, 2000);
+
+  }, [modalStack.length]);
+
+  useEffect(() => {
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+        window.removeEventListener('popstate', handlePopState);
+        if (toastTimer.current) {
+            clearTimeout(toastTimer.current);
+        }
+    };
+  }, [handlePopState]);
 
   const toggleFavorite = (id: string) => {
     const dataPathUid = masterUid || currentUser?.uid;
@@ -700,6 +737,7 @@ export default function App() {
             onClose={handleAlertClose}
             type={alertModalState.type}
         />
+        <Toast message={toastMessage} />
       </main>
     </AppContext.Provider>
   );
