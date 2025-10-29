@@ -1,15 +1,36 @@
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Sparkles, Trash2, Loader, Link as LinkIcon, Paperclip, 
     LoaderCircle, FileImage, FileText, FileQuestion, MoreHorizontal, Search, Copy, Repeat, ArrowLeftRight,
-    Lock, Undo, Redo, ChevronsRight, Check
+    Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus,
+    Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon
 } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Attachment } from '../types';
 import { fetchJournalPrompt } from '../services/geminiService';
 import Header from './Header';
 import AttachmentTypeModal from './AttachmentTypeModal';
+
+const FONT_COLORS = [
+  { name: 'Default', value: 'inherit', isDefault: true },
+  { name: 'Red', value: '#ef4444' }, // red-500
+  { name: 'Orange', value: '#f97316' }, // orange-500
+  { name: 'Green', value: '#16a34a' }, // green-600
+  { name: 'Blue', value: '#2563eb' }, // blue-600
+  { name: 'Purple', value: '#7e22ce' }, // purple-700
+];
+
+const HIGHLIGHT_COLORS = [
+  { name: 'None', value: 'transparent', isNone: true },
+  { name: 'Yellow', value: '#fef08a' }, // yellow-200
+  { name: 'Pink', value: '#fbcfe8' }, // pink-200
+  { name: 'Blue', value: '#bfdbfe' }, // blue-200
+  { name: 'Green', value: '#a7f3d0' }, // emerald-200
+  { name: 'Purple', value: '#e9d5ff' }, // purple-200
+];
 
 interface JournalEntryPageProps {
     entry?: JournalEntry;
@@ -117,7 +138,17 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [searchMatches, setSearchMatches] = useState<HTMLElement[]>([]);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
+    const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
+    const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
+    const [slashMenuFilter, setSlashMenuFilter] = useState('');
+    const [activeCommandIndex, setActiveCommandIndex] = useState(0);
+
+    const [isFormattingMenuOpen, setIsFormattingMenuOpen] = useState(false);
+    const [formattingMenuPosition, setFormattingMenuPosition] = useState({ top: 0, left: 0 });
+    const [activePalette, setActivePalette] = useState<'font' | 'highlight' | null>(null);
+
     const editorRef = useRef<HTMLDivElement>(null);
+    const slashCommandRef = useRef<HTMLElement | null>(null);
     const hasSetInitialContent = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -136,7 +167,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         const editor = editorRef.current;
         const marks = Array.from(editor.querySelectorAll('mark.search-highlight'));
         marks.forEach(mark => {
-            // FIX: Cast `mark` to `Node` to fix TypeScript errors where its type was inferred as `unknown`.
             const markNode = mark as Node;
             const parent = markNode.parentNode;
             if (parent) {
@@ -225,22 +255,64 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             setSearchQuery('');
         }
     }, [searchQuery, clearSearchHighlighting]);
+    
+     // --- Formatting Menu Logic ---
+    useEffect(() => {
+        const handleMouseUp = () => {
+            // Delay to allow clicks on formatting menu to register before selection is lost
+            setTimeout(() => {
+                if (isOptionsMenuOpen) return;
+
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) {
+                    if (isFormattingMenuOpen) setIsFormattingMenuOpen(false);
+                    return;
+                }
+
+                const range = selection.getRangeAt(0);
+                const editorNode = editorRef.current;
+                
+                if (selection.isCollapsed || !editorNode || !editorNode.contains(range.commonAncestorContainer)) {
+                    if (isFormattingMenuOpen) {
+                        setIsFormattingMenuOpen(false);
+                        setActivePalette(null);
+                    }
+                    return;
+                }
+
+                const rect = range.getBoundingClientRect();
+                const editorRect = editorNode.getBoundingClientRect();
+                
+                setFormattingMenuPosition({
+                    top: rect.top - editorRect.top - 65,
+                    left: rect.left - editorRect.left + rect.width / 2,
+                });
+                setIsFormattingMenuOpen(true);
+            }, 10);
+        };
+
+        document.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [isFormattingMenuOpen, isOptionsMenuOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 closeAndClearSearch();
             }
+            if (isSlashMenuOpen) {
+                setIsSlashMenuOpen(false);
+            }
         };
-        if (isOptionsMenuOpen) {
-            document.addEventListener("mousedown", handleClickOutside);
-        }
+        document.addEventListener("mousedown", handleClickOutside);
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [isOptionsMenuOpen, closeAndClearSearch]);
+    }, [isOptionsMenuOpen, closeAndClearSearch, isSlashMenuOpen]);
     
-    // --- End of Search Functionality ---
+    // --- End of Search & Formatting Functionality ---
 
     useEffect(() => {
         if (entry) {
@@ -496,9 +568,112 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             onSave: (newSelectedIds: string[]) => { setLinkedSessionIds(newSelectedIds); markAsChanged(); },
         });
     };
+
+     // --- Slash Command Logic ---
+    const COMMANDS = [
+        {
+            icon: <Heading2 size={18} />, title: 'Heading', description: 'Large section heading.',
+            action: () => document.execCommand('formatBlock', false, '<h2>'),
+        },
+        {
+            icon: <List size={18} />, title: 'Bulleted List', description: 'Create a simple bulleted list.',
+            action: () => document.execCommand('insertUnorderedList', false),
+        },
+        {
+            icon: <ListOrdered size={18} />, title: 'Numbered List', description: 'Create a list with numbering.',
+            action: () => document.execCommand('insertOrderedList', false),
+        },
+        {
+            icon: <Minus size={18} />, title: 'Divider', description: 'Visually separate sections.',
+            action: () => document.execCommand('insertHorizontalRule', false),
+        },
+    ];
+
+    const filteredCommands = COMMANDS.filter(cmd => cmd.title.toLowerCase().startsWith(slashMenuFilter.toLowerCase()));
+
+    const handleCommandSelect = useCallback((command: typeof COMMANDS[0]) => {
+        const block = slashCommandRef.current;
+        if (!block) return;
+
+        block.innerHTML = '';
+        
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(block);
+        range.collapse(false);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        
+        command.action();
+
+        // Trigger content change for autosave and history
+        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+
+        setIsSlashMenuOpen(false);
+        slashCommandRef.current = null;
+    }, []);
+
+    const checkSlashCommand = useCallback(() => {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        let node = range.startContainer;
+        
+        let parentBlock = node;
+        while (parentBlock && parentBlock.nodeType !== Node.ELEMENT_NODE) {
+            parentBlock = parentBlock.parentNode!;
+        }
+        while (parentBlock && !['P', 'DIV'].includes((parentBlock as HTMLElement).tagName)) {
+             if ((parentBlock as HTMLElement) === editorRef.current) break;
+            parentBlock = parentBlock.parentNode!;
+        }
+
+        const text = (parentBlock as HTMLElement)?.innerText;
+
+        if (text?.startsWith('/')) {
+            const rect = range.getBoundingClientRect();
+            setSlashMenuPosition({ top: rect.bottom + 5, left: rect.left });
+            setSlashMenuFilter(text.substring(1));
+            slashCommandRef.current = parentBlock as HTMLElement;
+            if (!isSlashMenuOpen) {
+                setActiveCommandIndex(0);
+                setIsSlashMenuOpen(true);
+            }
+        } else {
+            if (isSlashMenuOpen) {
+                setIsSlashMenuOpen(false);
+                slashCommandRef.current = null;
+            }
+        }
+    }, [isSlashMenuOpen]);
     
+    const handleEditorKeyUp = () => {
+        // We wrap this in a timeout to ensure the DOM has updated before we check it.
+        setTimeout(checkSlashCommand, 0);
+    };
+
+    const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (!isSlashMenuOpen) return;
+        
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveCommandIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveCommandIndex(prev => (prev + 1) % filteredCommands.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            handleCommandSelect(filteredCommands[activeCommandIndex]);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setIsSlashMenuOpen(false);
+        }
+    };
+     // --- End Slash Command Logic ---
+
     const fontClasses: Record<typeof fontStyle, string> = { default: 'font-sans', serif: 'font-serif', mono: 'font-mono' };
-    
+
     const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
         const spring = { type: "spring", stiffness: 700, damping: 30 };
         return (
@@ -576,8 +751,125 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         </div>
     );
 
+     const SlashCommandMenu = () => (
+        <motion.div
+            style={{ top: slashMenuPosition.top, left: slashMenuPosition.left }}
+            className="absolute z-50 w-64 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10 p-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onClick={(e) => e.stopPropagation()} // Prevent click-outside-to-close
+        >
+            <p className="px-2 pt-1 pb-2 text-xs font-semibold uppercase text-light-text-secondary dark:text-dark-text-secondary">Blocks</p>
+            {filteredCommands.length > 0 ? filteredCommands.map((cmd, index) => (
+                <button
+                    key={cmd.title}
+                    onClick={() => handleCommandSelect(cmd)}
+                    className={`w-full flex items-start gap-3 p-2 rounded-md text-left transition-colors ${index === activeCommandIndex ? 'bg-black/5 dark:bg-white/5' : ''}`}
+                >
+                    <div className="p-1 bg-light-glass dark:bg-dark-glass rounded text-light-text dark:text-dark-text">{cmd.icon}</div>
+                    <div>
+                        <p className="font-semibold">{cmd.title}</p>
+                        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{cmd.description}</p>
+                    </div>
+                </button>
+            )) : <p className="p-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">No matching commands.</p>}
+        </motion.div>
+    );
+
+    const FormattingMenu = () => {
+        const handleFormat = (command: string, value?: string) => {
+            document.execCommand(command, false, value);
+            editorRef.current?.focus();
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        };
+    
+        const handleColorFormat = (command: string, value: string) => {
+            handleFormat(command, value);
+            setActivePalette(null);
+        };
+    
+        return (
+            <AnimatePresence>
+                {isFormattingMenuOpen && (
+                    <motion.div
+                        style={{ 
+                            top: formattingMenuPosition.top, 
+                            left: formattingMenuPosition.left,
+                            transform: 'translateX(-50%)'
+                        }}
+                        className="absolute z-40"
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        onMouseDown={(e) => e.preventDefault()}
+                    >
+                        <div className="p-1 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10 flex items-center gap-1 relative z-10">
+                            <button onClick={() => handleFormat('bold')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Bold size={18} /></button>
+                            <button onClick={() => handleFormat('italic')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Italic size={18} /></button>
+                            <button onClick={() => handleFormat('underline')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Underline size={18} /></button>
+                            <button onClick={() => handleFormat('strikeThrough')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Strikethrough size={18} /></button>
+                            <div className="w-px h-5 bg-black/10 dark:bg-white/10 mx-1"></div>
+                            <button onClick={() => handleFormat('copy')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Copy size={18} /></button>
+                            <button onClick={() => setActivePalette(p => p === 'highlight' ? null : 'highlight')} className={`p-2 rounded ${activePalette === 'highlight' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Highlighter size={18} /></button>
+                            <button onClick={() => setActivePalette(p => p === 'font' ? null : 'font')} className={`p-2 rounded ${activePalette === 'font' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><PaletteIcon size={18} /></button>
+                        </div>
+                        
+                        <AnimatePresence>
+                        {activePalette && (
+                            <motion.div
+                                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 p-2 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10"
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.15, ease: 'easeOut' }}
+                            >
+                                {activePalette === 'font' && (
+                                    <div className="flex gap-2">
+                                        {FONT_COLORS.map(({ name, value, isDefault }) => (
+                                            <button
+                                                key={name}
+                                                title={name}
+                                                onClick={() => handleColorFormat('foreColor', value)}
+                                                className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center"
+                                                style={!isDefault ? { backgroundColor: value } : {}}
+                                            >
+                                                {isDefault && <span className="text-sm font-serif">A</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {activePalette === 'highlight' && (
+                                    <div className="flex gap-2">
+                                        {HIGHLIGHT_COLORS.map(({ name, value, isNone }) => (
+                                            <button
+                                                key={name}
+                                                title={name}
+                                                onClick={() => handleColorFormat('backColor', value)}
+                                                className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center"
+                                                style={!isNone ? { backgroundColor: value } : {}}
+                                            >
+                                                 {isNone && <div className="w-full h-0.5 bg-red-500 transform -rotate-45" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                        </AnimatePresence>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        );
+    };
+
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+            <AnimatePresence>
+                {isSlashMenuOpen && <SlashCommandMenu />}
+            </AnimatePresence>
             <Header title={entry ? 'Edit Entry' : 'New Entry'} showBackButton onBack={navigateBack} rightAction={HeaderActions} />
              <AnimatePresence>
                 {isOptionsMenuOpen && (
@@ -612,22 +904,23 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         </div>
                         <div className="flex items-center justify-around mb-2">
                             {([
-                                { style: 'default', label: 'Sans', char: 'S' },
-                                { style: 'serif', label: 'Serif', char: 'S' },
-                                { style: 'mono', label: 'Mono', char: 'M' },
+                                { style: 'default', label: 'Sans', char: 'Ag' },
+                                { style: 'serif', label: 'Serif', char: 'Ag' },
+                                { style: 'mono', label: 'Mono', char: 'Ag' },
                             ] as const).map(({ style, label, char }) => (
                                 <button
                                     key={style}
                                     onClick={() => { setFontStyle(style); markAsChanged(); }}
-                                    className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                    className="flex flex-col items-center gap-1 p-2 rounded-md"
                                 >
-                                    <span className={`text-2xl font-semibold transition-colors ${fontStyle === style ? 'text-light-primary dark:text-dark-primary' : ''}`}>
+                                    <span className={`text-2xl font-semibold transition-colors mt-1 ${fontClasses[style]} ${fontStyle === style ? 'text-light-primary dark:text-dark-primary' : ''}`}>
                                         {char}
                                     </span>
                                     <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{label}</span>
                                 </button>
                             ))}
                         </div>
+                        <MenuDivider/>
                         {(canUndo || canRedo) && (<>
                             <MenuItem icon={<Undo size={16}/>} label="Undo" onClick={handleUndo} disabled={!canUndo} />
                             <MenuItem icon={<Redo size={16}/>} label="Redo" onClick={handleRedo} disabled={!canRedo} />
@@ -653,7 +946,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     </motion.div>
                 )}
             </AnimatePresence>
-            <div className={`flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col overflow-hidden transition-all duration-300`}>
+            <div className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col overflow-hidden transition-all duration-300`}>
+                <FormattingMenu />
                 <div className={`${fontClasses[fontStyle]}`}>
                     <input
                         type="text" value={title} onChange={(e) => {setTitle(e.target.value); markAsChanged();}}
@@ -665,6 +959,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 <div className="relative flex-grow w-full journal-editor-container overflow-y-auto">
                     <div
                         ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
+                        onKeyUp={handleEditorKeyUp} onKeyDown={handleEditorKeyDown}
+                        onContextMenu={(e) => e.preventDefault()}
                         data-placeholder="Start writing..."
                         className={`w-full h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
                         autoFocus={!entry}
@@ -710,6 +1006,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
             <style>{`
                 .journal-editor-container [contentEditable=true]:empty:before { content: attr(data-placeholder); color: #a0a0a0; opacity: 0.5; }
+                .journal-editor-container p { min-height: 1.75rem; /* Corresponds to leading-7 */ }
                 .journal-editor-container h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.25rem; }
                 .journal-editor-container ul, .journal-editor-container ol { padding-left: 1.5rem; margin: 0.5rem 0; }
                 .journal-editor-container ul { list-style-type: disc; }

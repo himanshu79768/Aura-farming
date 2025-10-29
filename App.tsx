@@ -28,7 +28,6 @@ import SessionLinkingPage from './components/SessionLinkingPage';
 import LinkedJournalsPage from './components/LinkedJournalsPage';
 import AttachmentViewerPage from './components/AttachmentViewerPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import Toast from './components/Toast';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -160,8 +159,6 @@ export default function App() {
     message: '',
     type: 'alert',
   });
-
-  const [toastMessage, setToastMessage] = useState('');
 
   const showConfirmationModal = useCallback((options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => {
     setConfirmationModalState({
@@ -390,75 +387,20 @@ export default function App() {
     return () => cancelAnimationFrame(animationFrameId);
   }, [timerState, sessionName, addFocusSession]);
   
-  // --- Navigation & Back Button ---
-  const toastTimer = useRef<number | null>(null);
-  const canExit = useRef(false);
-  const currentViewRef = useRef(currentView);
-  currentViewRef.current = currentView;
-
   const navigateTo = (view: View, params?: any) => {
     if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'].includes(view)) {
-        setModalStack(stack => {
-            const newStack = [...stack, { view, params }];
-            window.history.pushState({ view, isModal: true, stackDepth: newStack.length }, "", `#${view}`);
-            return newStack;
-        });
+        setModalStack(stack => [...stack, { view, params }]);
     } else {
         if (currentView !== view) {
             setModalStack([]);
             setCurrentView(view);
-            window.history.pushState({ view, isModal: false }, "", `#${view}`);
         }
     }
   };
 
   const navigateBack = () => {
-    window.history.back();
+    setModalStack(stack => stack.slice(0, -1));
   };
-
-  const handlePopState = useCallback((event: PopStateEvent) => {
-      if (toastTimer.current) {
-          clearTimeout(toastTimer.current);
-      }
-      if (canExit.current) {
-          return;
-      }
-      
-      const state = event.state;
-
-      if (state && state.view) {
-          if (state.isModal) {
-              setModalStack(stack => stack.slice(0, -1));
-          } else {
-              setCurrentView(state.view);
-              setModalStack([]);
-          }
-          return;
-      }
-
-      setToastMessage('Press back again to exit');
-      canExit.current = true;
-      history.pushState({ view: currentViewRef.current, isModal: false }, '', `#${currentViewRef.current}`);
-
-      toastTimer.current = window.setTimeout(() => {
-          setToastMessage('');
-          canExit.current = false;
-      }, 2000);
-  }, []);
-
-  useEffect(() => {
-      window.history.replaceState({ view: 'home', isModal: false }, "", '#home');
-      
-      const popStateHandler = (event: PopStateEvent) => handlePopState(event);
-      window.addEventListener('popstate', popStateHandler);
-      
-      return () => {
-          window.removeEventListener('popstate', popStateHandler);
-          if (toastTimer.current) {
-              clearTimeout(toastTimer.current);
-          }
-      };
-  }, [handlePopState]);
 
   const toggleFavorite = (id: string) => {
     const dataPathUid = masterUid || currentUser?.uid;
@@ -732,7 +674,6 @@ export default function App() {
             onClose={handleAlertClose}
             type={alertModalState.type}
         />
-        <Toast message={toastMessage} />
       </main>
     </AppContext.Provider>
   );
