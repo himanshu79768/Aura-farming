@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -148,6 +147,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [activePalette, setActivePalette] = useState<'font' | 'highlight' | null>(null);
 
     const editorRef = useRef<HTMLDivElement>(null);
+    const positioningContainerRef = useRef<HTMLDivElement>(null);
     const slashCommandRef = useRef<HTMLElement | null>(null);
     const hasSetInitialContent = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -258,49 +258,84 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     
      // --- Formatting Menu Logic ---
     useEffect(() => {
-        const checkSelection = () => {
-            if (isOptionsMenuOpen) {
-                setIsFormattingMenuOpen(false);
-                return;
-            }
-            
-            const selection = window.getSelection();
+        const editorContainer = document.querySelector('.journal-editor-container');
+        if (!editorContainer) return;
 
-            if (!selection || selection.isCollapsed) {
-                if (isFormattingMenuOpen) setIsFormattingMenuOpen(false);
-                return;
-            }
-
-            const range = selection.getRangeAt(0);
-            const editorNode = editorRef.current;
-
-            if (!editorNode || !editorNode.contains(range.commonAncestorContainer)) {
-                if (isFormattingMenuOpen) setIsFormattingMenuOpen(false);
-                return;
-            }
-
-            const rect = range.getBoundingClientRect();
-            const editorRect = editorNode.getBoundingClientRect();
-            
-            setFormattingMenuPosition({
-                top: rect.top - editorRect.top - 60, // A bit more space above
-                left: rect.left - editorRect.left + rect.width / 2,
-            });
-            setIsFormattingMenuOpen(true);
+        const hideMenu = () => {
+            setIsFormattingMenuOpen(false);
         };
 
-        const handleEvent = () => {
-            // Use a minimal timeout to let the browser update the selection state
-            setTimeout(checkSelection, 1);
-        };
+        const handleSelectionChange = () => {
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
 
-        // Check selection on mouse up and on key up (for keyboard selections)
-        document.addEventListener('mouseup', handleEvent);
-        document.addEventListener('keyup', handleEvent);
+            debounceTimeoutRef.current = window.setTimeout(() => {
+                if (isOptionsMenuOpen) {
+                    hideMenu();
+                    return;
+                }
+
+                const selection = window.getSelection();
+                if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+                    hideMenu();
+                    return;
+                }
+
+                const range = selection.getRangeAt(0);
+                const positioningContainer = positioningContainerRef.current;
+                const editorNode = editorRef.current;
+
+                if (!positioningContainer || !editorNode || !editorNode.contains(range.commonAncestorContainer)) {
+                    hideMenu();
+                    return;
+                }
+
+                const selectionRect = range.getBoundingClientRect();
+                const containerRect = positioningContainer.getBoundingClientRect();
+
+                // Don't show menu for an empty selection rect (can happen)
+                if (selectionRect.width === 0 && selectionRect.height === 0) {
+                    hideMenu();
+                    return;
+                }
+                
+                const MENU_WIDTH = 280; // Approximate width of the menu
+                const MENU_HEIGHT = 44; // Approximate height of the menu
+                const MENU_OFFSET = 10; // Space between selection and menu
+
+                let top = selectionRect.top - containerRect.top - MENU_HEIGHT - MENU_OFFSET;
+                let left = selectionRect.left - containerRect.left + selectionRect.width / 2;
+
+                // Flip to appear below if there's not enough space on top
+                if (top < 0) {
+                    top = selectionRect.bottom - containerRect.top + MENU_OFFSET;
+                }
+                
+                // Adjust left position to keep the menu inside the container
+                if (left - MENU_WIDTH / 2 < 0) {
+                    left = MENU_WIDTH / 2;
+                }
+                if (left + MENU_WIDTH / 2 > containerRect.width) {
+                    left = containerRect.width - MENU_WIDTH / 2;
+                }
+
+                setFormattingMenuPosition({ top, left });
+                if (!isFormattingMenuOpen) {
+                    setIsFormattingMenuOpen(true);
+                }
+            }, 50); // 50ms debounce helps prevent flickering during selection adjustments
+        };
+        
+        document.addEventListener('selectionchange', handleSelectionChange);
+        editorContainer.addEventListener('scroll', hideMenu);
 
         return () => {
-            document.removeEventListener('mouseup', handleEvent);
-            document.removeEventListener('keyup', handleEvent);
+            document.removeEventListener('selectionchange', handleSelectionChange);
+            editorContainer.removeEventListener('scroll', hideMenu);
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
         };
     }, [isFormattingMenuOpen, isOptionsMenuOpen]);
 
@@ -682,7 +717,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const fontClasses: Record<typeof fontStyle, string> = { default: 'font-sans', serif: 'font-serif', mono: 'font-mono' };
 
     const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
-        const spring = { type: "spring", stiffness: 700, damping: 30 };
+        // Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal type.
+        const spring = { type: "spring" as const, stiffness: 700, damping: 30 };
         return (
              <div 
                 className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ${checked ? 'bg-light-primary dark:bg-dark-primary justify-end' : 'bg-gray-200 dark:bg-gray-700 justify-start'}`}
@@ -953,7 +989,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     </motion.div>
                 )}
             </AnimatePresence>
-            <div className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300`}>
+            <div 
+                ref={positioningContainerRef}
+                className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300`}>
                 <FormattingMenu />
                 <div className={`${fontClasses[fontStyle]}`}>
                     <input
