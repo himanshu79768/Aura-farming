@@ -258,42 +258,49 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     
      // --- Formatting Menu Logic ---
     useEffect(() => {
-        const handleMouseUp = () => {
-            // Delay to allow clicks on formatting menu to register before selection is lost
-            setTimeout(() => {
-                if (isOptionsMenuOpen) return;
+        const checkSelection = () => {
+            if (isOptionsMenuOpen) {
+                setIsFormattingMenuOpen(false);
+                return;
+            }
+            
+            const selection = window.getSelection();
 
-                const selection = window.getSelection();
-                if (!selection || selection.rangeCount === 0) {
-                    if (isFormattingMenuOpen) setIsFormattingMenuOpen(false);
-                    return;
-                }
+            if (!selection || selection.isCollapsed) {
+                if (isFormattingMenuOpen) setIsFormattingMenuOpen(false);
+                return;
+            }
 
-                const range = selection.getRangeAt(0);
-                const editorNode = editorRef.current;
-                
-                if (selection.isCollapsed || !editorNode || !editorNode.contains(range.commonAncestorContainer)) {
-                    if (isFormattingMenuOpen) {
-                        setIsFormattingMenuOpen(false);
-                        setActivePalette(null);
-                    }
-                    return;
-                }
+            const range = selection.getRangeAt(0);
+            const editorNode = editorRef.current;
 
-                const rect = range.getBoundingClientRect();
-                const editorRect = editorNode.getBoundingClientRect();
-                
-                setFormattingMenuPosition({
-                    top: rect.top - editorRect.top - 65,
-                    left: rect.left - editorRect.left + rect.width / 2,
-                });
-                setIsFormattingMenuOpen(true);
-            }, 10);
+            if (!editorNode || !editorNode.contains(range.commonAncestorContainer)) {
+                if (isFormattingMenuOpen) setIsFormattingMenuOpen(false);
+                return;
+            }
+
+            const rect = range.getBoundingClientRect();
+            const editorRect = editorNode.getBoundingClientRect();
+            
+            setFormattingMenuPosition({
+                top: rect.top - editorRect.top - 60, // A bit more space above
+                left: rect.left - editorRect.left + rect.width / 2,
+            });
+            setIsFormattingMenuOpen(true);
         };
 
-        document.addEventListener("mouseup", handleMouseUp);
+        const handleEvent = () => {
+            // Use a minimal timeout to let the browser update the selection state
+            setTimeout(checkSelection, 1);
+        };
+
+        // Check selection on mouse up and on key up (for keyboard selections)
+        document.addEventListener('mouseup', handleEvent);
+        document.addEventListener('keyup', handleEvent);
+
         return () => {
-            document.removeEventListener("mouseup", handleMouseUp);
+            document.removeEventListener('mouseup', handleEvent);
+            document.removeEventListener('keyup', handleEvent);
         };
     }, [isFormattingMenuOpen, isOptionsMenuOpen]);
 
@@ -806,7 +813,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         transition={{ duration: 0.15, ease: 'easeOut' }}
                         onMouseDown={(e) => e.preventDefault()}
                     >
-                        <div className="p-1 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10 flex items-center gap-1 relative z-10">
+                        <div className="p-1 bg-light-bg-secondary/80 dark:bg-dark-bg-secondary/80 backdrop-blur-md rounded-xl shadow-2xl border border-white/10 flex items-center gap-1 relative z-10">
                             <button onClick={() => handleFormat('bold')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Bold size={18} /></button>
                             <button onClick={() => handleFormat('italic')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Italic size={18} /></button>
                             <button onClick={() => handleFormat('underline')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Underline size={18} /></button>
@@ -946,7 +953,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     </motion.div>
                 )}
             </AnimatePresence>
-            <div className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col overflow-hidden transition-all duration-300`}>
+            <div className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300`}>
                 <FormattingMenu />
                 <div className={`${fontClasses[fontStyle]}`}>
                     <input
@@ -1005,6 +1012,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             </div>
             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
             <style>{`
+                .journal-editor-container [contentEditable=true] {
+                    -webkit-user-select: text;
+                    -moz-user-select: text;
+                    -ms-user-select: text;
+                    user-select: text;
+                }
                 .journal-editor-container [contentEditable=true]:empty:before { content: attr(data-placeholder); color: #a0a0a0; opacity: 0.5; }
                 .journal-editor-container p { min-height: 1.75rem; /* Corresponds to leading-7 */ }
                 .journal-editor-container h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.25rem; }

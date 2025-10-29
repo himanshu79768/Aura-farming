@@ -553,7 +553,7 @@ export default function App() {
         showConfirmationModal, showAlertModal,
         currentUser,
     }}>
-      <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen overflow-hidden relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
+      <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
             {shouldOnboard ? (
                 <OnboardingScreen 

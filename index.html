@@ -89,6 +89,10 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         margin: 0;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
       }
       .tappable {
         -webkit-tap-highlight-color: transparent;
@@ -136,7 +140,7 @@
   })();
 </script>
 </head>
-  <body>
+  <body oncontextmenu="return false;">
     <div id="root"></div>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
