@@ -583,7 +583,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 {isOptionsMenuOpen && (
                      <motion.div
                         ref={menuRef}
-                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 rounded-xl border border-white/10 shadow-3xl origin-top-right z-30 p-3 text-base"
+                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-xl border border-white/10 shadow-3xl origin-top-right z-30 p-3 text-base"
                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
@@ -610,22 +610,21 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                 )}
                             </div>
                         </div>
-                        <div className="relative flex items-center justify-between bg-black/5 dark:bg-white/5 p-1 rounded-md mb-2">
-                            {(['default', 'serif', 'mono'] as const).map(style => (
-                                <button 
-                                    key={style} 
-                                    onClick={() => {setFontStyle(style); markAsChanged();}} 
-                                    className={`relative w-full flex flex-col items-center justify-center gap-1 text-center px-2 py-1.5 rounded z-10`}
+                        <div className="flex items-center justify-around mb-2">
+                            {([
+                                { style: 'default', label: 'Sans', char: 'S' },
+                                { style: 'serif', label: 'Serif', char: 'S' },
+                                { style: 'mono', label: 'Mono', char: 'M' },
+                            ] as const).map(({ style, label, char }) => (
+                                <button
+                                    key={style}
+                                    onClick={() => { setFontStyle(style); markAsChanged(); }}
+                                    className="flex flex-col items-center gap-1 p-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                                 >
-                                    {fontStyle === style && (
-                                        <motion.div
-                                            layoutId="font-style-active-bg"
-                                            className="absolute inset-0 bg-light-bg dark:bg-dark-bg rounded shadow-sm"
-                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                        />
-                                    )}
-                                    <span className="relative text-xs capitalize font-medium">{style === 'default' ? 'Sans' : style}</span>
-                                    <span className={`relative ${fontClasses[style]} text-xl`}>Aa</span>
+                                    <span className={`text-2xl font-semibold transition-colors ${fontStyle === style ? 'text-light-primary dark:text-dark-primary' : ''}`}>
+                                        {char}
+                                    </span>
+                                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{label}</span>
                                 </button>
                             ))}
                         </div>
@@ -645,7 +644,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                          <MenuDivider/>
                          <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length})`} onClick={handleLinkSession}/>
                          <MenuDivider/>
-                         <div className="text-xs text-gray-500 dark:text-gray-400 px-2 pt-2 space-y-1">
+                         <div className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-75 px-2 pt-2 space-y-1">
                              <p>Word count: {wordCount}</p>
                              <p>Last edited by {userProfile.name}</p>
                              <p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', hour12: true }).format(lastModified)}</p>
