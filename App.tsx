@@ -89,9 +89,7 @@ export const useAppContext = () => {
 // --- Motion Variants & Transitions ---
 const pageVariants = { initial: { opacity: 0, scale: 0.98 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.98 } };
 const modalVariants = { initial: { opacity: 0, y: '100%' }, in: { opacity: 1, y: '0%' }, out: { opacity: 0, y: '100%' } };
-// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
 const pageTransition = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.3 };
-// Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
 const modalTransition = { type: 'tween' as const, ease: [0.32, 0.72, 0, 1] as const, duration: 0.35 };
 const moodFromColors: Record<Mood, string> = {
   [Mood.Calm]: 'from-blue-400/25',
@@ -165,7 +163,6 @@ export default function App() {
 
   const [toastMessage, setToastMessage] = useState('');
 
-  // Fix: Moved showAlertModal and showConfirmationModal before their usage to prevent a 'used before declaration' error.
   const showConfirmationModal = useCallback((options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => {
     setConfirmationModalState({
         isOpen: true,
@@ -230,7 +227,6 @@ export default function App() {
             setFocusHistory(focusHistoryArray);
 
         } else if (masterUid) {
-            // This can happen if data is deleted from DB but masterUid remains in localStorage
             set(userRef, { ...DEFAULT_USER_DATA, name: 'User' });
         }
         setIsLoading(false);
@@ -373,91 +369,95 @@ export default function App() {
   }, [currentUser, masterUid, playSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
 
   useEffect(() => {
-    // This effect handles the timer countdown.
     if (!timerState.isActive || timerState.endTime <= 0) {
-      return; // Timer is not running, do nothing.
+      return;
     }
 
     let animationFrameId: number;
-
     const tick = () => {
       const remaining = Math.round((timerState.endTime - Date.now()) / 1000);
-
       if (remaining > 0) {
         setTimeLeft(remaining);
         animationFrameId = requestAnimationFrame(tick);
       } else {
-        // Time is up.
         setTimeLeft(0);
         setTimerState(s => ({ ...s, isActive: false }));
         setIsTimerFinished(true);
-        // This is now guaranteed to run only once per session completion.
         addFocusSession(timerState.duration, sessionName);
       }
     };
-
     animationFrameId = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
+    return () => cancelAnimationFrame(animationFrameId);
   }, [timerState, sessionName, addFocusSession]);
   
+  // --- Navigation & Back Button ---
+  const toastTimer = useRef<number | null>(null);
+  const canExit = useRef(false);
+  const currentViewRef = useRef(currentView);
+  currentViewRef.current = currentView;
+
   const navigateTo = (view: View, params?: any) => {
     if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'].includes(view)) {
         setModalStack(stack => {
             const newStack = [...stack, { view, params }];
-            // Push state to history for the new modal
-            window.history.pushState({ modalIndex: newStack.length }, "", `#${view}`);
+            window.history.pushState({ view, isModal: true, stackDepth: newStack.length }, "", `#${view}`);
             return newStack;
         });
     } else {
-        setModalStack([]);
-        setCurrentView(view);
+        if (currentView !== view) {
+            setModalStack([]);
+            setCurrentView(view);
+            window.history.pushState({ view, isModal: false }, "", `#${view}`);
+        }
     }
   };
 
   const navigateBack = () => {
     window.history.back();
   };
-  
-  const toastTimer = useRef<number | null>(null);
-  const canExit = useRef(false);
-  
-  const handlePopState = useCallback(() => {
-    if (toastTimer.current) {
-        clearTimeout(toastTimer.current);
-    }
 
-    if (modalStack.length > 0) {
-        setModalStack(stack => stack.slice(0, -1));
-        return;
-    }
-    
-    if (canExit.current) {
-        return;
-    }
+  const handlePopState = useCallback((event: PopStateEvent) => {
+      if (toastTimer.current) {
+          clearTimeout(toastTimer.current);
+      }
+      if (canExit.current) {
+          return;
+      }
+      
+      const state = event.state;
 
-    setToastMessage('Press back again to exit');
-    canExit.current = true;
-    
-    history.pushState(null, '', location.href);
+      if (state && state.view) {
+          if (state.isModal) {
+              setModalStack(stack => stack.slice(0, -1));
+          } else {
+              setCurrentView(state.view);
+              setModalStack([]);
+          }
+          return;
+      }
 
-    toastTimer.current = window.setTimeout(() => {
-        setToastMessage('');
-        canExit.current = false;
-    }, 2000);
+      setToastMessage('Press back again to exit');
+      canExit.current = true;
+      history.pushState({ view: currentViewRef.current, isModal: false }, '', `#${currentViewRef.current}`);
 
-  }, [modalStack.length]);
+      toastTimer.current = window.setTimeout(() => {
+          setToastMessage('');
+          canExit.current = false;
+      }, 2000);
+  }, []);
 
   useEffect(() => {
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-        window.removeEventListener('popstate', handlePopState);
-        if (toastTimer.current) {
-            clearTimeout(toastTimer.current);
-        }
-    };
+      window.history.replaceState({ view: 'home', isModal: false }, "", '#home');
+      
+      const popStateHandler = (event: PopStateEvent) => handlePopState(event);
+      window.addEventListener('popstate', popStateHandler);
+      
+      return () => {
+          window.removeEventListener('popstate', popStateHandler);
+          if (toastTimer.current) {
+              clearTimeout(toastTimer.current);
+          }
+      };
   }, [handlePopState]);
 
   const toggleFavorite = (id: string) => {
@@ -489,7 +489,6 @@ export default function App() {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return false;
     
-    // Optimistically update local state for instant UI feedback
     setJournalEntries(prevEntries =>
         prevEntries.map(e => e.id === updatedEntry.id ? updatedEntry : e)
     );
@@ -502,8 +501,6 @@ export default function App() {
     } catch (error) {
         console.error("Error updating journal entry:", error);
         showAlertModal({ title: "Update Failed", message: "Could not update your entry. Please try again." });
-        // Note: The onValue listener will eventually correct the state if the update fails,
-        // so no explicit rollback is implemented here for simplicity.
         return false;
     }
   };
@@ -533,13 +530,12 @@ export default function App() {
       return false;
     }
     
-    // Create a new entry object, omitting the original id and createdAt
     const { id: originalId, createdAt, ...data } = entryToDuplicate;
 
     const newEntry: Omit<JournalEntry, 'id' | 'createdAt'> = {
       ...data,
       title: `${data.title || 'Untitled'} (Copy)`,
-      date: new Date().toISOString(), // Use current date for the new entry
+      date: new Date().toISOString(),
     };
 
     const success = await addJournalEntry(newEntry);
@@ -585,7 +581,6 @@ export default function App() {
       setAlertModalState(s => ({ ...s, isOpen: false }));
   };
   
-  // --- Render Logic ---
   const renderView = () => {
     switch (currentView) {
       case 'home': return <HomePage />;
