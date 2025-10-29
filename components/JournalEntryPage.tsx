@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -145,6 +144,14 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [isFormattingMenuOpen, setIsFormattingMenuOpen] = useState(false);
     const [formattingMenuPosition, setFormattingMenuPosition] = useState({ top: 0, left: 0 });
     const [activePalette, setActivePalette] = useState<'font' | 'highlight' | null>(null);
+    const [activeFormats, setActiveFormats] = useState({
+        bold: false,
+        italic: false,
+        underline: false,
+        strikethrough: false,
+    });
+    const [isMouseOverMenu, setIsMouseOverMenu] = useState(false);
+
 
     const editorRef = useRef<HTMLDivElement>(null);
     const positioningContainerRef = useRef<HTMLDivElement>(null);
@@ -153,6 +160,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const debounceTimeoutRef = useRef<number | null>(null);
+    const formattingMenuRef = useRef<HTMLDivElement>(null);
+    const paletteRef = useRef<HTMLDivElement>(null);
 
     const markAsChanged = useCallback(() => {
         if (!hasUnsavedChanges) {
@@ -199,7 +208,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         nodesToProcess.forEach(textNode => {
             if (!textNode.textContent || !regex.test(textNode.textContent)) return;
             const parent = textNode.parentNode;
-            if (!parent || (parent as HTMLElement).tagName === 'MARK') return;
+            if (!parent || (parent as HTMLElement).tagName === 'MARK' || (parent as HTMLElement).closest('[data-highlight="true"]')) return;
 
             const fragment = document.createDocumentFragment();
             let lastIndex = 0;
@@ -263,6 +272,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
         const hideMenu = () => {
             setIsFormattingMenuOpen(false);
+            setActivePalette(null);
         };
 
         const handleSelectionChange = () => {
@@ -277,10 +287,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 }
 
                 const selection = window.getSelection();
-                if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+                if ((!selection || selection.isCollapsed || selection.rangeCount === 0) && !isMouseOverMenu) {
                     hideMenu();
                     return;
                 }
+                if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
 
                 const range = selection.getRangeAt(0);
                 const positioningContainer = positioningContainerRef.current;
@@ -291,40 +302,44 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     return;
                 }
 
+                // Update active formats
+                setActiveFormats({
+                    bold: document.queryCommandState('bold'),
+                    italic: document.queryCommandState('italic'),
+                    underline: document.queryCommandState('underline'),
+                    strikethrough: document.queryCommandState('strikeThrough'),
+                });
+
                 const selectionRect = range.getBoundingClientRect();
                 const containerRect = positioningContainer.getBoundingClientRect();
 
-                // Don't show menu for an empty selection rect (can happen)
                 if (selectionRect.width === 0 && selectionRect.height === 0) {
                     hideMenu();
                     return;
                 }
                 
-                const MENU_WIDTH = 280; // Approximate width of the menu
-                const MENU_HEIGHT = 44; // Approximate height of the menu
-                const MENU_OFFSET = 10; // Space between selection and menu
+                const MENU_WIDTH = 320;
+                const MENU_HEIGHT = 44;
+                const MENU_OFFSET = 10;
 
                 let top = selectionRect.top - containerRect.top - MENU_HEIGHT - MENU_OFFSET;
-                let left = selectionRect.left - containerRect.left + selectionRect.width / 2;
+                
+                const selectionCenter = selectionRect.left - containerRect.left + selectionRect.width / 2;
+                let left = selectionCenter - MENU_WIDTH / 2;
 
-                // Flip to appear below if there's not enough space on top
                 if (top < 0) {
                     top = selectionRect.bottom - containerRect.top + MENU_OFFSET;
                 }
                 
-                // Adjust left position to keep the menu inside the container
-                if (left - MENU_WIDTH / 2 < 0) {
-                    left = MENU_WIDTH / 2;
-                }
-                if (left + MENU_WIDTH / 2 > containerRect.width) {
-                    left = containerRect.width - MENU_WIDTH / 2;
-                }
+                const minLeft = 0;
+                const maxLeft = containerRect.width - MENU_WIDTH;
+                left = Math.max(minLeft, Math.min(left, maxLeft));
 
                 setFormattingMenuPosition({ top, left });
                 if (!isFormattingMenuOpen) {
                     setIsFormattingMenuOpen(true);
                 }
-            }, 50); // 50ms debounce helps prevent flickering during selection adjustments
+            }, 50);
         };
         
         document.addEventListener('selectionchange', handleSelectionChange);
@@ -337,7 +352,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 clearTimeout(debounceTimeoutRef.current);
             }
         };
-    }, [isFormattingMenuOpen, isOptionsMenuOpen]);
+    }, [isFormattingMenuOpen, isOptionsMenuOpen, isMouseOverMenu]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -648,7 +663,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         
         command.action();
 
-        // Trigger content change for autosave and history
         editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
 
         setIsSlashMenuOpen(false);
@@ -691,7 +705,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     }, [isSlashMenuOpen]);
     
     const handleEditorKeyUp = () => {
-        // We wrap this in a timeout to ensure the DOM has updated before we check it.
         setTimeout(checkSlashCommand, 0);
     };
 
@@ -717,7 +730,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const fontClasses: Record<typeof fontStyle, string> = { default: 'font-sans', serif: 'font-serif', mono: 'font-mono' };
 
     const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
-        // Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal type.
         const spring = { type: "spring" as const, stiffness: 700, damping: 30 };
         return (
              <div 
@@ -802,7 +814,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            onClick={(e) => e.stopPropagation()} // Prevent click-outside-to-close
+            onClick={(e) => e.stopPropagation()}
         >
             <p className="px-2 pt-1 pb-2 text-xs font-semibold uppercase text-light-text-secondary dark:text-dark-text-secondary">Blocks</p>
             {filteredCommands.length > 0 ? filteredCommands.map((cmd, index) => (
@@ -820,50 +832,143 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             )) : <p className="p-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">No matching commands.</p>}
         </motion.div>
     );
+    
+    const handleRemoveHighlight = useCallback(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        let node = selection.getRangeAt(0).commonAncestorContainer;
+        
+        while(node && node !== editorRef.current) {
+            if (node.nodeType === 1 && (node as HTMLElement).dataset.highlight === 'true') {
+                const span = node as HTMLElement;
+                const parent = span.parentNode;
+                if (parent) {
+                    while (span.firstChild) {
+                        parent.insertBefore(span.firstChild, span);
+                    }
+                    parent.removeChild(span);
+                    parent.normalize();
+                }
+                // Continue search in case of nested highlights
+            }
+            node = node.parentNode;
+        }
+        // Fallback for simple browser highlights
+        document.execCommand('backColor', false, 'transparent');
+    }, []);
+    
+    const handleApplyHighlight = useCallback((color: string) => {
+        handleRemoveHighlight(); // Clear existing highlights in selection first
+        
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || color === 'transparent') return;
+    
+        const thickness = 75; // Default thickness
+        const calculatedPosition = 65 + (thickness / 4);
+    
+        const span = document.createElement('span');
+        span.dataset.highlight = 'true';
+        span.style.backgroundColor = color;
+        span.style.backgroundImage = `linear-gradient(to top, ${color}, ${color})`;
+        span.style.backgroundRepeat = 'no-repeat';
+        span.style.backgroundSize = `100% ${thickness}%`;
+        span.style.backgroundPosition = `0% ${calculatedPosition}%`;
+        span.className = 'custom-highlight';
+    
+        const range = selection.getRangeAt(0);
+        try {
+            range.surroundContents(span);
+        } catch (e) {
+            console.warn("Could not apply custom highlight due to complex selection. Falling back to simple highlight.", e);
+            document.execCommand('backColor', false, color);
+        }
+    
+        editorRef.current?.focus();
+        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    }, [handleRemoveHighlight]);
+
 
     const FormattingMenu = () => {
         const handleFormat = (command: string, value?: string) => {
             document.execCommand(command, false, value);
             editorRef.current?.focus();
             editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+             setActiveFormats({
+                bold: document.queryCommandState('bold'),
+                italic: document.queryCommandState('italic'),
+                underline: document.queryCommandState('underline'),
+                strikethrough: document.queryCommandState('strikeThrough'),
+            });
         };
     
-        const handleColorFormat = (command: string, value: string) => {
-            handleFormat(command, value);
+        const handleHighlightFormat = (color: string) => {
+            if (color === 'transparent') {
+                handleRemoveHighlight();
+            } else {
+                handleApplyHighlight(color);
+            }
             setActivePalette(null);
         };
+    
+        useEffect(() => {
+            if (activePalette && paletteRef.current && formattingMenuRef.current && positioningContainerRef.current) {
+                const palette = paletteRef.current;
+                const menu = formattingMenuRef.current;
+                const container = positioningContainerRef.current;
+    
+                const menuRect = menu.getBoundingClientRect();
+                const paletteRect = palette.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                
+                if (paletteRect.width === 0) return;
+    
+                let left = (menuRect.width / 2) - (paletteRect.width / 2);
+                const absoluteLeft = menuRect.left + left;
+    
+                if (absoluteLeft < containerRect.left) {
+                    left = containerRect.left - menuRect.left;
+                } else if (absoluteLeft + paletteRect.width > containerRect.right) {
+                    left = containerRect.right - menuRect.left - paletteRect.width - 5;
+                }
+    
+                palette.style.left = `${left}px`;
+            }
+        }, [activePalette, isFormattingMenuOpen]);
     
         return (
             <AnimatePresence>
                 {isFormattingMenuOpen && (
                     <motion.div
-                        style={{ 
-                            top: formattingMenuPosition.top, 
-                            left: formattingMenuPosition.left,
-                            transform: 'translateX(-50%)'
-                        }}
-                        className="absolute z-40"
+                        ref={formattingMenuRef}
+                        style={{ top: formattingMenuPosition.top, left: formattingMenuPosition.left }}
+                        className="absolute z-40 cursor-grab"
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         transition={{ duration: 0.15, ease: 'easeOut' }}
-                        onMouseDown={(e) => e.preventDefault()}
+                        drag
+                        dragConstraints={positioningContainerRef}
+                        dragMomentum={false}
+                        whileTap={{ cursor: 'grabbing' }}
+                        onMouseEnter={() => setIsMouseOverMenu(true)}
+                        onMouseLeave={() => setIsMouseOverMenu(false)}
                     >
-                        <div className="p-1 bg-light-bg-secondary/80 dark:bg-dark-bg-secondary/80 backdrop-blur-md rounded-xl shadow-2xl border border-white/10 flex items-center gap-1 relative z-10">
-                            <button onClick={() => handleFormat('bold')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Bold size={18} /></button>
-                            <button onClick={() => handleFormat('italic')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Italic size={18} /></button>
-                            <button onClick={() => handleFormat('underline')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Underline size={18} /></button>
-                            <button onClick={() => handleFormat('strikeThrough')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Strikethrough size={18} /></button>
+                        <div className="p-1 bg-light-bg-secondary/80 dark:bg-dark-bg-secondary/80 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className={`p-2 rounded ${activeFormats.bold ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Bold size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className={`p-2 rounded ${activeFormats.italic ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Italic size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('underline')} className={`p-2 rounded ${activeFormats.underline ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Underline size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('strikeThrough')} className={`p-2 rounded ${activeFormats.strikethrough ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Strikethrough size={18} /></button>
                             <div className="w-px h-5 bg-black/10 dark:bg-white/10 mx-1"></div>
-                            <button onClick={() => handleFormat('copy')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Copy size={18} /></button>
-                            <button onClick={() => setActivePalette(p => p === 'highlight' ? null : 'highlight')} className={`p-2 rounded ${activePalette === 'highlight' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Highlighter size={18} /></button>
-                            <button onClick={() => setActivePalette(p => p === 'font' ? null : 'font')} className={`p-2 rounded ${activePalette === 'font' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><PaletteIcon size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('copy')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Copy size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePalette(p => p === 'highlight' ? null : 'highlight')} className={`p-2 rounded ${activePalette === 'highlight' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Highlighter size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePalette(p => p === 'font' ? null : 'font')} className={`p-2 rounded ${activePalette === 'font' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><PaletteIcon size={18} /></button>
                         </div>
                         
                         <AnimatePresence>
                         {activePalette && (
                             <motion.div
-                                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 p-2 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10"
+                                ref={paletteRef}
+                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10"
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
@@ -872,29 +977,17 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                 {activePalette === 'font' && (
                                     <div className="flex gap-2">
                                         {FONT_COLORS.map(({ name, value, isDefault }) => (
-                                            <button
-                                                key={name}
-                                                title={name}
-                                                onClick={() => handleColorFormat('foreColor', value)}
-                                                className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center"
-                                                style={!isDefault ? { backgroundColor: value } : {}}
-                                            >
+                                            <button key={name} title={name} onMouseDown={(e) => e.preventDefault()} onClick={() => {handleFormat('foreColor', value); setActivePalette(null);}} className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center" style={!isDefault ? { backgroundColor: value } : {}}>
                                                 {isDefault && <span className="text-sm font-serif">A</span>}
                                             </button>
                                         ))}
                                     </div>
                                 )}
                                 {activePalette === 'highlight' && (
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 items-center">
                                         {HIGHLIGHT_COLORS.map(({ name, value, isNone }) => (
-                                            <button
-                                                key={name}
-                                                title={name}
-                                                onClick={() => handleColorFormat('backColor', value)}
-                                                className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center"
-                                                style={!isNone ? { backgroundColor: value } : {}}
-                                            >
-                                                 {isNone && <div className="w-full h-0.5 bg-red-500 transform -rotate-45" />}
+                                            <button key={name} title={name} onMouseDown={(e) => e.preventDefault()} onClick={() => handleHighlightFormat(value)} className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center" style={!isNone ? { backgroundColor: value } : {}}>
+                                                    {isNone && <div className="w-full h-0.5 bg-red-500 transform -rotate-45" />}
                                             </button>
                                         ))}
                                     </div>
@@ -1050,14 +1143,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             </div>
             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
             <style>{`
-                .journal-editor-container [contentEditable=true] {
-                    -webkit-user-select: text;
-                    -moz-user-select: text;
-                    -ms-user-select: text;
-                    user-select: text;
-                }
+                .journal-editor-container [contentEditable=true] { -webkit-user-select: text; user-select: text; }
                 .journal-editor-container [contentEditable=true]:empty:before { content: attr(data-placeholder); color: #a0a0a0; opacity: 0.5; }
-                .journal-editor-container p { min-height: 1.75rem; /* Corresponds to leading-7 */ }
+                .journal-editor-container p { min-height: 1.75rem; }
                 .journal-editor-container h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.25rem; }
                 .journal-editor-container ul, .journal-editor-container ol { padding-left: 1.5rem; margin: 0.5rem 0; }
                 .journal-editor-container ul { list-style-type: disc; }
@@ -1069,6 +1157,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
                 mark.search-highlight { background-color: #facc15; color: black; border-radius: 3px; }
                 mark.search-highlight.current { background-color: #fb923c; }
+                .custom-highlight { color: inherit; }
+                html.dark .journal-editor-container .custom-highlight { color: #1a1a1a !important; }
+                html.dark .journal-editor-container [style*="rgb(254, 240, 138)"],
+                html.dark .journal-editor-container [style*="rgb(251, 207, 232)"],
+                html.dark .journal-editor-container [style*="rgb(191, 219, 254)"],
+                html.dark .journal-editor-container [style*="rgb(167, 243, 208)"],
+                html.dark .journal-editor-container [style*="rgb(233, 213, 255)"] {
+                    color: #1a1a1a !important;
+                }
             `}</style>
         </div>
     );
