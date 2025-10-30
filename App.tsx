@@ -58,6 +58,10 @@ interface AppContextType {
   vibrate: (style?: 'light' | 'medium' | 'heavy') => void;
   navigateTo: (view: View, params?: any) => void;
   navigateBack: () => void;
+  navigateForward: () => void;
+  navigateToStackIndex: (index: number) => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
   timeLeft: number;
   timerDuration: number;
   isTimerActive: boolean;
@@ -75,6 +79,8 @@ interface AppContextType {
   showConfirmationModal: (options: { title: string; message: string; onConfirm: () => void; confirmText?: string; }) => void;
   showAlertModal: (options: { title: string; message: string; type?: 'alert' | 'success' }) => void;
   currentUser: any | null;
+  currentView: View;
+  modalStack: { view: View; params?: any }[];
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -123,6 +129,7 @@ export default function App() {
   // App State
   const [currentView, setCurrentView] = useState<View>('home');
   const [modalStack, setModalStack] = useState<{ view: View; params?: any }[]>([]);
+  const [forwardStack, setForwardStack] = useState<{ view: View; params?: any }[]>([]);
   const [mood, setMood] = useState<Mood>(Mood.Calm);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -390,6 +397,8 @@ export default function App() {
   }, [timerState, sessionName, addFocusSession]);
   
   const navigateTo = (view: View, params?: any) => {
+    // Any new navigation action clears the forward history.
+    setForwardStack([]);
     if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'].includes(view)) {
         setModalStack(stack => [...stack, { view, params }]);
     } else {
@@ -401,7 +410,33 @@ export default function App() {
   };
 
   const navigateBack = () => {
-    setModalStack(stack => stack.slice(0, -1));
+    if (modalStack.length > 0) {
+        const lastModal = modalStack[modalStack.length - 1];
+        setForwardStack(stack => [lastModal, ...stack]); // Add to forward history
+        setModalStack(stack => stack.slice(0, -1));
+    }
+  };
+
+  const navigateForward = () => {
+    if (forwardStack.length > 0) {
+        const [nextView, ...restOfStack] = forwardStack;
+        setForwardStack(restOfStack);
+        setModalStack(stack => [...stack, nextView]);
+    }
+  };
+  
+  const navigateToStackIndex = (index: number) => {
+    if (index < modalStack.length - 1) { // Only navigate if not clicking the last item
+        vibrate();
+        const itemsToMove = modalStack.slice(index + 1);
+        setForwardStack(stack => [...itemsToMove.reverse(), ...stack]);
+        
+        if (index === -1) { // Clicked on root
+            setModalStack([]);
+        } else {
+            setModalStack(stack => stack.slice(0, index + 1));
+        }
+    }
   };
 
   const toggleFavorite = (id: string) => {
@@ -565,13 +600,14 @@ export default function App() {
     <AppContext.Provider value={{ 
         mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
         userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-        focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack,
+        focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
         timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
         focusSearchQuery, setFocusSearchQuery,
         logoutUser, loginUserByName,
         showConfirmationModal, showAlertModal,
         currentUser,
+        currentView, modalStack,
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">

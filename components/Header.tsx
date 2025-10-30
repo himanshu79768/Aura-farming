@@ -1,8 +1,9 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Zap, Droplet, Sun } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Zap, Droplet, Sun } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Mood } from '../types';
+import Breadcrumbs from './Breadcrumbs';
 
 interface HeaderProps {
     title?: string;
@@ -57,14 +58,15 @@ const MoodSelector: React.FC = () => {
 }
 
 const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, leftAction, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
+    const { navigateBack, navigateForward, canGoBack, canGoForward } = useAppContext();
     const measureRef = useRef<HTMLHeadingElement>(null);
-    const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-lg');
+    const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-base');
 
     useLayoutEffect(() => {
         const checkWrap = () => {
             const element = measureRef.current;
             if (element) {
-                const originalClass = titleClassName || 'text-lg';
+                const originalClass = titleClassName || 'text-base';
                 const smallerClass = originalClass === 'text-base' ? 'text-sm' : 'text-base';
     
                 const style = getComputedStyle(element);
@@ -81,43 +83,90 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
     }, [title, titleClassName]);
     
     return (
-        <header className="relative w-full min-h-[5rem] h-auto flex items-center justify-center p-4 z-20 flex-shrink-0">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                {leftAction ? leftAction : (showBackButton && (
-                    <motion.button 
-                        onClick={onBack} 
-                        className="flex items-center gap-1 text-light-primary dark:text-dark-primary"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                    >
-                        <ChevronLeft className="w-6 h-6" />
-                        <span className="text-lg">Back</span>
-                    </motion.button>
-                ))}
-            </div>
+        <header className="relative w-full min-h-[5rem] h-auto flex items-center p-4 z-20 flex-shrink-0">
             
-            {showCenteredMoodSelector ? (
-                <MoodSelector />
-            ) : (
-                <div className="relative flex items-center justify-center">
-                    {/* The actual visible title */}
-                    <motion.h1 
-                        key={title}
-                        className={`font-semibold text-center max-w-[calc(100vw-11rem)] ${effectiveTitleClass}`}
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                    >
-                        {title}
-                    </motion.h1>
-
-                    {/* A hidden element used ONLY for measuring if the title *would* wrap with the original font size */}
-                    <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-11rem)] absolute invisible -z-10 ${titleClassName || 'text-lg'}`}>{title}</h1>
+            {/* --- Mobile Layout (uses absolute positioning) --- */}
+            <div className="w-full flex items-center justify-center md:hidden">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    {leftAction ? leftAction : (showBackButton && (
+                        <motion.button 
+                            onClick={onBack} 
+                            className="flex items-center gap-1 text-light-primary dark:text-dark-primary"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                        >
+                            <ChevronLeft className="w-6 h-6" />
+                            <span className="text-lg">Back</span>
+                        </motion.button>
+                    ))}
                 </div>
-            )}
+                
+                {showCenteredMoodSelector ? (
+                    <MoodSelector />
+                ) : (
+                    <div className="relative flex items-center justify-center">
+                        <motion.h1 
+                            key={title}
+                            className={`font-semibold text-center max-w-[calc(100vw-11rem)] ${effectiveTitleClass}`}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                        >
+                            {title}
+                        </motion.h1>
 
-            <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                 {rightAction ? rightAction : (!showCenteredMoodSelector && !showBackButton && !leftAction && <MoodSelector />)}
+                        <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-11rem)] absolute invisible -z-10 ${titleClassName || 'text-base'}`}>{title}</h1>
+                    </div>
+                )}
+
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    {rightAction ? rightAction : (!showCenteredMoodSelector && !showBackButton && !leftAction && <MoodSelector />)}
+                </div>
+            </div>
+
+            {/* --- Desktop Layout (uses flex column) --- */}
+            <div className="hidden md:flex flex-col w-full items-start">
+                <div className="w-full flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        {leftAction ? leftAction : (
+                            <>
+                                <motion.button 
+                                    onClick={navigateBack} 
+                                    disabled={!canGoBack}
+                                    className="flex items-center p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    aria-label="Back"
+                                >
+                                    <ChevronLeft className="w-5 h-5" />
+                                </motion.button>
+                                <motion.button
+                                    onClick={navigateForward}
+                                    disabled={!canGoForward}
+                                    className="flex items-center p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    aria-label="Forward"
+                                >
+                                    <ChevronRight className="w-5 h-5" />
+                                </motion.button>
+                            </>
+                        )}
+                        {!showCenteredMoodSelector && (
+                            <motion.h1 
+                                key={title}
+                                className={`font-semibold ml-1 ${titleClassName || 'text-base'}`}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                            >
+                                {title}
+                            </motion.h1>
+                        )}
+                    </div>
+
+                    <div className="flex items-center">
+                        {rightAction ? rightAction : ((showCenteredMoodSelector || (!showBackButton && !leftAction)) && <MoodSelector />)}
+                    </div>
+                </div>
+                 <div className="mt-2">
+                    <Breadcrumbs />
+                </div>
             </div>
         </header>
     );

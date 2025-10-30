@@ -1,4 +1,4 @@
-import { Quote, FocusMusic, AccentColor } from './types';
+import { Quote, FocusMusic, AccentColor, View } from './types';
 
 export const INITIAL_QUOTES: Quote[] = [
   { id: '1', text: "You have the right to work, but never to the fruit of work.", author: "Bhagavad Gita" },
@@ -86,4 +86,25 @@ export const ACCENT_COLORS: Record<AccentColor, { name: string; light: string; d
     teal: { name: 'Aqua', light: '162 80% 40%', dark: '162 72% 48%' },
     cyan: { name: 'Sky', light: '184 89% 40%', dark: '184 89% 48%' },
     indigo: { name: 'Twilight', light: '250 75% 62%', dark: '250 70% 68%' },
+};
+
+export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
+    home: 'Home',
+    focus: 'Focus',
+    journal: 'Journal',
+    quotes: 'Quotes',
+    profile: 'Profile',
+    // Modals
+    settings: 'Settings',
+    breathing: 'Breathe',
+    auraCheckin: 'Aura Check-in',
+    journalEntry: 'Journal Entry',
+    journalView: 'View Entry',
+    favorites: 'Favorites',
+    focusHistory: 'Focus History',
+    focusAnalytics: 'Analytics',
+    soundOptions: 'Sound Options',
+    sessionLinking: 'Link Sessions',
+    linkedJournals: 'Linked Journals',
+    attachmentViewer: 'Attachments',
 };

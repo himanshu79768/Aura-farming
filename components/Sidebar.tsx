@@ -37,11 +37,11 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClic
 };
 
 const SidebarHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <h3 className="px-3 pt-6 pb-2 text-xs font-semibold uppercase tracking-wider text-light-text-secondary/70 dark:text-dark-text-secondary/70">{children}</h3>
+    <h3 className="px-3 pt-2 pb-2 text-xs font-semibold uppercase tracking-wider text-light-text-secondary/70 dark:text-dark-text-secondary/70">{children}</h3>
 );
 
 const Sidebar: React.FC = () => {
-    const { currentView, navigateTo, favoriteQuotes, journalEntries, focusHistory } = useAppContext();
+    const { currentView, navigateTo, favoriteQuotes, journalEntries, focusHistory, userProfile } = useAppContext();
     
     const navItems: { view: View; label: string; icon: React.ReactNode }[] = [
         { view: 'home', label: 'Home', icon: <Home size={20} /> },
@@ -58,48 +58,66 @@ const Sidebar: React.FC = () => {
         <aside className="fixed top-0 left-0 bottom-0 z-40 hidden md:block w-64 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-xl border-r border-white/20 dark:border-white/10 p-4">
             <nav className="flex flex-col h-full">
                 <div className="flex-grow">
-                    <SidebarHeader>Main</SidebarHeader>
-                    {navItems.map(({ view, label, icon }) => (
-                        <SidebarItem
-                            key={view}
-                            icon={icon}
-                            label={label}
-                            isActive={currentView === view}
-                            onClick={() => navigateTo(view)}
-                            count={view === 'journal' ? journalEntries.length : undefined}
-                        />
-                    ))}
-                     <SidebarItem
-                        icon={<Star size={20} />}
-                        label="Favorites"
-                        isActive={false} // This opens a modal, so it's never "active" in the same way
-                        onClick={() => navigateTo('favorites')}
-                        count={favoriteQuotes.length}
-                    />
-                     <SidebarItem
-                        icon={<Timer size={20} />}
-                        label="History"
-                        isActive={false}
-                        onClick={() => navigateTo('focusHistory')}
-                        count={focusHistory.length}
-                    />
-
-                    <SidebarHeader>Account</SidebarHeader>
-                    {profileItems.map(({ view, label, icon }) => (
+                    <motion.div layout transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}>
+                        <SidebarHeader>Main</SidebarHeader>
+                        {navItems.map(({ view, label, icon }) => (
+                            <SidebarItem
+                                key={view}
+                                icon={icon}
+                                label={label}
+                                isActive={currentView === view}
+                                onClick={() => navigateTo(view)}
+                                count={view === 'journal' ? journalEntries.length : undefined}
+                            />
+                        ))}
                          <SidebarItem
-                            key={view}
-                            icon={icon}
-                            label={label}
-                            isActive={currentView === view}
-                            onClick={() => navigateTo(view)}
+                            icon={<Star size={20} />}
+                            label="Favorites"
+                            isActive={false}
+                            onClick={() => navigateTo('favorites')}
+                            count={favoriteQuotes.length}
                         />
-                    ))}
-                     <SidebarItem
-                        icon={<Settings size={20} />}
-                        label="Settings"
-                        isActive={false} // Modal view
-                        onClick={() => navigateTo('settings')}
-                    />
+                         <SidebarItem
+                            icon={<Timer size={20} />}
+                            label="History"
+                            isActive={false}
+                            onClick={() => navigateTo('focusHistory')}
+                            count={focusHistory.length}
+                        />
+
+                        <SidebarHeader>Account</SidebarHeader>
+                        {profileItems.map(({ view, label, icon }) => (
+                             <SidebarItem
+                                key={view}
+                                icon={icon}
+                                label={label}
+                                isActive={currentView === view}
+                                onClick={() => navigateTo(view)}
+                            />
+                        ))}
+                         <SidebarItem
+                            icon={<Settings size={20} />}
+                            label="Settings"
+                            isActive={false}
+                            onClick={() => navigateTo('settings')}
+                        />
+                    </motion.div>
+                </div>
+                 <div className="flex-shrink-0">
+                    <div className="h-px bg-black/10 dark:bg-white/10 my-2" />
+                    <button onClick={() => navigateTo('profile')} className="flex items-center gap-3 p-3 w-full rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-light-glass dark:bg-dark-glass flex items-center justify-center border border-white/20 dark:border-white/10">
+                            <User size={16} />
+                        </div>
+                        <span className="font-normal text-sm text-light-text-secondary/80 dark:text-dark-text-secondary/80">{userProfile.name}</span>
+                    </button>
+                    <div className="text-center pt-2 pb-1">
+                        <span 
+                           className="text-xs font-bold tracking-[0.3em] bg-clip-text text-transparent bg-gradient-to-r from-light-primary/70 to-light-primary dark:from-dark-primary/70 dark:to-dark-primary opacity-60"
+                        >
+                            AURA
+                        </span>
+                    </div>
                 </div>
             </nav>
         </aside>
