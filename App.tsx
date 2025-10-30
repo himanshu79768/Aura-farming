@@ -15,7 +15,7 @@ import AuraCheckinPage from './components/AuraCheckinPage';
 import JournalPage from './components/JournalPage';
 import JournalEntryPage from './components/JournalEntryPage';
 import JournalViewPage from './components/JournalViewPage';
-import { INITIAL_QUOTES, ACCENT_COLORS } from './constants';
+import { INITIAL_QUOTES, ACCENT_COLORS, VIEW_PARENTS } from './constants';
 import TimerPill from './components/TimerPill';
 import DeleteZone from './components/DeleteZone';
 import FavoritesPage from './components/FavoritesPage';
@@ -120,6 +120,13 @@ const DEFAULT_USER_DATA: UserData = {
     mood: Mood.Calm,
     favoriteQuotes: {},
 };
+
+const MODAL_VIEWS: View[] = [
+    'settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 
+    'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 
+    'sessionLinking', 'linkedJournals', 'attachmentViewer'
+];
+const ROOT_VIEWS: View[] = ['home', 'focus', 'journal', 'quotes', 'profile'];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
@@ -405,11 +412,38 @@ export default function App() {
   }, [timerState, sessionName, addFocusSession]);
   
   const navigateTo = (view: View, params?: any) => {
-    // Any new navigation action clears the forward history.
     setForwardStack([]);
-    if (['settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 'sessionLinking', 'linkedJournals', 'attachmentViewer'].includes(view)) {
+
+    if (MODAL_VIEWS.includes(view)) {
+        const newViewParent = VIEW_PARENTS[view];
+
+        // Is the new view a top-level modal (its parent is a root view)?
+        const isTopLevelModal = newViewParent && ROOT_VIEWS.includes(newViewParent);
+
+        if (isTopLevelModal) {
+            // If navigating to a top-level modal, it should always be the only item in the stack,
+            // and its corresponding root view must be active.
+            if (newViewParent !== currentView) {
+                setCurrentView(newViewParent!);
+            }
+            setModalStack([{ view, params }]);
+            return;
+        }
+
+        // It's a nested modal, like focusAnalytics.
+        const topOfStackView = modalStack.length > 0 ? modalStack[modalStack.length - 1].view : null;
+
+        if (newViewParent === topOfStackView) {
+            // This is a child of the current screen, so append it.
+            setModalStack(stack => [...stack, { view, params }]);
+            return;
+        }
+        
+        // Fallback for more complex navigation jumps (e.g. from a deep nested view to another deep nested view in a different branch)
+        // We retain the old behavior of just appending to maintain history, as this seems to be the least disruptive change.
         setModalStack(stack => [...stack, { view, params }]);
-    } else {
+
+    } else { // Root view
         if (currentView !== view) {
             setModalStack([]);
             setCurrentView(view);

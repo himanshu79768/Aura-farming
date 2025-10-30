@@ -1,5 +1,24 @@
 import { Quote, FocusMusic, AccentColor, View } from './types';
 
+export const VIEW_PARENTS: Partial<Record<View, View>> = {
+    // Home children
+    'breathing': 'home',
+    'auraCheckin': 'home',
+    // Focus children
+    'soundOptions': 'focus',
+    // Journal children
+    'journalEntry': 'journal',
+    'journalView': 'journal',
+    'sessionLinking': 'journalEntry',
+    'attachmentViewer': 'journalView', // Primary parent for hierarchy
+    // Profile children
+    'settings': 'profile',
+    'favorites': 'profile',
+    'focusHistory': 'profile',
+    'focusAnalytics': 'focusHistory',
+    'linkedJournals': 'focusHistory',
+};
+
 export const INITIAL_QUOTES: Quote[] = [
   { id: '1', text: "You have the right to work, but never to the fruit of work.", author: "Bhagavad Gita" },
   { id: '2', text: "Arise, awake, and stop not till the goal is reached.", author: "Swami Vivekananda" },
