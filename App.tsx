@@ -81,6 +81,8 @@ interface AppContextType {
   currentUser: any | null;
   currentView: View;
   modalStack: { view: View; params?: any }[];
+  isImmersive: boolean;
+  toggleImmersive: () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -138,6 +140,7 @@ export default function App() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [focusHistory, setFocusHistory] = useState<FocusSession[]>([]);
   const [focusSearchQuery, setFocusSearchQuery] = useState('');
+  const [isImmersive, setIsImmersive] = useLocalStorage('isImmersive', false);
   
   // Timer state
   const [timerState, setTimerState] = useState({ duration: 15 * 60, endTime: 0, isActive: false });
@@ -251,6 +254,11 @@ export default function App() {
         navigator.vibrate(intensity);
     }
   }, [settings.hapticIntensity]);
+  
+  const toggleImmersive = useCallback(() => {
+      vibrate();
+      setIsImmersive(prev => !prev);
+  }, [vibrate, setIsImmersive]);
 
   const updateUserData = useCallback((data: Partial<UserData>) => {
     const dataPathUid = masterUid || currentUser?.uid;
@@ -608,6 +616,7 @@ export default function App() {
         showConfirmationModal, showAlertModal,
         currentUser,
         currentView, modalStack,
+        isImmersive, toggleImmersive,
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
@@ -625,8 +634,8 @@ export default function App() {
                 />
             ) : (
                 <motion.div key="main-app" className="w-full h-full md:flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-                    <Sidebar />
-                    <div className="relative w-full h-full md:ml-64">
+                    {!isImmersive && <Sidebar />}
+                    <div className={`relative w-full h-full ${isImmersive ? 'md:ml-0' : 'md:ml-64'} transition-[margin-left] duration-300 ease-in-out`}>
                         <div 
                             className={`absolute bottom-0 left-0 right-0 h-[55%] bg-gradient-to-t ${moodFromColors[mood]} to-transparent transition-opacity duration-1000 pointer-events-none z-0`}
                             style={{ opacity: (settings.gradientIntensity ?? 75) / 100 }}

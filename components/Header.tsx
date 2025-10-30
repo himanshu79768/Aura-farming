@@ -1,6 +1,6 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Zap, Droplet, Sun } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Zap, Droplet, Sun, Maximize2, Minimize2 } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Mood } from '../types';
 import Breadcrumbs from './Breadcrumbs';
@@ -58,7 +58,7 @@ const MoodSelector: React.FC = () => {
 }
 
 const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, leftAction, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
-    const { navigateBack, navigateForward, canGoBack, canGoForward } = useAppContext();
+    const { navigateBack, navigateForward, canGoBack, canGoForward, isImmersive, toggleImmersive } = useAppContext();
     const measureRef = useRef<HTMLHeadingElement>(null);
     const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-base');
 
@@ -81,13 +81,35 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
         window.addEventListener('resize', checkWrap);
         return () => window.removeEventListener('resize', checkWrap);
     }, [title, titleClassName]);
+
+    const ImmersiveButton = (
+        <motion.button
+          onClick={toggleImmersive}
+          className="p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5"
+          aria-label={isImmersive ? "Exit immersive mode" : "Enter immersive mode"}
+          whileTap={{ scale: 0.9 }}
+          key="immersive-button"
+        >
+            <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                    key={isImmersive ? 'minimize' : 'expand'}
+                    initial={{ opacity: 0, rotate: -90, scale: 0.5 }}
+                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                    exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
+                    transition={{ duration: 0.2 }}
+                >
+                    {isImmersive ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                </motion.div>
+            </AnimatePresence>
+        </motion.button>
+    );
     
     return (
         <header className="relative w-full min-h-[5rem] h-auto flex items-center p-4 z-20 flex-shrink-0">
             
             {/* --- Mobile Layout (uses absolute positioning) --- */}
             <div className="w-full flex items-center justify-center md:hidden">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-0">
                     {leftAction ? leftAction : (showBackButton && (
                         <motion.button 
                             onClick={onBack} 
@@ -108,14 +130,14 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                     <div className="relative flex items-center justify-center">
                         <motion.h1 
                             key={title}
-                            className={`font-semibold text-center max-w-[calc(100vw-11rem)] ${effectiveTitleClass}`}
+                            className={`font-semibold text-center max-w-[calc(100vw-14rem)] ${effectiveTitleClass}`}
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                         >
                             {title}
                         </motion.h1>
 
-                        <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-11rem)] absolute invisible -z-10 ${titleClassName || 'text-base'}`}>{title}</h1>
+                        <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-14rem)] absolute invisible -z-10 ${titleClassName || 'text-base'}`}>{title}</h1>
                     </div>
                 )}
 
@@ -127,7 +149,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
             {/* --- Desktop Layout (uses flex column) --- */}
             <div className="hidden md:flex flex-col w-full items-start">
                 <div className="w-full flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                         {leftAction ? leftAction : (
                             <>
                                 <motion.button 
@@ -160,8 +182,9 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                         )}
                     </div>
 
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                         {rightAction ? rightAction : ((showCenteredMoodSelector || (!showBackButton && !leftAction)) && <MoodSelector />)}
+                        {ImmersiveButton}
                     </div>
                 </div>
                  <div className="mt-2">
