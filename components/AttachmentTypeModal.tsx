@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image, FileText, Presentation } from 'lucide-react';
+import { Image, FileText } from 'lucide-react';
 
 interface AttachmentTypeModalProps {
   isOpen: boolean;
@@ -11,8 +11,7 @@ interface AttachmentTypeModalProps {
 
 const attachmentOptions = [
   { label: 'Photo', icon: Image, accept: 'image/jpeg, image/png' },
-  { label: 'PDF', icon: FileText, accept: 'application/pdf' },
-  { label: 'PPT', icon: Presentation, accept: '.ppt, .pptx, application/vnd.ms-powerpoint, application/vnd.openxmlformats-officedocument.presentationml.presentation' }
+  { label: 'Files', icon: FileText, accept: 'application/pdf, .ppt, .pptx, application/vnd.ms-powerpoint, application/vnd.openxmlformats-officedocument.presentationml.presentation, .doc, .docx, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
 ];
 
 const AttachmentTypeModal: React.FC<AttachmentTypeModalProps> = ({ isOpen, onClose, onSelect }) => {
