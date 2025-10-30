@@ -31,7 +31,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
     const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [numPages, setNumPages] = useState(0);
-    const [scale, setScale] = useState(isThumbnail ? 1 : 0);
+    const [scale, setScale] = useState(isThumbnail ? 1 : 0); // scale is CSS pixels scale
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [dragConstraints, setDragConstraints] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
@@ -72,38 +72,37 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
     }, [dataUrl, isThumbnail]);
 
     useEffect(() => {
-        if (!pdf) return;
-
         const render = async () => {
+            if (!pdf) return;
             setIsLoading(true);
+
             try {
                 const pageNum = isThumbnail ? 1 : currentPage;
                 const page = await pdf.getPage(pageNum);
                 const canvas = canvasRef.current;
                 const container = containerRef.current;
                 if (!canvas || !container) return;
+
+                const dpr = window.devicePixelRatio || 1;
+                const ctx = canvas.getContext('2d')!;
                 
-                let renderScale = scale;
+                let cssScale = scale;
 
                 if (isThumbnail) {
                     if (container.clientWidth > 0) {
                         const viewport = page.getViewport({ scale: 1 });
-                        renderScale = container.clientWidth / viewport.width;
+                        cssScale = container.clientWidth / viewport.width;
                     } else {
                         setTimeout(render, 50);
                         return;
                     }
-                } else if (scale === 0) {
+                } else if (scale === 0) { // Initial "fit to screen" for full viewer
                     if (container.clientWidth > 0 && container.clientHeight > 0) {
                         const viewport = page.getViewport({ scale: 1 });
-                        const isPortrait = container.clientHeight > container.clientWidth;
-                        let calculatedScale;
-                        if (isPortrait) {
-                            calculatedScale = (container.clientWidth - 32) / viewport.width;
-                        } else {
-                            calculatedScale = (container.clientHeight - 32) / viewport.height;
-                        }
-                        setScale(calculatedScale);
+                        const scaleToFitWidth = (container.clientWidth - 32) / viewport.width;
+                        const scaleToFitHeight = (container.clientHeight - 32) / viewport.height;
+                        const initialScale = Math.min(scaleToFitWidth, scaleToFitHeight);
+                        setScale(initialScale);
                         return;
                     } else {
                         setTimeout(render, 50);
@@ -111,54 +110,50 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ dataUrl, isThumbnail = false }) =
                     }
                 }
 
-                if (renderScale <= 0) {
+                if (cssScale <= 0) {
                     setIsLoading(false);
                     return;
                 }
+
+                const viewport = page.getViewport({ scale: cssScale * dpr });
                 
-                const viewport = page.getViewport({ scale: renderScale });
-                canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                const cssWidth = viewport.width / dpr;
+                const cssHeight = viewport.height / dpr;
+
+                canvas.style.width = `${cssWidth}px`;
+                canvas.style.height = `${cssHeight}px`;
 
                 const renderContext = {
-                    canvasContext: canvas.getContext('2d')!,
+                    canvasContext: ctx,
                     viewport: viewport,
                 };
                 await page.render(renderContext).promise;
+                
+                if (!isThumbnail) {
+                    const containerEl = canvasContainerRef.current;
+                    if (containerEl) {
+                        const containerWidth = containerEl.clientWidth;
+                        const containerHeight = containerEl.clientHeight;
+                        const overflowX = Math.max(0, (cssWidth - containerWidth) / 2);
+                        const overflowY = Math.max(0, (cssHeight - containerHeight) / 2);
+                        setDragConstraints({ left: -overflowX, right: overflowX, top: -overflowY, bottom: overflowY });
+                    }
+                } else {
+                    setDragConstraints({ top: 0, left: 0, right: 0, bottom: 0 });
+                }
 
             } catch (e) {
                 console.error("Error rendering PDF page:", e);
                 setError("Could not render PDF page.");
             } finally {
                 setIsLoading(false);
-
-                if (!isThumbnail) {
-                    const canvasEl = canvasRef.current;
-                    const containerEl = canvasContainerRef.current;
-                    if (canvasEl && containerEl) {
-                        const containerWidth = containerEl.clientWidth;
-                        const containerHeight = containerEl.clientHeight;
-
-                        const canvasWidth = canvasEl.width;
-                        const canvasHeight = canvasEl.height;
-
-                        const overflowX = Math.max(0, (canvasWidth - containerWidth) / 2);
-                        const overflowY = Math.max(0, (canvasHeight - containerHeight) / 2);
-
-                        setDragConstraints({
-                            left: -overflowX,
-                            right: overflowX,
-                            top: -overflowY,
-                            bottom: overflowY,
-                        });
-                    }
-                } else {
-                    setDragConstraints({ top: 0, left: 0, right: 0, bottom: 0 });
-                }
             }
         };
 
-        render();
+        if(pdf) render();
     }, [pdf, currentPage, scale, isThumbnail]);
 
     const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
