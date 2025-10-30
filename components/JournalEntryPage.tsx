@@ -1132,7 +1132,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             </AnimatePresence>
             <div 
                 ref={positioningContainerRef}
-                className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300`}>
+                className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300 overflow-hidden`}>
                 <FormattingMenu />
                 <div className={`${fontClasses[fontStyle]}`}>
                     <input
@@ -1148,7 +1148,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         onKeyUp={handleEditorKeyUp} onKeyDown={handleEditorKeyDown}
                         onContextMenu={(e) => e.preventDefault()}
                         data-placeholder="Start writing..."
-                        className={`w-full h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
+                        className={`w-full min-h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
                         autoFocus={!entry}
                     />
                 </div>
