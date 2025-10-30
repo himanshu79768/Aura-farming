@@ -47,9 +47,10 @@ interface AppContextType {
   userProfile: UserProfile;
   updateUserName: (newName: string) => Promise<{ success: boolean; message?: string }>;
   journalEntries: JournalEntry[];
-  addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => Promise<boolean>;
+  addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => Promise<string | null>;
   updateJournalEntry: (entry: JournalEntry) => Promise<boolean>;
   deleteJournalEntry: (id: string) => Promise<boolean>;
+  deleteMultipleJournalEntries: (ids: string[]) => Promise<boolean>;
   duplicateJournalEntry: (id: string) => Promise<boolean>;
   focusHistory: FocusSession[];
   addFocusSession: (durationInSeconds: number, name?: string) => void;
@@ -414,18 +415,18 @@ export default function App() {
         set(favRef, true);
     }
   };
-  const addJournalEntry = async (entry: Omit<JournalEntry, 'id' | 'createdAt'>): Promise<boolean> => {
+  const addJournalEntry = async (entry: Omit<JournalEntry, 'id' | 'createdAt'>): Promise<string | null> => {
     const dataPathUid = masterUid || currentUser?.uid;
-    if (!dataPathUid) return false;
+    if (!dataPathUid) return null;
     try {
         const journalRef = ref(db, `users/${dataPathUid}/journalEntries`);
         const newEntryRef = push(journalRef);
         await set(newEntryRef, { ...entry, createdAt: serverTimestamp() });
-        return true;
+        return newEntryRef.key;
     } catch (error) {
         console.error("Error adding journal entry:", error);
         showAlertModal({ title: "Save Failed", message: "Could not save your entry. Please try again." });
-        return false;
+        return null;
     }
   };
   const updateJournalEntry = async (updatedEntry: JournalEntry): Promise<boolean> => {
@@ -463,6 +464,24 @@ export default function App() {
     }
   };
   
+    const deleteMultipleJournalEntries = async (ids: string[]): Promise<boolean> => {
+        const dataPathUid = masterUid || currentUser?.uid;
+        if (!dataPathUid || ids.length === 0) return false;
+
+        try {
+            const updates: { [key: string]: null } = {};
+            ids.forEach(id => {
+                updates[`/users/${dataPathUid}/journalEntries/${id}`] = null;
+            });
+            await update(ref(db), updates);
+            return true;
+        } catch (error) {
+            console.error("Error deleting multiple journal entries:", error);
+            showAlertModal({ title: "Delete Failed", message: "Could not delete the selected entries. Please try again." });
+            return false;
+        }
+    };
+
   const duplicateJournalEntry = async (id: string): Promise<boolean> => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return false;
@@ -481,7 +500,7 @@ export default function App() {
       date: new Date().toISOString(),
     };
 
-    const success = await addJournalEntry(newEntry);
+    const success = !!(await addJournalEntry(newEntry));
     if (success) {
         showAlertModal({ title: "Entry Duplicated", message: "A copy of the journal entry has been created.", type: 'success' });
     }
@@ -545,7 +564,7 @@ export default function App() {
   return (
     <AppContext.Provider value={{ 
         mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
-        userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry,
+        userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
         focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack,
         timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
         selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,

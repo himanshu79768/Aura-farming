@@ -1,19 +1,23 @@
-
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon } from 'lucide-react';
+import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon, Trash2, Check } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry } from '../types';
 import Header from './Header';
 import SearchBar from './SearchBar';
 
 const JournalPage: React.FC = () => {
-    const { journalEntries, navigateTo, focusHistory } = useAppContext();
+    const { journalEntries, navigateTo, focusHistory, deleteMultipleJournalEntries, showConfirmationModal } = useAppContext();
     const [searchQuery, setSearchQuery] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    
+    const longPressTimerRef = useRef<number>();
+    const isLongPress = useRef(false);
+
 
     const entryDates = useMemo(() => {
         return new Set(journalEntries.map(entry => new Date(entry.date).toDateString()));
@@ -32,7 +36,6 @@ const JournalPage: React.FC = () => {
 
         const lowerCaseQuery = searchQuery.toLowerCase();
         
-        // Create a map of session IDs to session names for efficient lookup
         const sessionNameMap = new Map<string, string>();
         focusHistory.forEach(session => {
             if (session.name) {
@@ -41,12 +44,10 @@ const JournalPage: React.FC = () => {
         });
 
         return entries.filter(entry => {
-            // 1. Check title and content
             if (entry.title?.toLowerCase().includes(lowerCaseQuery) || entry.content.toLowerCase().includes(lowerCaseQuery)) {
                 return true;
             }
 
-            // 2. Check linked session names
             if (entry.linkedSessionIds) {
                 for (const sessionId of entry.linkedSessionIds) {
                     const sessionName = sessionNameMap.get(sessionId);
@@ -60,7 +61,6 @@ const JournalPage: React.FC = () => {
         });
     }, [journalEntries, searchQuery, selectedDate, focusHistory]);
     
-    // Fix: Use a generic argument with `reduce` to correctly type the accumulator and ensure proper type inference for `groupedEntries`.
     const groupedEntries = filteredEntries.reduce<Record<string, JournalEntry[]>>((acc, entry) => {
         const date = new Date(entry.date).toLocaleDateString(undefined, {
             year: 'numeric', month: 'long', day: 'numeric'
@@ -97,6 +97,89 @@ const JournalPage: React.FC = () => {
     const handleNextMonth = () => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
     const handleDateClick = (day: Date) => {
         setSelectedDate(prev => (prev && prev.toDateString() === day.toDateString() ? null : day));
+    };
+
+    const exitSelectionMode = () => {
+        setIsSelectionMode(false);
+        setSelectedIds([]);
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedIds.length === 0) return;
+        showConfirmationModal({
+            title: `Delete ${selectedIds.length} entr${selectedIds.length > 1 ? 'ies' : 'y'}?`,
+            message: 'This action cannot be undone and will permanently remove the selected entries.',
+            confirmText: 'Delete',
+            onConfirm: async () => {
+                const success = await deleteMultipleJournalEntries(selectedIds);
+                if (success) {
+                    exitSelectionMode();
+                }
+            },
+        });
+    };
+
+    const handleItemClick = (entry: JournalEntry) => {
+        if (isLongPress.current) {
+            isLongPress.current = false;
+            return;
+        }
+
+        if (isSelectionMode) {
+            setSelectedIds(prev => {
+                const newIds = prev.includes(entry.id)
+                    ? prev.filter(id => id !== entry.id)
+                    : [...prev, entry.id];
+                
+                if (newIds.length === 0) {
+                    setIsSelectionMode(false);
+                }
+                
+                return newIds;
+            });
+        } else {
+            navigateTo('journalView', { entry });
+        }
+    };
+
+    const handlePointerDown = (entryId: string) => {
+        isLongPress.current = false;
+        longPressTimerRef.current = window.setTimeout(() => {
+            isLongPress.current = true;
+            if (!isSelectionMode) {
+                setIsSelectionMode(true);
+            }
+            setSelectedIds(prev => (prev.includes(entryId) ? prev : [...prev, entryId]));
+        }, 500);
+    };
+
+    const handlePointerUpOrLeave = () => {
+        clearTimeout(longPressTimerRef.current);
+    };
+
+    const headerProps = isSelectionMode ? {
+        leftAction: (
+            <motion.button onClick={exitSelectionMode} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                <X size={24} />
+            </motion.button>
+        ),
+        title: `${selectedIds.length} selected`,
+        rightAction: (
+            <motion.button onClick={handleDeleteSelected} disabled={selectedIds.length === 0} className="p-2 rounded-full hover:bg-red-500/10 text-red-500 disabled:opacity-50">
+                <Trash2 size={20} />
+            </motion.button>
+        )
+    } : {
+        title: "Journal",
+        rightAction: (
+            <motion.button 
+                onClick={() => setShowCalendar(s => !s)}
+                className={`p-2 rounded-full transition-colors ${showCalendar ? 'bg-light-primary/20 dark:bg-dark-primary/20 text-light-primary dark:text-dark-primary' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                whileTap={{ scale: 0.9 }}
+            >
+                <Calendar size={20} />
+            </motion.button>
+        )
     };
 
     const calendarView = (
@@ -136,21 +219,10 @@ const JournalPage: React.FC = () => {
 
     return (
         <div className="w-full h-full flex flex-col">
-            <Header 
-                title="Journal"
-                rightAction={
-                    <motion.button 
-                        onClick={() => setShowCalendar(s => !s)}
-                        className={`p-2 rounded-full transition-colors ${showCalendar ? 'bg-light-primary/20 dark:bg-dark-primary/20 text-light-primary dark:text-dark-primary' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                        whileTap={{ scale: 0.9 }}
-                    >
-                        <Calendar size={20} />
-                    </motion.button>
-                }
-            />
+            <Header {...headerProps} />
             <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 flex-shrink-0">
                 <AnimatePresence>
-                    {showCalendar && (
+                    {showCalendar && !isSelectionMode && (
                         <motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
@@ -214,30 +286,58 @@ const JournalPage: React.FC = () => {
                         </motion.div>
                     ) : (
                         <div className="pt-2 pb-28 px-4">
-                        {/* Fix: Use Object.keys to iterate over grouped entries, ensuring proper type inference. */}
                         {Object.keys(groupedEntries).map((date) => (
                             <div key={date} className="mb-6">
                                 <h2 className="font-medium text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-2 sticky top-0 bg-light-bg/80 dark:bg-dark-bg/80 backdrop-blur-md py-1.5 text-center">{date}</h2>
                                 <div className="space-y-3">
-                                {groupedEntries[date].map(entry => (
-                                    <motion.button 
-                                        key={entry.id}
-                                        onClick={() => navigateTo('journalView', { entry })}
-                                        className="w-full text-left p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10"
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-semibold truncate pr-2 text-lg">{entry.title || 'Untitled Entry'}</p>
-                                            {entry.linkedSessionIds && entry.linkedSessionIds.length > 0 && (
-                                                <LinkIcon size={14} className="text-light-text-secondary dark:text-dark-text-secondary shrink-0" />
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
-                                            {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}
-                                        </p>
-                                    </motion.button>
-                                ))}
+                                {groupedEntries[date].map(entry => {
+                                    const isSelected = selectedIds.includes(entry.id);
+                                    return (
+                                        <motion.div
+                                            key={entry.id}
+                                            layout
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{
+                                                opacity: 1,
+                                                y: 0,
+                                                scale: isSelected ? 0.98 : 1,
+                                            }}
+                                            exit={{ opacity: 0, y: -20 }}
+                                            onClick={() => handleItemClick(entry)}
+                                            onPointerDown={() => handlePointerDown(entry.id)}
+                                            onPointerUp={handlePointerUpOrLeave}
+                                            onPointerLeave={handlePointerUpOrLeave}
+                                            className={`w-full text-left p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 ${isSelected ? 'journal-item-selected border-light-primary dark:border-dark-primary' : 'border-white/10'}`}
+                                        >
+                                            <AnimatePresence>
+                                                {isSelectionMode && (
+                                                    <motion.div
+                                                        initial={{ scale: 0, opacity: 0 }}
+                                                        animate={{ scale: 1, opacity: 1 }}
+                                                        exit={{ scale: 0, opacity: 0 }}
+                                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                        className="w-6 h-6 flex-shrink-0"
+                                                    >
+                                                        <div className={`w-full h-full rounded-full border-2 flex items-center justify-center transition-all duration-200 ${isSelected ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-500'}`}>
+                                                            {isSelected && <Check size={16} className="text-white" />}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                            <div className="flex-grow overflow-hidden">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="font-semibold truncate pr-2 text-lg">{entry.title || 'Untitled Entry'}</p>
+                                                    {entry.linkedSessionIds && entry.linkedSessionIds.length > 0 && (
+                                                        <LinkIcon size={14} className="text-light-text-secondary dark:text-dark-text-secondary shrink-0" />
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
+                                                    {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                                </p>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
                                 </div>
                             </div>
                         ))}
@@ -245,15 +345,54 @@ const JournalPage: React.FC = () => {
                     )}
                 </AnimatePresence>
             </div>
-             <motion.button
-                onClick={() => navigateTo('journalEntry')}
-                className="absolute bottom-28 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                aria-label="New journal entry"
-            >
-                <Plus size={32} />
-            </motion.button>
+             <AnimatePresence>
+             {!isSelectionMode && (
+                <motion.button
+                    onClick={() => navigateTo('journalEntry')}
+                    className="absolute bottom-28 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    aria-label="New journal entry"
+                    initial={{ scale: 0, y: 50 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0, y: 50 }}
+                >
+                    <Plus size={32} />
+                </motion.button>
+             )}
+            </AnimatePresence>
+            <style>{`
+                html.dark .dark\\:bg-dark-primary {
+                    background-color: hsl(var(--accent-dark));
+                }
+                .bg-light-primary {
+                    background-color: hsl(var(--accent-light));
+                }
+                .journal-item-selected {
+                    background-color: hsla(var(--accent-light), 0.2);
+                }
+                html.dark .journal-item-selected {
+                    background-color: hsla(var(--accent-dark), 0.2);
+                }
+                .border-light-primary {
+                     border-color: hsl(var(--accent-light));
+                }
+                html.dark .dark\\:border-dark-primary {
+                    border-color: hsl(var(--accent-dark));
+                }
+                .text-light-primary {
+                     color: hsl(var(--accent-light));
+                }
+                html.dark .dark\\:text-dark-primary {
+                    color: hsl(var(--accent-dark));
+                }
+                 .bg-light-primary\\/20 {
+                    background-color: hsla(var(--accent-light), 0.2);
+                }
+                 html.dark .dark\\:bg-dark-primary\\/20 {
+                    background-color: hsla(var(--accent-dark), 0.2);
+                }
+            `}</style>
         </div>
     );
 };

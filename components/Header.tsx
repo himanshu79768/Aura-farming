@@ -8,6 +8,7 @@ interface HeaderProps {
     title?: string;
     showBackButton?: boolean;
     onBack?: () => void;
+    leftAction?: React.ReactNode;
     rightAction?: React.ReactNode;
     showCenteredMoodSelector?: boolean;
     titleClassName?: string;
@@ -55,7 +56,7 @@ const MoodSelector: React.FC = () => {
     )
 }
 
-const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
+const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, leftAction, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
     const measureRef = useRef<HTMLHeadingElement>(null);
     const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-lg');
 
@@ -82,7 +83,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
     return (
         <header className="relative w-full min-h-[5rem] h-auto flex items-center justify-center p-4 z-20 flex-shrink-0">
             <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                {showBackButton && (
+                {leftAction ? leftAction : (showBackButton && (
                     <motion.button 
                         onClick={onBack} 
                         className="flex items-center gap-1 text-light-primary dark:text-dark-primary"
@@ -93,7 +94,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                         <ChevronLeft className="w-6 h-6" />
                         <span className="text-lg">Back</span>
                     </motion.button>
-                )}
+                ))}
             </div>
             
             {showCenteredMoodSelector ? (
@@ -116,7 +117,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
             )}
 
             <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                 {!showCenteredMoodSelector && (rightAction ? rightAction : (!showBackButton && <MoodSelector />))}
+                 {rightAction ? rightAction : (!showCenteredMoodSelector && !showBackButton && !leftAction && <MoodSelector />)}
             </div>
         </header>
     );

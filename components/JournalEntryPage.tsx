@@ -109,6 +109,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         showConfirmationModal, navigateTo, showAlertModal, userProfile
     } = useAppContext();
 
+    const [currentEntry, setCurrentEntry] = useState<JournalEntry | undefined>(entry);
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [linkedSessionIds, setLinkedSessionIds] = useState<string[]>([]);
@@ -159,16 +160,100 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const hasSetInitialContent = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
-    const debounceTimeoutRef = useRef<number | null>(null);
+    const historyDebounceTimeoutRef = useRef<number | null>(null);
     const formattingMenuRef = useRef<HTMLDivElement>(null);
     const paletteRef = useRef<HTMLDivElement>(null);
+    
+    const saveDebounceTimeoutRef = useRef<number | null>(null);
+    const handleSaveRef = useRef<() => void>();
+    const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+    useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
 
+
+    const handleSave = useCallback(async () => {
+        if (!hasUnsavedChangesRef.current) return;
+
+        const currentContent = editorRef.current?.innerHTML.trim() || '';
+        const currentText = editorRef.current?.innerText.trim() || '';
+
+        const isNewEntry = !currentEntry;
+        const hasOnlyTitle = !!title.trim() && !currentText && attachments.length === 0;
+
+        if (isNewEntry && hasOnlyTitle) {
+            return; 
+        }
+
+        if (!title.trim() && !currentText && attachments.length === 0) {
+            setHasUnsavedChanges(false);
+            setSaveStatus('idle');
+            return;
+        }
+        
+        vibrate('light');
+        setSaveStatus('saving');
+        
+        const entryTitle = title.trim() || currentText.split('\n')[0].substring(0, 50) || "Journal Entry";
+        const modifiedDate = new Date().toISOString();
+        let success = false;
+        let newEntryId: string | null = null;
+
+        const commonData = {
+            title: entryTitle,
+            content: currentContent,
+            linkedSessionIds,
+            attachments,
+            fontStyle,
+            isSmallText,
+            isFullWidth,
+            isLocked,
+            date: modifiedDate,
+        };
+
+        if (currentEntry) {
+            const updatedEntry: JournalEntry = { ...currentEntry, ...commonData };
+            success = await updateJournalEntry(updatedEntry);
+        } else {
+            const newEntry: Omit<JournalEntry, 'id' | 'createdAt'> = commonData;
+            newEntryId = await addJournalEntry(newEntry);
+            success = !!newEntryId;
+        }
+        
+        if (success) {
+            setHasUnsavedChanges(false);
+            setSaveStatus('saved');
+            setLastModified(new Date(modifiedDate));
+            if (newEntryId) {
+                setCurrentEntry({
+                    id: newEntryId,
+                    createdAt: Date.now(),
+                    ...commonData,
+                });
+            }
+        } else {
+            setSaveStatus('unsaved');
+        }
+    }, [
+        title, attachments, linkedSessionIds, fontStyle, 
+        isSmallText, isFullWidth, isLocked, currentEntry, updateJournalEntry, 
+        addJournalEntry, vibrate
+    ]);
+    
+    useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+    
     const markAsChanged = useCallback(() => {
         if (!hasUnsavedChanges) {
             setHasUnsavedChanges(true);
         }
         setSaveStatus('unsaved');
+
+        if (saveDebounceTimeoutRef.current) {
+            clearTimeout(saveDebounceTimeoutRef.current);
+        }
+        saveDebounceTimeoutRef.current = window.setTimeout(() => {
+            handleSaveRef.current?.();
+        }, 2000);
     }, [hasUnsavedChanges]);
+
 
     // --- Search Functionality ---
     const clearSearchHighlighting = useCallback(() => {
@@ -269,6 +354,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     useEffect(() => {
         const editorContainer = document.querySelector('.journal-editor-container');
         if (!editorContainer) return;
+        
+        const formattingDebounceTimeoutRef = { current: null as number | null };
 
         const hideMenu = () => {
             setIsFormattingMenuOpen(false);
@@ -276,11 +363,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         };
 
         const handleSelectionChange = () => {
-            if (debounceTimeoutRef.current) {
-                clearTimeout(debounceTimeoutRef.current);
+            if (formattingDebounceTimeoutRef.current) {
+                clearTimeout(formattingDebounceTimeoutRef.current);
             }
 
-            debounceTimeoutRef.current = window.setTimeout(() => {
+            formattingDebounceTimeoutRef.current = window.setTimeout(() => {
                 if (isOptionsMenuOpen) {
                     hideMenu();
                     return;
@@ -348,8 +435,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         return () => {
             document.removeEventListener('selectionchange', handleSelectionChange);
             editorContainer.removeEventListener('scroll', hideMenu);
-            if (debounceTimeoutRef.current) {
-                clearTimeout(debounceTimeoutRef.current);
+            if (formattingDebounceTimeoutRef.current) {
+                clearTimeout(formattingDebounceTimeoutRef.current);
             }
         };
     }, [isFormattingMenuOpen, isOptionsMenuOpen, isMouseOverMenu]);
@@ -373,6 +460,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
     useEffect(() => {
         if (entry) {
+            setCurrentEntry(entry);
             setTitle(entry.title || '');
             setContent(entry.content);
             setLinkedSessionIds(entry.linkedSessionIds || []);
@@ -386,6 +474,24 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             setHistoryIndex(0);
             setSaveStatus('idle');
             setHasUnsavedChanges(false);
+        } else {
+            setCurrentEntry(undefined);
+            setTitle('');
+            setContent('');
+            setLinkedSessionIds([]);
+            setAttachments([]);
+            setFontStyle('default');
+            setIsSmallText(false);
+            setIsFullWidth(false);
+            setIsLocked(false);
+            setLastModified(new Date());
+            setHistory(['']);
+            setHistoryIndex(0);
+            setSaveStatus('idle');
+            setHasUnsavedChanges(false);
+            if (editorRef.current) {
+                editorRef.current.innerHTML = '';
+            }
         }
     }, [entry]);
 
@@ -399,62 +505,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
         }
     }, [content]);
-    
-    const handleSave = useCallback(async () => {
-        if (!hasUnsavedChanges) return;
-
-        setSaveStatus('saving');
-        vibrate('light');
-        const currentContent = editorRef.current?.innerHTML.trim() || '';
-        const currentText = editorRef.current?.innerText.trim() || '';
-        
-        if (currentText || title.trim() || attachments.length > 0) {
-            const entryTitle = title.trim() || currentText.split('\n')[0].substring(0, 50) || "Journal Entry";
-            const modifiedDate = new Date().toISOString();
-            let success = false;
-
-            const commonData = {
-                title: entryTitle,
-                content: currentContent,
-                linkedSessionIds,
-                attachments,
-                fontStyle,
-                isSmallText,
-                isFullWidth,
-                isLocked,
-                date: modifiedDate,
-            };
-
-            if (entry) {
-                const updatedEntry: JournalEntry = { ...entry, ...commonData };
-                success = await updateJournalEntry(updatedEntry);
-            } else {
-                const newEntry: Omit<JournalEntry, 'id' | 'createdAt'> = commonData;
-                success = await addJournalEntry(newEntry);
-            }
-            
-            if (success) {
-                setHasUnsavedChanges(false);
-                setSaveStatus('saved');
-                setLastModified(new Date(modifiedDate));
-            } else {
-                setSaveStatus('unsaved');
-            }
-        } else {
-            setSaveStatus('idle');
-            setHasUnsavedChanges(false);
-        }
-    }, [title, attachments, linkedSessionIds, fontStyle, isSmallText, isFullWidth, isLocked, entry, hasUnsavedChanges, updateJournalEntry, addJournalEntry, vibrate]);
-
-    // Auto-save on change
-    useEffect(() => {
-        if (saveStatus === 'unsaved') {
-            const timer = setTimeout(() => {
-                handleSave();
-            }, 2000); // 2-second debounce
-            return () => clearTimeout(timer);
-        }
-    }, [saveStatus, title, attachments, linkedSessionIds, fontStyle, isSmallText, isFullWidth, isLocked, handleSave]);
 
     // Reset "Saved" status to idle
     useEffect(() => {
@@ -467,28 +517,26 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     }, [saveStatus]);
     
     // Save on unmount (as a fallback)
-    const handleSaveRef = useRef(handleSave);
-    useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
-    const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
-    useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
-
     useEffect(() => {
         return () => {
+            if (saveDebounceTimeoutRef.current) {
+                clearTimeout(saveDebounceTimeoutRef.current);
+            }
             if (hasUnsavedChangesRef.current) {
-                handleSaveRef.current();
+                handleSaveRef.current?.();
             }
         };
     }, []);
 
     const handleDelete = async () => {
-        if (entry) {
+        if (currentEntry) {
             showConfirmationModal({
                 title: 'Move to Trash?',
                 message: 'This action cannot be undone. Are you sure you want to permanently delete this entry?',
                 confirmText: 'Delete',
                 onConfirm: async () => {
                     vibrate('heavy');
-                    const success = await deleteJournalEntry(entry.id);
+                    const success = await deleteJournalEntry(currentEntry.id);
                     if (success) {
                         navigateBack();
                         setTimeout(() => navigateBack(), 100);
@@ -499,8 +547,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     };
     
      const handleDuplicate = async () => {
-        if (entry) {
-            const success = await duplicateJournalEntry(entry.id);
+        if (currentEntry) {
+            const success = await duplicateJournalEntry(currentEntry.id);
             if (success) {
                 setIsOptionsMenuOpen(false);
             }
@@ -579,8 +627,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         const text = e.currentTarget.innerText || '';
         const currentHtml = e.currentTarget.innerHTML || '';
         setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
-        if (debounceTimeoutRef.current) { clearTimeout(debounceTimeoutRef.current); }
-        debounceTimeoutRef.current = window.setTimeout(() => {
+        if (historyDebounceTimeoutRef.current) { clearTimeout(historyDebounceTimeoutRef.current); }
+        historyDebounceTimeoutRef.current = window.setTimeout(() => {
             setHistory(prevHistory => {
                 const newHistory = prevHistory.slice(0, historyIndex + 1);
                 if (newHistory[newHistory.length - 1] !== currentHtml) {
@@ -1063,7 +1111,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                             <MenuDivider/>
                         </>)}
                         <MenuItem icon={<Copy size={16}/>} label="Copy text" onClick={handleCopyText} />
-                        {entry && <MenuItem icon={<Repeat size={16}/>} label="Duplicate" onClick={handleDuplicate} />}
+                        {currentEntry && <MenuItem icon={<Repeat size={16}/>} label="Duplicate" onClick={handleDuplicate} />}
                         <MenuItem icon={<Trash2 size={16}/>} label="Move to Trash" onClick={handleDelete} danger/>
                         <MenuDivider/>
                         <MenuToggleItem icon={<ArrowLeftRight size={16}/>} label="Small text" checked={isSmallText} onChange={() => {setIsSmallText(s => !s); markAsChanged();}} />
