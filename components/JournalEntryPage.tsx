@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-    Sparkles, Trash2, Loader, Link as LinkIcon, Paperclip, 
+    Trash2, Loader, Link as LinkIcon, Paperclip, 
     LoaderCircle, FileImage, FileText, FileQuestion, MoreHorizontal, Search, Copy, Repeat, ArrowLeftRight,
     Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus,
     Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon
 } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Attachment } from '../types';
-import { fetchJournalPrompt } from '../services/geminiService';
 import Header from './Header';
 import AttachmentTypeModal from './AttachmentTypeModal';
+import PdfViewer from './PdfViewer';
 
 const FONT_COLORS = [
   { name: 'Default', value: 'inherit', isDefault: true },
@@ -115,7 +115,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [linkedSessionIds, setLinkedSessionIds] = useState<string[]>([]);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
-    const [isPromptLoading, setIsPromptLoading] = useState(false);
     const [showAttachmentModal, setShowAttachmentModal] = useState(false);
     
     const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
@@ -251,7 +250,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         }
         saveDebounceTimeoutRef.current = window.setTimeout(() => {
             handleSaveRef.current?.();
-        }, 2000);
+        }, 500);
     }, [hasUnsavedChanges]);
 
 
@@ -341,14 +340,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     
     const goToNextMatch = () => searchMatches.length > 0 && setCurrentMatchIndex(prev => (prev + 1) % searchMatches.length);
     const goToPrevMatch = () => searchMatches.length > 0 && setCurrentMatchIndex(prev => (prev - 1 + searchMatches.length) % searchMatches.length);
-
-    const closeAndClearSearch = useCallback(() => {
-        setIsOptionsMenuOpen(false);
-        if (searchQuery) {
-            clearSearchHighlighting();
-            setSearchQuery('');
-        }
-    }, [searchQuery, clearSearchHighlighting]);
     
      // --- Formatting Menu Logic ---
     useEffect(() => {
@@ -443,8 +434,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                closeAndClearSearch();
+            if (isOptionsMenuOpen && menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOptionsMenuOpen(false);
+                if (searchQuery) {
+                    clearSearchHighlighting();
+                    setSearchQuery('');
+                }
             }
             if (isSlashMenuOpen) {
                 setIsSlashMenuOpen(false);
@@ -454,7 +449,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [isOptionsMenuOpen, closeAndClearSearch, isSlashMenuOpen]);
+    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, isSlashMenuOpen]);
     
     // --- End of Search & Formatting Functionality ---
 
@@ -609,19 +604,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         markAsChanged();
     };
     
-    const handleGetPrompt = async () => {
-        vibrate();
-        setIsPromptLoading(true);
-        const prompt = await fetchJournalPrompt();
-        const currentHtml = editorRef.current?.innerHTML || '';
-        if (editorRef.current) {
-            editorRef.current.innerHTML = `<p>${prompt}</p><p><br></p>${currentHtml}`;
-        }
-        setIsPromptLoading(false);
-        editorRef.current?.focus();
-        markAsChanged();
-    };
-
     const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
         markAsChanged();
         const text = e.currentTarget.innerText || '';
@@ -857,7 +839,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
      const SlashCommandMenu = () => (
         <motion.div
             style={{ top: slashMenuPosition.top, left: slashMenuPosition.left }}
-            className="absolute z-50 w-64 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10 p-2"
+            className="absolute z-50 w-64 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -1001,7 +983,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         onMouseEnter={() => setIsMouseOverMenu(true)}
                         onMouseLeave={() => setIsMouseOverMenu(false)}
                     >
-                        <div className="p-1 bg-light-bg-secondary/80 dark:bg-dark-bg-secondary/80 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
+                        <div className="p-1 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className={`p-2 rounded ${activeFormats.bold ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Bold size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className={`p-2 rounded ${activeFormats.italic ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Italic size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('underline')} className={`p-2 rounded ${activeFormats.underline ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Underline size={18} /></button>
@@ -1016,7 +998,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         {activePalette && (
                             <motion.div
                                 ref={paletteRef}
-                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-lg shadow-xl border border-white/10"
+                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-lg shadow-xl border border-white/10"
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
@@ -1058,8 +1040,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
              <AnimatePresence>
                 {isOptionsMenuOpen && (
                      <motion.div
+                        key="journal-options-menu"
                         ref={menuRef}
-                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-xl border border-white/10 shadow-3xl origin-top-right z-30 p-3 text-base"
+                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-xl border border-white/10 dark:border-white/5 shadow-3xl origin-top-right z-30 p-3 text-base"
                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
@@ -1142,7 +1125,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         autoFocus={!entry} readOnly={isLocked}
                     />
                 </div>
-                <div className="relative flex-grow w-full journal-editor-container overflow-y-auto">
+                <div className="relative flex-grow w-full journal-editor-container overflow-y-auto pb-24">
                     <div
                         ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
                         onKeyUp={handleEditorKeyUp} onKeyDown={handleEditorKeyDown}
@@ -1151,43 +1134,66 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         className={`w-full min-h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
                         autoFocus={!entry}
                     />
-                </div>
-                <div className="flex-shrink-0 pt-4">
-                     <AnimatePresence>
-                        {attachments.length > 0 && (
-                            <motion.div layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-4">
-                                <div className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden">
-                                    <div className="flex items-center justify-between p-3 border-b border-white/10">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <AttachmentIcon type={attachments[0].type} />
-                                            <span className="font-semibold truncate pr-2">{attachments[0].name}</span>
+                     <div className="mt-8 pt-6 border-t border-white/10">
+                        <AnimatePresence>
+                            {attachments.length > 0 && (
+                                <div className="space-y-3">
+                                <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
+                                {attachments.map((att, index) => (
+                                    <motion.div
+                                        key={att.id}
+                                        layout
+                                        className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden"
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.1 }}
+                                    >
+                                        <div className="flex items-center justify-between p-3 border-b border-white/10">
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <AttachmentIcon type={att.type} />
+                                                <span className="font-semibold truncate pr-2">{att.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <button onClick={() => handleRemoveAttachment(att)} className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10" aria-label="Remove attachment"><Trash2 size={16} /></button>
+                                                <button onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm">View</button>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <button onClick={() => handleRemoveAttachment(attachments[0])} className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10" aria-label="Remove attachment"><Trash2 size={16} /></button>
-                                            <button onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: 0 })} className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm">{attachments.length > 1 ? `View All (${attachments.length})` : 'View'}</button>
+                                        <div onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer">
+                                            {att.type.startsWith('image/') ? <img src={att.data} alt={att.name} className="max-w-full max-h-full object-contain" /> : att.type === 'application/pdf' ? <PdfViewer dataUrl={att.data} isThumbnail={true} /> : <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary"><AttachmentIcon type={att.type} /><span>Click to View</span></div>}
                                         </div>
-                                    </div>
-                                    <div onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: 0 })} className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer">
-                                        {attachments[0].type.startsWith('image/') ? <img src={attachments[0].data} alt={attachments[0].name} className="max-w-full max-h-full object-contain" /> : <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary"><AttachmentIcon type={attachments[0].type} /><span>Click to View</span></div>}
-                                    </div>
+                                    </motion.div>
+                                ))}
                                 </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    <AnimatePresence>
-                        {isUploading && <motion.div className="flex items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><LoaderCircle size={16} className="animate-spin" /><span>Compressing & preparing...</span></motion.div>}
-                    </AnimatePresence>
+                            )}
+                        </AnimatePresence>
+                        <AnimatePresence>
+                            {isUploading && <motion.div className="flex items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><LoaderCircle size={16} className="animate-spin" /><span>Compressing & preparing...</span></motion.div>}
+                        </AnimatePresence>
+                    </div>
                 </div>
-                <div className="relative flex-shrink-0 py-4 flex items-center justify-between">
-                    <button onClick={handleGetPrompt} disabled={isPromptLoading} className="flex items-center gap-2 px-4 py-2 text-sm bg-light-glass dark:bg-dark-glass rounded-full border border-white/20">
-                        {isPromptLoading ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-400" />}
-                        Get a prompt
-                    </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
-                    <motion.button onClick={() => setShowAttachmentModal(true)} disabled={isUploading} className="w-12 h-12 bg-light-glass dark:bg-dark-glass rounded-full flex items-center justify-center shadow-lg border border-white/20 disabled:opacity-50" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} aria-label="Attach file">
-                        <Paperclip size={24} />
-                    </motion.button>
-                </div>
+                <AnimatePresence>
+                    {!isLocked && (
+                        <motion.button
+                            onClick={() => setShowAttachmentModal(true)}
+                            disabled={isUploading}
+                            className="absolute bottom-6 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20 disabled:opacity-50"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            aria-label="Attach file"
+                            initial={{ scale: 0, y: 50 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0, y: 50 }}
+                        >
+                           <AnimatePresence mode="wait">
+                            {isUploading 
+                                ? <motion.div key="loader" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><LoaderCircle size={24} className="animate-spin" /></motion.div>
+                                : <motion.div key="icon" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><Paperclip size={24} /></motion.div>
+                            }
+                            </AnimatePresence>
+                        </motion.button>
+                    )}
+                </AnimatePresence>
+                <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
             </div>
             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
             <style>{`

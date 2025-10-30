@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Image, FileText } from 'lucide-react';
@@ -26,7 +27,7 @@ const AttachmentTypeModal: React.FC<AttachmentTypeModalProps> = ({ isOpen, onClo
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="absolute bottom-20 right-4 w-48 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-xl border border-white/10 shadow-3xl p-2"
+            className="absolute bottom-20 right-4 w-48 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}

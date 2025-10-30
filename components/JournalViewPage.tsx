@@ -240,7 +240,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                     {isMenuOpen && (
                         <motion.div
                             ref={menuRef}
-                            className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
+                            className="absolute top-12 right-0 w-48 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
                             variants={menuVariants}
                             initial="hidden"
                             animate="visible"
@@ -269,7 +269,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                     {isShareMenuOpen && (
                         <motion.div
                             ref={shareMenuRef}
-                            className="absolute top-12 right-0 w-48 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
+                            className="absolute top-12 right-0 w-48 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-xl border border-white/10 shadow-xl origin-top-right z-10"
                             variants={menuVariants}
                             initial="hidden"
                             animate="visible"
