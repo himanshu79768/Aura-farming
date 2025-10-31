@@ -1,8 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search as SearchIcon, X, BookOpen, MessageSquare, Timer, Settings, Wind, Plus } from 'lucide-react';
+import { X, BookOpen, MessageSquare, Timer, Settings, Wind, Plus } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Quote, FocusSession } from '../types';
+
+const SearchIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" fill="currentColor" className={className}>
+        <path d="M 21 3 C 11.622998 3 4 10.623005 4 20 C 4 29.376995 11.622998 37 21 37 C 24.712383 37 28.139151 35.791079 30.9375 33.765625 L 44.085938 46.914062 L 46.914062 44.085938 L 33.886719 31.058594 C 36.443536 28.083 38 24.223631 38 20 C 38 10.623005 30.377002 3 21 3 z M 21 5 C 29.296122 5 36 11.703883 36 20 C 36 28.296117 29.296122 35 21 35 C 12.703878 35 6 28.296117 6 20 C 6 11.703883 12.703878 5 21 5 z"></path>
+    </svg>
+);
 
 type SearchResult = {
     id: string;
@@ -96,16 +102,17 @@ const GlobalSearch: React.FC = () => {
         return [...actions, ...journals, ...focusSessions, ...allQuotes];
     }, [query, journalEntries, quotes, focusHistory, searchableActions, navigateTo]);
     
-    // Fix: Explicitly type the accumulator in the `reduce` function to ensure correct type inference for `groupedResults`.
     const groupedResults = useMemo(() => {
-        return allResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
+        // Fix: Explicitly type the initial value for `reduce` to ensure `groupedResults` is correctly typed.
+        // This prevents `items` from being inferred as `unknown` when using `Object.entries`.
+        return allResults.reduce((acc, result) => {
             const key = result.type.charAt(0).toUpperCase() + result.type.slice(1) + 's';
             if (!acc[key]) {
                 acc[key] = [];
             }
             acc[key].push(result);
             return acc;
-        }, {});
+        }, {} as Record<string, SearchResult[]>);
     }, [allResults]);
 
     useEffect(() => {
@@ -162,7 +169,7 @@ const GlobalSearch: React.FC = () => {
             onClick={toggleSearch}
         >
             <motion.div
-                className="w-full max-w-2xl bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
+                className="w-full max-w-2xl bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
                 initial={{ scale: 0.95, y: -20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.95, y: -20 }}
@@ -188,7 +195,6 @@ const GlobalSearch: React.FC = () => {
                     <AnimatePresence>
                         {query.trim() ? (
                             allResults.length > 0 ? (
-                                // Fix: Correctly type the `reduce` function for `groupedResults` to ensure `Object.entries` works correctly.
                                 Object.entries(groupedResults).map(([groupName, items]) => (
                                     <div key={groupName} className="mb-2">
                                         <h3 className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">{groupName}</h3>

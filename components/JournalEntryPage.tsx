@@ -4,7 +4,7 @@ import {
     Trash2, Loader, Link as LinkIcon, Paperclip, 
     LoaderCircle, FileImage, FileText, FileQuestion, MoreHorizontal, Search, Copy, Repeat, ArrowLeftRight,
     Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus,
-    Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon
+    Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon, TextSelect
 } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Attachment } from '../types';
@@ -839,7 +839,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
      const SlashCommandMenu = () => (
         <motion.div
             style={{ top: slashMenuPosition.top, left: slashMenuPosition.left }}
-            className="absolute z-50 w-64 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
+            className="absolute z-50 w-64 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -940,6 +940,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             setActivePalette(null);
         };
     
+        const handleSelectAll = () => {
+            if (editorRef.current) {
+                editorRef.current.focus();
+                const range = document.createRange();
+                range.selectNodeContents(editorRef.current);
+                const selection = window.getSelection();
+                if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }
+        };
+
         useEffect(() => {
             if (activePalette && paletteRef.current && formattingMenuRef.current && positioningContainerRef.current) {
                 const palette = paletteRef.current;
@@ -983,11 +996,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         onMouseEnter={() => setIsMouseOverMenu(true)}
                         onMouseLeave={() => setIsMouseOverMenu(false)}
                     >
-                        <div className="p-1 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
+                        <div className="p-1 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className={`p-2 rounded ${activeFormats.bold ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Bold size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className={`p-2 rounded ${activeFormats.italic ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Italic size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('underline')} className={`p-2 rounded ${activeFormats.underline ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Underline size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('strikeThrough')} className={`p-2 rounded ${activeFormats.strikethrough ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Strikethrough size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={handleSelectAll} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded" title="Select All"><TextSelect size={18} /></button>
                             <div className="w-px h-5 bg-black/10 dark:bg-white/10 mx-1"></div>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('copy')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Copy size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePalette(p => p === 'highlight' ? null : 'highlight')} className={`p-2 rounded ${activePalette === 'highlight' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Highlighter size={18} /></button>
@@ -998,7 +1012,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         {activePalette && (
                             <motion.div
                                 ref={paletteRef}
-                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-lg shadow-xl border border-white/10"
+                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10"
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
@@ -1042,7 +1056,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                      <motion.div
                         key="journal-options-menu"
                         ref={menuRef}
-                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-xl border border-white/10 dark:border-white/5 shadow-3xl origin-top-right z-30 p-3 text-base"
+                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-xl border border-white/10 dark:border-white/5 shadow-3xl origin-top-right z-30 p-3 text-base"
                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
