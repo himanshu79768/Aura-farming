@@ -151,6 +151,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         strikethrough: false,
     });
     const [isMouseOverMenu, setIsMouseOverMenu] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(false);
 
 
     const editorRef = useRef<HTMLDivElement>(null);
@@ -167,6 +168,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const handleSaveRef = useRef<() => void>();
     const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
     useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
+    
+    useEffect(() => {
+        // A simple check for non-touch devices, commonly desktops.
+        setIsDesktop(!('ontouchstart' in window) || navigator.maxTouchPoints === 0);
+    }, []);
 
 
     const handleSave = useCallback(async () => {
@@ -523,7 +529,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         };
     }, []);
 
-    const handleDelete = async () => {
+    const handleDelete = useCallback(async () => {
         if (currentEntry) {
             showConfirmationModal({
                 title: 'Move to Trash?',
@@ -539,16 +545,16 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 }
             });
         }
-    };
+    }, [currentEntry, showConfirmationModal, vibrate, deleteJournalEntry, navigateBack]);
     
-     const handleDuplicate = async () => {
+     const handleDuplicate = useCallback(async () => {
         if (currentEntry) {
             const success = await duplicateJournalEntry(currentEntry.id);
             if (success) {
                 setIsOptionsMenuOpen(false);
             }
         }
-    };
+    }, [currentEntry, duplicateJournalEntry]);
     
     const handleCopyText = () => {
         const htmlToPlainText = (html: string): string => {
@@ -657,12 +663,53 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         }
     }, [canRedo, history, historyIndex]);
     
-    const handleLinkSession = () => {
+    const handleLinkSession = useCallback(() => {
         navigateTo('sessionLinking', {
             selectedIds: linkedSessionIds,
             onSave: (newSelectedIds: string[]) => { setLinkedSessionIds(newSelectedIds); markAsChanged(); },
         });
-    };
+    }, [navigateTo, linkedSessionIds, markAsChanged]);
+
+    useEffect(() => {
+        if (!isDesktop) return;
+    
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.target as HTMLElement).isContentEditable || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+                return;
+            }
+            
+            if (!e.shiftKey) return;
+    
+            let handled = false;
+            switch (e.key.toUpperCase()) {
+                case 'D':
+                    if (currentEntry) {
+                        handleDuplicate();
+                        handled = true;
+                    }
+                    break;
+                case 'T':
+                    if (currentEntry) {
+                        handleDelete();
+                        handled = true;
+                    }
+                    break;
+                case 'C':
+                    handleLinkSession();
+                    handled = true;
+                    break;
+            }
+    
+            if (handled) {
+                e.preventDefault();
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isDesktop, currentEntry, handleDuplicate, handleDelete, handleLinkSession]);
 
      // --- Slash Command Logic ---
     const COMMANDS = [
@@ -1116,15 +1163,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                             <MenuDivider/>
                         </>)}
                         <MenuItem icon={<Copy size={16}/>} label="Copy text" onClick={handleCopyText} />
-                        {currentEntry && <MenuItem icon={<Repeat size={16}/>} label="Duplicate" onClick={handleDuplicate} />}
-                        <MenuItem icon={<Trash2 size={16}/>} label="Move to Trash" onClick={handleDelete} danger/>
+                        <MenuItem icon={<Repeat size={16}/>} label={`Duplicate ${isDesktop ? '(Shift+D)' : ''}`.trim()} onClick={handleDuplicate} disabled={!currentEntry} />
+                        <MenuItem icon={<Trash2 size={16}/>} label={`Move to Trash ${isDesktop ? '(Shift+T)' : ''}`.trim()} onClick={handleDelete} danger disabled={!currentEntry} />
                         <MenuDivider/>
                         <MenuToggleItem icon={<ArrowLeftRight size={16}/>} label="Small text" checked={isSmallText} onChange={() => {setIsSmallText(s => !s); markAsChanged();}} />
                         <MenuToggleItem icon={<ChevronsRight size={16}/>} label="Full width" checked={isFullWidth} onChange={() => {setIsFullWidth(s => !s); markAsChanged();}} />
                         <MenuDivider/>
                         <MenuToggleItem icon={<Lock size={16}/>} label="Lock page" checked={isLocked} onChange={() => {setIsLocked(l => !l); markAsChanged();}} />
                          <MenuDivider/>
-                         <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length})`} onClick={handleLinkSession}/>
+                         <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length}) ${isDesktop ? '(Shift+C)' : ''}`.trim()} onClick={handleLinkSession}/>
                          <MenuDivider/>
                          <div className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-75 px-2 pt-2 space-y-1">
                              <p>Word count: {wordCount}</p>
