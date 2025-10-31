@@ -317,53 +317,55 @@ const JournalPage: React.FC = () => {
                     </div>
                 )}
             </div>
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto overflow-y-auto">
-                <AnimatePresence>
-                    {journalEntries.length === 0 ? (
-                         <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
-                        >
-                            <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">Your space is clear.</h2>
-                            <p>Tap the '+' button to capture your first thought.</p>
-                        </motion.div>
-                    ) : filteredEntries.length === 0 ? (
-                        <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
-                        >
-                             <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">
-                                {selectedDate ? 'No entries for this day' : 'No entries found'}
-                            </h2>
-                            <p>
-                                {selectedDate ? 'Tap the date again to clear.' : 'Try a different search term.'}
-                            </p>
-                        </motion.div>
-                    ) : (
-                        <div className="pt-2 pb-28 px-4">
-                        {Object.keys(groupedEntries).map((date) => (
-                            <div key={date} className="mb-6">
-                                <h2 className="font-medium text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-2 sticky top-0 bg-light-bg/80 dark:bg-dark-bg/80 backdrop-blur-md py-1.5 text-center">{date}</h2>
-                                <div className="space-y-3">
-                                {groupedEntries[date].map(entry => (
-                                    <JournalListItem
-                                        key={entry.id}
-                                        entry={entry}
-                                        isSelected={selectedIds.includes(entry.id)}
-                                        isSelectionMode={isSelectionMode}
-                                        onClick={handleItemClick}
-                                        onPointerDown={handlePointerDown}
-                                        onPointerUpOrLeave={handlePointerUpOrLeave}
-                                    />
-                                ))}
+            <div className="flex-grow w-full overflow-y-auto">
+                <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto">
+                    <AnimatePresence>
+                        {journalEntries.length === 0 ? (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
+                            >
+                                <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">Your space is clear.</h2>
+                                <p>Tap the '+' button to capture your first thought.</p>
+                            </motion.div>
+                        ) : filteredEntries.length === 0 ? (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
+                            >
+                                <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">
+                                    {selectedDate ? 'No entries for this day' : 'No entries found'}
+                                </h2>
+                                <p>
+                                    {selectedDate ? 'Tap the date again to clear.' : 'Try a different search term.'}
+                                </p>
+                            </motion.div>
+                        ) : (
+                            <div className="pt-2 pb-28 px-4">
+                            {Object.keys(groupedEntries).map((date) => (
+                                <div key={date} className="mb-6">
+                                    <h2 className="font-medium text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-2 sticky top-0 bg-light-bg/80 dark:bg-dark-bg/80 backdrop-blur-md py-1.5 text-center">{date}</h2>
+                                    <div className="space-y-3">
+                                    {groupedEntries[date].map(entry => (
+                                        <JournalListItem
+                                            key={entry.id}
+                                            entry={entry}
+                                            isSelected={selectedIds.includes(entry.id)}
+                                            isSelectionMode={isSelectionMode}
+                                            onClick={handleItemClick}
+                                            onPointerDown={handlePointerDown}
+                                            onPointerUpOrLeave={handlePointerUpOrLeave}
+                                        />
+                                    ))}
+                                    </div>
                                 </div>
+                            ))}
                             </div>
-                        ))}
-                        </div>
-                    )}
-                </AnimatePresence>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
              <AnimatePresence>
              {!isSelectionMode && (

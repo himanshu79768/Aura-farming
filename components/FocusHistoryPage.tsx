@@ -162,70 +162,72 @@ const FocusHistoryPage: React.FC = () => {
                     setSearchQuery={setFocusSearchQuery}
                 />
             </div>
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
-                {focusHistory.length === 0 ? (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
-                    >
-                        <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No sessions yet.</h2>
-                        <p>Complete a focus timer to see your history.</p>
-                    </motion.div>
-                ) : (
-                    <div className="pt-2 pb-24">
-                        <div className="flex justify-between items-center mb-4 px-1">
-                            <div className="flex items-center bg-light-glass dark:bg-dark-glass p-1 rounded-full border border-white/10">
-                                {(['7d', '30d', 'all'] as FilterRange[]).map(f => (
-                                    <button
-                                        key={f}
-                                        onClick={() => setFilter(f)}
-                                        className={`px-3 py-1 text-sm rounded-full transition-colors ${filter === f ? 'bg-light-bg-secondary dark:bg-dark-bg-secondary' : 'text-light-text-secondary dark:text-dark-text-secondary'}`}
-                                    >
-                                        {f === 'all' ? 'All Time' : `Last ${f.replace('d', '')} days`}
-                                    </button>
-                                ))}
+            <div className="flex-grow w-full overflow-y-auto">
+                <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4">
+                    {focusHistory.length === 0 ? (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 pb-24"
+                        >
+                            <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No sessions yet.</h2>
+                            <p>Complete a focus timer to see your history.</p>
+                        </motion.div>
+                    ) : (
+                        <div className="pt-2 pb-24">
+                            <div className="flex justify-between items-center mb-4 px-1">
+                                <div className="flex items-center bg-light-glass dark:bg-dark-glass p-1 rounded-full border border-white/10">
+                                    {(['7d', '30d', 'all'] as FilterRange[]).map(f => (
+                                        <button
+                                            key={f}
+                                            onClick={() => setFilter(f)}
+                                            className={`px-3 py-1 text-sm rounded-full transition-colors ${filter === f ? 'bg-light-bg-secondary dark:bg-dark-bg-secondary' : 'text-light-text-secondary dark:text-dark-text-secondary'}`}
+                                        >
+                                            {f === 'all' ? 'All Time' : `Last ${f.replace('d', '')} days`}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button onClick={handleExport} className="p-2.5 bg-light-glass dark:bg-dark-glass rounded-full border border-white/10" aria-label="Export history">
+                                    <Download size={16} />
+                                </button>
                             </div>
-                             <button onClick={handleExport} className="p-2.5 bg-light-glass dark:bg-dark-glass rounded-full border border-white/10" aria-label="Export history">
-                                <Download size={16} />
-                            </button>
-                        </div>
-                        
-                        <motion.div
-                            className="grid grid-cols-3 gap-3 mb-8"
-                            initial="hidden"
-                            animate="visible"
-                            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-                        >
-                            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                                <SummaryCard icon={<Timer size={20} />} label="Total Sessions" value={stats.totalSessions} />
+                            
+                            <motion.div
+                                className="grid grid-cols-3 gap-3 mb-8"
+                                initial="hidden"
+                                animate="visible"
+                                variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+                            >
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
+                                    <SummaryCard icon={<Timer size={20} />} label="Total Sessions" value={stats.totalSessions} />
+                                </motion.div>
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
+                                    <SummaryCard icon={<Clock size={20} />} label="Total Time" value={formatTotalTime(stats.totalSeconds)} />
+                                </motion.div>
+                                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
+                                    <SummaryCard icon={<BarChart size={20} />} label="Avg Session" value={`${stats.averageMinutes} min`} onClick={() => navigateTo('focusAnalytics')} />
+                                </motion.div>
                             </motion.div>
-                            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                                <SummaryCard icon={<Clock size={20} />} label="Total Time" value={formatTotalTime(stats.totalSeconds)} />
-                            </motion.div>
-                             <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                                <SummaryCard icon={<BarChart size={20} />} label="Avg Session" value={`${stats.averageMinutes} min`} onClick={() => navigateTo('focusAnalytics')} />
-                            </motion.div>
-                        </motion.div>
 
-                        <h2 className="font-semibold px-1 mb-3">Sessions ({filteredHistory.length})</h2>
-                        <motion.div
-                            className="space-y-3"
-                            initial="hidden"
-                            animate="visible"
-                            variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
-                        >
-                            {filteredHistory.map(session => (
-                               <SessionItem
-                                    key={session.id}
-                                    session={session}
-                                    isLinked={linkedSessionIds.has(session.id)}
-                                    onClick={() => navigateTo('linkedJournals', { session })}
-                                />
-                            ))}
-                        </motion.div>
-                    </div>
-                )}
+                            <h2 className="font-semibold px-1 mb-3">Sessions ({filteredHistory.length})</h2>
+                            <motion.div
+                                className="space-y-3"
+                                initial="hidden"
+                                animate="visible"
+                                variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
+                            >
+                                {filteredHistory.map(session => (
+                                <SessionItem
+                                        key={session.id}
+                                        session={session}
+                                        isLinked={linkedSessionIds.has(session.id)}
+                                        onClick={() => navigateTo('linkedJournals', { session })}
+                                    />
+                                ))}
+                            </motion.div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

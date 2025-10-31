@@ -64,52 +64,54 @@ const SessionLinkingPage: React.FC<SessionLinkingPageProps> = ({ selectedIds, on
                     setSearchQuery={setSearchQuery}
                 />
             </div>
-            <div className="flex-grow w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 overflow-y-auto">
-                <div className="space-y-3 pb-24">
-                    {filteredHistory.length > 0 ? (
-                        <>
-                             <div className="flex justify-start mb-2 px-1">
-                                <button onClick={handleSelectAll} className="px-4 py-1.5 text-sm font-semibold text-light-primary dark:text-dark-primary rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                    {allFilteredSelected ? 'Deselect All Visible' : 'Select All Visible'}
-                                </button>
+            <div className="flex-grow w-full overflow-y-auto">
+                <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4">
+                    <div className="space-y-3 pb-24">
+                        {filteredHistory.length > 0 ? (
+                            <>
+                                <div className="flex justify-start mb-2 px-1">
+                                    <button onClick={handleSelectAll} className="px-4 py-1.5 text-sm font-semibold text-light-primary dark:text-dark-primary rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                        {allFilteredSelected ? 'Deselect All Visible' : 'Select All Visible'}
+                                    </button>
+                                </div>
+                                {filteredHistory.map(session => (
+                                <motion.button
+                                    key={session.id}
+                                    onClick={() => handleToggleSession(session.id)}
+                                    className="w-full flex items-center justify-between text-left p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10"
+                                    whileTap={{ scale: 0.98 }}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                                >
+                                    <div className="pr-4">
+                                        <p className="font-medium">{session.name || 'Focus Session'}</p>
+                                        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
+                                            {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {Math.round(session.duration / 60)} min
+                                        </p>
+                                    </div>
+                                    <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border-2 transition-all duration-200 ease-in-out ${currentSelectedIds.includes(session.id) ? 'bg-light-primary dark:bg-dark-primary border-light-primary dark:border-dark-primary' : 'border-gray-500'}`}>
+                                        <AnimatePresence>
+                                        {currentSelectedIds.includes(session.id) && (
+                                            <motion.div
+                                                initial={{ scale: 0.5, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                exit={{ scale: 0.5, opacity: 0 }}
+                                            >
+                                                <Check className="w-4 h-4 text-white" />
+                                            </motion.div>
+                                        )}
+                                        </AnimatePresence>
+                                    </div>
+                                </motion.button>
+                            ))}
+                            </>
+                        ) : (
+                            <div className="text-center text-light-text-secondary dark:text-dark-text-secondary py-16">
+                                <p>No focus sessions found.</p>
                             </div>
-                            {filteredHistory.map(session => (
-                            <motion.button
-                                key={session.id}
-                                onClick={() => handleToggleSession(session.id)}
-                                className="w-full flex items-center justify-between text-left p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10"
-                                whileTap={{ scale: 0.98 }}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                            >
-                                <div className="pr-4">
-                                    <p className="font-medium">{session.name || 'Focus Session'}</p>
-                                    <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                                        {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {Math.round(session.duration / 60)} min
-                                    </p>
-                                </div>
-                                <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border-2 transition-all duration-200 ease-in-out ${currentSelectedIds.includes(session.id) ? 'bg-light-primary dark:bg-dark-primary border-light-primary dark:border-dark-primary' : 'border-gray-500'}`}>
-                                    <AnimatePresence>
-                                    {currentSelectedIds.includes(session.id) && (
-                                        <motion.div
-                                            initial={{ scale: 0.5, opacity: 0 }}
-                                            animate={{ scale: 1, opacity: 1 }}
-                                            exit={{ scale: 0.5, opacity: 0 }}
-                                        >
-                                            <Check className="w-4 h-4 text-white" />
-                                        </motion.div>
-                                    )}
-                                    </AnimatePresence>
-                                </div>
-                            </motion.button>
-                        ))}
-                        </>
-                    ) : (
-                        <div className="text-center text-light-text-secondary dark:text-dark-text-secondary py-16">
-                            <p>No focus sessions found.</p>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

@@ -1171,15 +1171,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                             <MenuDivider/>
                         </>)}
                         <MenuItem icon={<Copy size={16}/>} label="Copy text" onClick={handleCopyText} />
-                        <MenuItem icon={<Repeat size={16}/>} label="Duplicate" shortcut={isDesktop ? 'Fn+D' : undefined} onClick={handleDuplicate} disabled={!currentEntry} />
-                        <MenuItem icon={<Trash2 size={16}/>} label="Move to Trash" shortcut={isDesktop ? 'Fn+T' : undefined} onClick={handleDelete} danger disabled={!currentEntry} />
+                        <MenuItem icon={<Repeat size={16}/>} label="Duplicate" shortcut={isDesktop ? 'Alt+D' : undefined} onClick={handleDuplicate} disabled={!currentEntry} />
+                        <MenuItem icon={<Trash2 size={16}/>} label="Move to Trash" shortcut={isDesktop ? 'Alt+T' : undefined} onClick={handleDelete} danger disabled={!currentEntry} />
                         <MenuDivider/>
                         <MenuToggleItem icon={<ArrowLeftRight size={16}/>} label="Small text" checked={isSmallText} onChange={() => {setIsSmallText(s => !s); markAsChanged();}} />
                         <MenuToggleItem icon={<ChevronsRight size={16}/>} label="Full width" checked={isFullWidth} onChange={() => {setIsFullWidth(s => !s); markAsChanged();}} />
                         <MenuDivider/>
                         <MenuToggleItem icon={<Lock size={16}/>} label="Lock page" checked={isLocked} onChange={() => {setIsLocked(l => !l); markAsChanged();}} />
                          <MenuDivider/>
-                         <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length})`} shortcut={isDesktop ? 'Fn+C' : undefined} onClick={handleLinkSession}/>
+                         <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length})`} shortcut={isDesktop ? 'Alt+C' : undefined} onClick={handleLinkSession}/>
                          <MenuDivider/>
                          <div className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-75 px-2 pt-2 space-y-1">
                              <p>Word count: {wordCount}</p>

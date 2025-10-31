@@ -306,83 +306,85 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 onBack={navigateBack}
                 rightAction={HeaderActions}
             />
-            <div className={`flex-grow w-full ${useFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} overflow-y-auto transition-all duration-300`}>
-                <div className="pb-24">
-                    <h1 className="text-3xl font-bold mt-4 mb-2 break-words">
-                        {entry.title || 'Untitled Entry'}
-                    </h1>
-                    <div className="mb-6 border-b border-white/10 pb-4">
-                        <p className="font-medium text-light-text-secondary dark:text-dark-text-secondary">{formattedDate}</p>
-                        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{formattedTime}</p>
-                    </div>
-                    <div
-                        className={`journal-view-content leading-relaxed ${useSmallText ? 'text-base' : 'text-lg'}`}
-                        dangerouslySetInnerHTML={{ __html: entry.content }}
-                    />
-                    {entry.attachments && entry.attachments.length > 0 && (
-                        <div className="mt-8 pt-6 border-t border-white/10">
-                            <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
-                            <div className="space-y-3">
-                                {entry.attachments.map((att, index) => (
-                                    <motion.div
-                                        key={att.id}
-                                        className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden"
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.1 }}
-                                    >
-                                        <div className="flex items-center justify-between p-3 border-b border-white/10">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <AttachmentIcon type={att.type} />
-                                                <span className="font-semibold truncate pr-2">{att.name}</span>
-                                            </div>
-                                            <button
-                                                onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
-                                                className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm"
-                                            >
-                                                View
-                                            </button>
-                                        </div>
-                                        <div 
-                                            onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
-                                            className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer"
+            <div className="flex-grow w-full overflow-y-auto">
+                <div className={`w-full ${useFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} transition-all duration-300`}>
+                    <div className="pb-24">
+                        <h1 className="text-3xl font-bold mt-4 mb-2 break-words">
+                            {entry.title || 'Untitled Entry'}
+                        </h1>
+                        <div className="mb-6 border-b border-white/10 pb-4">
+                            <p className="font-medium text-light-text-secondary dark:text-dark-text-secondary">{formattedDate}</p>
+                            <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{formattedTime}</p>
+                        </div>
+                        <div
+                            className={`journal-view-content leading-relaxed ${useSmallText ? 'text-base' : 'text-lg'}`}
+                            dangerouslySetInnerHTML={{ __html: entry.content }}
+                        />
+                        {entry.attachments && entry.attachments.length > 0 && (
+                            <div className="mt-8 pt-6 border-t border-white/10">
+                                <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
+                                <div className="space-y-3">
+                                    {entry.attachments.map((att, index) => (
+                                        <motion.div
+                                            key={att.id}
+                                            className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden"
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.1 }}
                                         >
-                                            {att.type.startsWith('image/') ? (
-                                                <img src={att.data} alt={att.name} className="max-w-full max-h-full object-contain" />
-                                            ) : att.type === 'application/pdf' ? (
-                                                <PdfViewer dataUrl={att.data} isThumbnail={true} />
-                                            ) : (
-                                                <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary">
+                                            <div className="flex items-center justify-between p-3 border-b border-white/10">
+                                                <div className="flex items-center gap-3 overflow-hidden">
                                                     <AttachmentIcon type={att.type} />
-                                                    <span>Click to View</span>
+                                                    <span className="font-semibold truncate pr-2">{att.name}</span>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                ))}
+                                                <button
+                                                    onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
+                                                    className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm"
+                                                >
+                                                    View
+                                                </button>
+                                            </div>
+                                            <div 
+                                                onClick={() => navigateTo('attachmentViewer', { attachments: entry.attachments, startIndex: index })}
+                                                className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer"
+                                            >
+                                                {att.type.startsWith('image/') ? (
+                                                    <img src={att.data} alt={att.name} className="max-w-full max-h-full object-contain" />
+                                                ) : att.type === 'application/pdf' ? (
+                                                    <PdfViewer dataUrl={att.data} isThumbnail={true} />
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary">
+                                                        <AttachmentIcon type={att.type} />
+                                                        <span>Click to View</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                     {linkedSessions.length > 0 && (
-                        <div className="mt-8 pt-6 border-t border-white/10">
-                            <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Connections</h2>
-                            <div className="space-y-3">
-                                {linkedSessions.map(session => (
-                                    <div key={session.id} className="flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl">
-                                        <div>
-                                            <p className="font-medium">{session.name || 'Focus Session'}</p>
-                                            <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                                                {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                            </p>
+                        )}
+                        {linkedSessions.length > 0 && (
+                            <div className="mt-8 pt-6 border-t border-white/10">
+                                <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Connections</h2>
+                                <div className="space-y-3">
+                                    {linkedSessions.map(session => (
+                                        <div key={session.id} className="flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl">
+                                            <div>
+                                                <p className="font-medium">{session.name || 'Focus Session'}</p>
+                                                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
+                                                    {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                </p>
+                                            </div>
+                                            <div className="font-medium text-right">
+                                                {Math.round(session.duration / 60)} min
+                                            </div>
                                         </div>
-                                        <div className="font-medium text-right">
-                                            {Math.round(session.duration / 60)} min
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
              <style>{`

@@ -201,50 +201,52 @@ const GlobalSearch: React.FC = () => {
                     </button>
                 </div>
 
-                <div className="overflow-y-auto max-h-[60vh] p-2">
-                    <AnimatePresence>
-                        {debouncedQuery.trim() ? (
-                            allResults.length > 0 ? (
-                                // Fix: Switched from Object.entries to Object.keys to ensure proper type inference for the 'items' array, resolving the '.map' of unknown error.
-                                Object.keys(groupedResults).map((groupName) => {
-                                    const items = groupedResults[groupName];
-                                    return (
-                                        <div key={groupName} className="mb-2">
-                                            <h3 className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">{groupName}</h3>
-                                            {items.map((result, index) => {
-                                                const globalIndex = allResults.findIndex(r => r.id === result.id);
-                                                return (
-                                                    <motion.button
-                                                        key={result.id}
-                                                        id={`search-result-${globalIndex}`}
-                                                        onClick={() => handleAction(result)}
-                                                        className={`w-full flex items-center gap-3 p-2 text-left rounded-lg transition-colors ${activeIndex === globalIndex ? 'bg-light-primary/10 dark:bg-dark-primary/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                                                        initial={{ opacity: 0, y: 10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        transition={{ delay: index * 0.02 }}
-                                                    >
-                                                        <div className="text-light-primary dark:text-dark-primary">{result.icon}</div>
-                                                        <div className="overflow-hidden">
-                                                            <p className="font-medium truncate"><Highlight text={result.title} query={debouncedQuery} /></p>
-                                                            {result.description && <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary truncate"><Highlight text={result.description} query={debouncedQuery} /></p>}
-                                                        </div>
-                                                    </motion.button>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                })
+                <div className="overflow-y-auto max-h-[60vh]">
+                    <div className="p-2">
+                        <AnimatePresence>
+                            {debouncedQuery.trim() ? (
+                                allResults.length > 0 ? (
+                                    // Fix: Switched from Object.entries to Object.keys to ensure proper type inference for the 'items' array, resolving the '.map' of unknown error.
+                                    Object.keys(groupedResults).map((groupName) => {
+                                        const items = groupedResults[groupName];
+                                        return (
+                                            <div key={groupName} className="mb-2">
+                                                <h3 className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">{groupName}</h3>
+                                                {items.map((result, index) => {
+                                                    const globalIndex = allResults.findIndex(r => r.id === result.id);
+                                                    return (
+                                                        <motion.button
+                                                            key={result.id}
+                                                            id={`search-result-${globalIndex}`}
+                                                            onClick={() => handleAction(result)}
+                                                            className={`w-full flex items-center gap-3 p-2 text-left rounded-lg transition-colors ${activeIndex === globalIndex ? 'bg-light-primary/10 dark:bg-dark-primary/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{ delay: index * 0.02 }}
+                                                        >
+                                                            <div className="text-light-primary dark:text-dark-primary">{result.icon}</div>
+                                                            <div className="overflow-hidden">
+                                                                <p className="font-medium truncate"><Highlight text={result.title} query={debouncedQuery} /></p>
+                                                                {result.description && <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary truncate"><Highlight text={result.description} query={debouncedQuery} /></p>}
+                                                            </div>
+                                                        </motion.button>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <motion.div className="p-8 text-center text-light-text-secondary dark:text-dark-text-secondary" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                        No results found for "{debouncedQuery}"
+                                    </motion.div>
+                                )
                             ) : (
                                 <motion.div className="p-8 text-center text-light-text-secondary dark:text-dark-text-secondary" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                    No results found for "{debouncedQuery}"
+                                    Start typing to search the app.
                                 </motion.div>
-                            )
-                        ) : (
-                             <motion.div className="p-8 text-center text-light-text-secondary dark:text-dark-text-secondary" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                Start typing to search the app.
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
             </motion.div>
         </motion.div>
