@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor } from './types';
 import HomePage from './components/HomePage';
@@ -98,10 +98,10 @@ export const useAppContext = () => {
 };
 
 // --- Motion Variants & Transitions ---
-const pageVariants = { initial: { opacity: 0, scale: 0.98 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.98 } };
-const modalVariants = { initial: { opacity: 0, y: '100%' }, in: { opacity: 1, y: '0%' }, out: { opacity: 0, y: '100%' } };
-const pageTransition = { type: 'tween' as const, ease: 'easeInOut' as const, duration: 0.3 };
-const modalTransition = { type: 'tween' as const, ease: [0.32, 0.72, 0, 1] as const, duration: 0.35 };
+const pageVariants = { initial: { opacity: 0 }, in: { opacity: 1 }, out: { opacity: 0 } };
+const modalVariants = { initial: { x: '100%' }, in: { x: '0%' }, out: { x: '100%' } };
+const pageTransition = { type: 'tween' as const, ease: 'easeInOut', duration: 0.3 };
+const modalTransition = { type: 'tween' as const, ease: [0.4, 0, 0.2, 1], duration: 0.4 };
 const moodFromColors: Record<Mood, string> = {
   [Mood.Calm]: 'from-blue-400/25',
   [Mood.Focus]: 'from-purple-400/25',
@@ -270,10 +270,10 @@ export default function App() {
       setIsImmersive(prev => !prev);
   }, [vibrate, setIsImmersive]);
 
-  const toggleSearch = () => {
+  const toggleSearch = useCallback(() => {
     vibrate();
     setIsSearchOpen(p => !p);
-  };
+  }, [vibrate]);
 
   const updateUserData = useCallback((data: Partial<UserData>) => {
     const dataPathUid = masterUid || currentUser?.uid;
@@ -281,11 +281,12 @@ export default function App() {
     update(ref(db, 'users/' + dataPathUid), data);
   }, [currentUser, masterUid]);
 
-  const handleSetMood = (newMood: Mood) => updateUserData({ mood: newMood });
-  const handleSetSettings = (value: Settings | ((s: Settings) => Settings)) => {
+  const handleSetMood = useCallback((newMood: Mood) => updateUserData({ mood: newMood }), [updateUserData]);
+  
+  const handleSetSettings = useCallback((value: Settings | ((s: Settings) => Settings)) => {
     const newSettings = value instanceof Function ? value(settings) : value;
     updateUserData(newSettings);
-  };
+  }, [settings, updateUserData]);
 
   const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean; message?: string }> => {
     const dataPathUid = masterUid || currentUser?.uid;
@@ -419,63 +420,55 @@ export default function App() {
     return () => cancelAnimationFrame(animationFrameId);
   }, [timerState, sessionName, addFocusSession]);
   
-  const navigateTo = (view: View, params?: any) => {
-    setForwardStack([]);
+    const navigateTo = useCallback((view: View, params?: any) => {
+        setForwardStack([]); // Clear forward history on new navigation
 
-    if (MODAL_VIEWS.includes(view)) {
-        const newViewParent = VIEW_PARENTS[view];
-
-        // Is the new view a top-level modal (its parent is a root view)?
-        const isTopLevelModal = newViewParent && ROOT_VIEWS.includes(newViewParent);
-
-        if (isTopLevelModal) {
-            // If navigating to a top-level modal, it should always be the only item in the stack,
-            // and its corresponding root view must be active.
-            if (newViewParent !== currentView) {
+        if (MODAL_VIEWS.includes(view)) {
+            // We are navigating to a modal view.
+            const newViewParent = VIEW_PARENTS[view];
+            const isTopLevelModal = newViewParent && ROOT_VIEWS.includes(newViewParent);
+            
+            // If the new modal's parent is a root view, and it's different from the current root view,
+            // we should switch the underlying root view to maintain context.
+            if (isTopLevelModal && newViewParent !== currentView) {
                 setCurrentView(newViewParent!);
             }
-            setModalStack([{ view, params }]);
-            return;
-        }
-
-        // It's a nested modal, like focusAnalytics.
-        const topOfStackView = modalStack.length > 0 ? modalStack[modalStack.length - 1].view : null;
-
-        if (newViewParent === topOfStackView) {
-            // This is a child of the current screen, so append it.
+            
+            // Append the new modal to the stack. This fixes the bug where navigating from
+            // journalView to journalEntry would incorrectly replace the stack.
             setModalStack(stack => [...stack, { view, params }]);
-            return;
-        }
-        
-        // Fallback for more complex navigation jumps (e.g. from a deep nested view to another deep nested view in a different branch)
-        // We retain the old behavior of just appending to maintain history, as this seems to be the least disruptive change.
-        setModalStack(stack => [...stack, { view, params }]);
 
-    } else { // Root view
-        if (currentView !== view) {
-            setModalStack([]);
-            setCurrentView(view);
+        } else { // We are navigating to a root view.
+            if (currentView !== view) {
+                // Clear the entire modal stack and set the new root view.
+                setModalStack([]);
+                setCurrentView(view);
+            } else {
+                // If we are already on the target root view, just clear the modals.
+                // This handles cases like being in settings and tapping the 'Profile' nav icon again.
+                setModalStack([]);
+            }
         }
-    }
-  };
+    }, [currentView]);
 
-  const navigateBack = () => {
+
+  const navigateBack = useCallback(() => {
     if (modalStack.length > 0) {
         const lastModal = modalStack[modalStack.length - 1];
         setForwardStack(stack => [lastModal, ...stack]); // Add to forward history
         setModalStack(stack => stack.slice(0, -1));
     }
-  };
+  }, [modalStack]);
 
-  const navigateForward = () => {
+  const navigateForward = useCallback(() => {
     if (forwardStack.length > 0) {
         const [nextView, ...restOfStack] = forwardStack;
         setForwardStack(restOfStack);
         setModalStack(stack => [...stack, nextView]);
     }
-  };
+  }, [forwardStack]);
   
-  const navigateToStackIndex = (index: number) => {
+  const navigateToStackIndex = useCallback((index: number) => {
     if (index < modalStack.length - 1) { // Only navigate if not clicking the last item
         vibrate();
         const itemsToMove = modalStack.slice(index + 1);
@@ -487,9 +480,9 @@ export default function App() {
             setModalStack(stack => stack.slice(0, index + 1));
         }
     }
-  };
+  }, [modalStack, vibrate]);
 
-  const toggleFavorite = (id: string) => {
+  const toggleFavorite = useCallback((id: string) => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return;
     vibrate();
@@ -499,8 +492,9 @@ export default function App() {
     } else {
         set(favRef, true);
     }
-  };
-  const addJournalEntry = async (entry: Omit<JournalEntry, 'id' | 'createdAt'>): Promise<string | null> => {
+  }, [currentUser, masterUid, vibrate, favoriteQuotes]);
+
+  const addJournalEntry = useCallback(async (entry: Omit<JournalEntry, 'id' | 'createdAt'>): Promise<string | null> => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return null;
     try {
@@ -513,8 +507,9 @@ export default function App() {
         showAlertModal({ title: "Save Failed", message: "Could not save your entry. Please try again." });
         return null;
     }
-  };
-  const updateJournalEntry = async (updatedEntry: JournalEntry): Promise<boolean> => {
+  }, [currentUser, masterUid, showAlertModal]);
+
+  const updateJournalEntry = useCallback(async (updatedEntry: JournalEntry): Promise<boolean> => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return false;
     
@@ -532,9 +527,9 @@ export default function App() {
         showAlertModal({ title: "Update Failed", message: "Could not update your entry. Please try again." });
         return false;
     }
-  };
+  }, [currentUser, masterUid, showAlertModal]);
 
-  const deleteJournalEntry = async (id: string): Promise<boolean> => {
+  const deleteJournalEntry = useCallback(async (id: string): Promise<boolean> => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return false;
 
@@ -547,9 +542,9 @@ export default function App() {
         showAlertModal({ title: "Delete Failed", message: "Could not delete your entry. Please try again." });
         return false;
     }
-  };
+  }, [currentUser, masterUid, showAlertModal]);
   
-    const deleteMultipleJournalEntries = async (ids: string[]): Promise<boolean> => {
+    const deleteMultipleJournalEntries = useCallback(async (ids: string[]): Promise<boolean> => {
         const dataPathUid = masterUid || currentUser?.uid;
         if (!dataPathUid || ids.length === 0) return false;
 
@@ -565,9 +560,9 @@ export default function App() {
             showAlertModal({ title: "Delete Failed", message: "Could not delete the selected entries. Please try again." });
             return false;
         }
-    };
+    }, [currentUser, masterUid, showAlertModal]);
 
-  const duplicateJournalEntry = async (id: string): Promise<boolean> => {
+  const duplicateJournalEntry = useCallback(async (id: string): Promise<boolean> => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return false;
 
@@ -590,30 +585,32 @@ export default function App() {
         showAlertModal({ title: "Entry Duplicated", message: "A copy of the journal entry has been created.", type: 'success' });
     }
     return success;
-  };
+  }, [currentUser, masterUid, journalEntries, addJournalEntry, showAlertModal]);
 
-  const selectTimerDuration = (minutes: number) => {
+  const selectTimerDuration = useCallback((minutes: number) => {
       vibrate();
       const newDuration = minutes * 60;
       setTimerState({ duration: newDuration, endTime: 0, isActive: false });
       setTimeLeft(newDuration);
       setIsTimerFinished(false);
-  };
-  const toggleTimer = () => {
+  }, [vibrate]);
+
+  const toggleTimer = useCallback(() => {
     if (isTimerFinished) { resetTimer(false); return; }
     if (timerState.isActive) {
       setTimerState(s => ({ ...s, isActive: false }));
     } else if (timeLeft > 0) {
       setTimerState(s => ({ ...s, isActive: true, endTime: Date.now() + timeLeft * 1000 }));
     }
-  };
-  const resetTimer = (vibrateFeedback = true) => {
+  }, [isTimerFinished, timerState.isActive, timeLeft]);
+
+  const resetTimer = useCallback((vibrateFeedback = true) => {
     if (vibrateFeedback) vibrate();
     setTimerState(s => ({ ...s, endTime: 0, isActive: false }));
     setTimeLeft(timerState.duration);
     setIsTimerFinished(false);
     setSessionName('');
-  };
+  }, [vibrate, timerState.duration]);
 
   const handleConfirm = () => {
       confirmationModalState.onConfirm();
@@ -638,6 +635,35 @@ export default function App() {
       default: return <HomePage />;
     }
   };
+  
+  const appContextValue = useMemo(() => ({
+    mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
+    userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
+    focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
+    timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
+    selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
+    focusSearchQuery, setFocusSearchQuery,
+    logoutUser, loginUserByName,
+    showConfirmationModal, showAlertModal,
+    currentUser,
+    currentView, modalStack,
+    isImmersive, toggleImmersive,
+    toggleSearch,
+  }), [
+    mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
+    userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
+    focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
+    timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
+    selectTimerDuration, toggleTimer, resetTimer, sessionName,
+    focusSearchQuery,
+    logoutUser, loginUserByName,
+    showConfirmationModal, showAlertModal,
+    currentUser,
+    currentView,
+    isImmersive, toggleImmersive,
+    toggleSearch,
+  ]);
+
 
   if (isLoading) {
     return <div className="w-screen h-screen bg-light-bg dark:bg-dark-bg" />;
@@ -647,20 +673,7 @@ export default function App() {
   const shouldShowIntro = showIntro && userProfile.name;
 
   return (
-    <AppContext.Provider value={{ 
-        mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
-        userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-        focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
-        timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
-        selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
-        focusSearchQuery, setFocusSearchQuery,
-        logoutUser, loginUserByName,
-        showConfirmationModal, showAlertModal,
-        currentUser,
-        currentView, modalStack,
-        isImmersive, toggleImmersive,
-        toggleSearch,
-    }}>
+    <AppContext.Provider value={appContextValue}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
             {shouldOnboard ? (
@@ -739,7 +752,7 @@ export default function App() {
                                         animate="in"
                                         exit="out"
                                         transition={modalTransition}
-                                        style={{ zIndex: 30 + index }}
+                                        style={{ zIndex: 30 + index, willChange: 'transform' }}
                                     >
                                         {modalContent}
                                     </motion.div>
@@ -762,7 +775,7 @@ export default function App() {
                         initial={{ y: '100%' }}
                         animate={{ y: '0%' }}
                         exit={{ y: '100%' }}
-                        transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                         className="absolute bottom-0 left-0 right-0 w-full"
                         >
                         <BottomNav currentView={currentView} navigateTo={navigateTo} />

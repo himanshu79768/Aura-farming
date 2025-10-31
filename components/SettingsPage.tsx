@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette } from 'lucide-react';
 import { Theme, Mood, FocusSound, AppIcon, HapticIntensity, AccentColor } from '../types';
@@ -30,9 +30,19 @@ const SegmentedControl = <T extends string>({ options, selectedValue, onChange, 
   );
 };
 
+const MemoizedSegmentedControl = React.memo(SegmentedControl) as typeof SegmentedControl;
+
 
 const SettingsPage: React.FC = () => {
     const { settings, setSettings, mood, setMood, navigateBack } = useAppContext();
+    
+    const handleThemeChange = useCallback((value: Theme) => setSettings(s => ({ ...s, theme: value })), [setSettings]);
+    const handleAccentChange = useCallback((value: AccentColor) => setSettings(s => ({ ...s, accentColor: value })), [setSettings]);
+    const handleAppIconChange = useCallback((value: AppIcon) => setSettings(s => ({ ...s, appIcon: value })), [setSettings]);
+    const handleGradientChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSettings(s => ({ ...s, gradientIntensity: Number(e.target.value) })), [setSettings]);
+    const handleFocusSoundChange = useCallback((value: FocusSound) => setSettings(s => ({ ...s, focusSound: value })), [setSettings]);
+    const handleHapticChange = useCallback((value: HapticIntensity) => setSettings(s => ({ ...s, hapticIntensity: value })), [setSettings]);
+    const handleMoodChange = useCallback((value: Mood) => setMood(value), [setMood]);
 
     return (
         <div className="w-full h-full flex flex-col">
@@ -46,14 +56,14 @@ const SettingsPage: React.FC = () => {
                         <div className="p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 space-y-4">
                             <div>
                                 <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">Theme</h3>
-                                <SegmentedControl<Theme>
+                                <MemoizedSegmentedControl<Theme>
                                     options={[
                                         { value: Theme.Light, label: <><Sun size={16}/> Light</> },
                                         { value: Theme.Dark, label: <><Moon size={16}/> Dark</> },
                                         { value: Theme.Auto, label: <><Sparkles size={16}/> Auto</> },
                                     ]}
                                     selectedValue={settings.theme}
-                                    onChange={(value) => setSettings(s => ({ ...s, theme: value }))}
+                                    onChange={handleThemeChange}
                                     layoutId="theme-selector"
                                 />
                             </div>
@@ -63,7 +73,7 @@ const SettingsPage: React.FC = () => {
                                     {Object.entries(ACCENT_COLORS).map(([key, color]) => (
                                         <motion.button
                                             key={key}
-                                            onClick={() => setSettings(s => ({ ...s, accentColor: key as AccentColor }))}
+                                            onClick={() => handleAccentChange(key as AccentColor)}
                                             className="w-full aspect-square rounded-full flex items-center justify-center transition-all border-2 border-transparent hover:border-white/50"
                                             style={{ backgroundColor: `hsl(${color.light})` }}
                                             aria-label={color.name}
@@ -78,27 +88,27 @@ const SettingsPage: React.FC = () => {
                             </div>
                             <div>
                                 <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">App Icon</h3>
-                                <SegmentedControl<AppIcon>
+                                <MemoizedSegmentedControl<AppIcon>
                                     options={[
                                         { value: 'default', label: <><AppWindow size={16}/> Default</> },
                                         { value: 'serene', label: <><Droplet size={16}/> Serene</> },
                                         { value: 'mono', label: <><Star size={16}/> Mono</> },
                                     ]}
                                     selectedValue={settings.appIcon}
-                                    onChange={(value) => setSettings(s => ({ ...s, appIcon: value }))}
+                                    onChange={handleAppIconChange}
                                     layoutId="app-icon-selector"
                                 />
                             </div>
                              <div>
                                 <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">Current Mood</h3>
-                                <SegmentedControl<Mood>
+                                <MemoizedSegmentedControl<Mood>
                                     options={[
                                         { value: Mood.Calm, label: <><Droplet size={16}/> Calm</> },
                                         { value: Mood.Focus, label: <><Zap size={16}/> Focus</> },
                                         { value: Mood.Energize, label: <><Sun size={16}/> Energize</> },
                                     ]}
                                     selectedValue={mood}
-                                    onChange={setMood}
+                                    onChange={handleMoodChange}
                                     layoutId="mood-selector"
                                 />
                             </div>
@@ -112,7 +122,7 @@ const SettingsPage: React.FC = () => {
                                     min="0"
                                     max="100"
                                     value={settings.gradientIntensity ?? 75}
-                                    onChange={(e) => setSettings(s => ({ ...s, gradientIntensity: Number(e.target.value) }))}
+                                    onChange={handleGradientChange}
                                     className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-light-primary dark:accent-dark-primary"
                                 />
                             </div>
@@ -125,27 +135,27 @@ const SettingsPage: React.FC = () => {
                         <div className="p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 space-y-4">
                             <div>
                                 <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">Focus Sound</h3>
-                                <SegmentedControl<FocusSound>
+                                <MemoizedSegmentedControl<FocusSound>
                                     options={[
                                         { value: 'chime', label: <>Chime</> },
                                         { value: 'bell', label: <>Bell</> },
                                         { value: 'bowl', label: <>Bowl</> },
                                     ]}
                                     selectedValue={settings.focusSound}
-                                    onChange={(value) => setSettings(s => ({ ...s, focusSound: value }))}
+                                    onChange={handleFocusSoundChange}
                                     layoutId="focus-sound-selector"
                                 />
                             </div>
                             <div>
                                 <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">Haptic Intensity</h3>
-                                <SegmentedControl<HapticIntensity>
+                                <MemoizedSegmentedControl<HapticIntensity>
                                     options={[
                                         { value: 'off', label: <>Off</> },
                                         { value: 'light', label: <>Light</> },
                                         { value: 'medium', label: <>Medium</> },
                                     ]}
                                     selectedValue={settings.hapticIntensity}
-                                    onChange={(value) => setSettings(s => ({ ...s, hapticIntensity: value }))}
+                                    onChange={handleHapticChange}
                                     layoutId="haptic-selector"
                                 />
                             </div>

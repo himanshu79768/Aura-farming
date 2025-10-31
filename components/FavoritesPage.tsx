@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Download, Loader } from 'lucide-react';
 import { useAppContext } from '../App';
@@ -104,9 +104,43 @@ const generateQuoteImage = async (quote: Quote, mood: Mood, theme: Theme): Promi
     return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
 };
 
+interface FavoriteQuoteItemProps {
+    quote: Quote;
+    isGenerating: boolean;
+    onDownload: (quote: Quote) => void;
+    onToggleFavorite: (id: string) => void;
+}
+
+const FavoriteQuoteItem: React.FC<FavoriteQuoteItemProps> = React.memo(({ quote, isGenerating, onDownload, onToggleFavorite }) => {
+    return (
+        <motion.div
+            className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10 flex items-start gap-4"
+            variants={{
+                hidden: { opacity: 0, y: 20 },
+                visible: { opacity: 1, y: 0 }
+            }}
+            layout
+        >
+            <div className="flex-grow">
+                <p className="font-medium">"{quote.text}"</p>
+                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary mt-2">- {quote.author}</p>
+            </div>
+            <div className="flex items-center gap-2">
+                <button onClick={() => onDownload(quote)} className="p-2 -mr-1 -mt-2" disabled={isGenerating}>
+                    {isGenerating ? <Loader className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5 text-light-text-secondary dark:text-dark-text-secondary" />}
+                </button>
+                <button onClick={() => onToggleFavorite(quote.id)} className="p-2 -mr-2 -mt-2">
+                    <Heart className="w-5 h-5 text-red-500 fill-current" />
+                </button>
+            </div>
+        </motion.div>
+    );
+});
+
+
 const FavoritesPage: React.FC = () => {
     const { quotes, favoriteQuotes, toggleFavorite, navigateBack, mood, settings, showAlertModal } = useAppContext();
-    const [isGenerating, setIsGenerating] = useState<string | null>(null);
+    const [generatingId, setGeneratingId] = useState<string | null>(null);
 
     const favoriteQuoteObjects = quotes.filter(q => favoriteQuotes.includes(q.id));
 
@@ -115,11 +149,11 @@ const FavoritesPage: React.FC = () => {
         return document.documentElement.classList.contains('dark') ? Theme.Dark : Theme.Light;
       }, [settings.theme]);
     
-      const handleDownload = async (quote: Quote) => {
+      const handleDownload = useCallback(async (quote: Quote) => {
           if (!quote) return;
-          setIsGenerating(quote.id);
+          setGeneratingId(quote.id);
           const blob = await generateQuoteImage(quote, mood, resolvedTheme);
-          setIsGenerating(null);
+          setGeneratingId(null);
     
           if (blob) {
               const url = URL.createObjectURL(blob);
@@ -134,7 +168,7 @@ const FavoritesPage: React.FC = () => {
           } else {
               showAlertModal({ title: "Download Failed", message: "Could not generate the image. Please try again." });
           }
-      };
+      }, [mood, resolvedTheme, showAlertModal]);
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
@@ -160,28 +194,13 @@ const FavoritesPage: React.FC = () => {
                             }}
                         >
                             {favoriteQuoteObjects.map(quote => (
-                                <motion.div
+                                <FavoriteQuoteItem
                                     key={quote.id}
-                                    className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10 flex items-start gap-4"
-                                    variants={{
-                                        hidden: { opacity: 0, y: 20 },
-                                        visible: { opacity: 1, y: 0 }
-                                    }}
-                                    layout
-                                >
-                                    <div className="flex-grow">
-                                        <p className="font-medium">"{quote.text}"</p>
-                                        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary mt-2">- {quote.author}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => handleDownload(quote)} className="p-2 -mr-1 -mt-2" disabled={isGenerating === quote.id}>
-                                            {isGenerating === quote.id ? <Loader className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5 text-light-text-secondary dark:text-dark-text-secondary" />}
-                                        </button>
-                                        <button onClick={() => toggleFavorite(quote.id)} className="p-2 -mr-2 -mt-2">
-                                            <Heart className="w-5 h-5 text-red-500 fill-current" />
-                                        </button>
-                                    </div>
-                                </motion.div>
+                                    quote={quote}
+                                    isGenerating={generatingId === quote.id}
+                                    onDownload={handleDownload}
+                                    onToggleFavorite={toggleFavorite}
+                                />
                             ))}
                         </motion.div>
                     )}

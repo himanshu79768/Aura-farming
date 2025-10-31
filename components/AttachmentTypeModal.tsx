@@ -29,7 +29,7 @@ const AttachmentTypeModal: React.FC<AttachmentTypeModalProps> = ({ isOpen, onClo
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="absolute bottom-20 right-4 w-48 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
+            className="absolute bottom-20 right-4 w-48 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-sm rounded-xl border border-white/10 shadow-3xl p-2"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}

@@ -68,7 +68,7 @@ const HomePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.8, ease: "easeInOut" }}
+              transition={{ type: "spring", stiffness: 100, damping: 20, duration: 0.8 }}
               className="flex flex-col items-center"
             >
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-light-text dark:from-dark-text to-light-text-secondary dark:to-dark-text-secondary">

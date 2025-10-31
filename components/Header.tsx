@@ -66,14 +66,14 @@ const MoodSelector: React.FC = () => {
 const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, leftAction, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
     const { navigateBack, navigateForward, canGoBack, canGoForward, isImmersive, toggleImmersive, toggleSearch } = useAppContext();
     const measureRef = useRef<HTMLHeadingElement>(null);
-    const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-base');
+    const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-lg');
 
     useLayoutEffect(() => {
         const checkWrap = () => {
             const element = measureRef.current;
             if (element) {
-                const originalClass = titleClassName || 'text-base';
-                const smallerClass = originalClass === 'text-base' ? 'text-sm' : 'text-base';
+                const originalClass = titleClassName || 'text-lg';
+                const smallerClass = 'text-base';
     
                 const style = getComputedStyle(element);
                 const lineHeight = parseFloat(style.lineHeight);
@@ -155,7 +155,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                             {title}
                         </motion.h1>
 
-                        <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-14rem)] absolute invisible -z-10 ${titleClassName || 'text-base'}`}>{title}</h1>
+                        <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-14rem)] absolute invisible -z-10 ${titleClassName || 'text-lg'}`}>{title}</h1>
                     </div>
                 )}
 

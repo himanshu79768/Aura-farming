@@ -4,6 +4,7 @@ import { Timer, BarChart, Clock, Download, BookOpen } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import SearchBar from './SearchBar';
+import { FocusSession } from '../types';
 
 interface SummaryCardProps {
     icon: React.ReactNode;
@@ -50,6 +51,42 @@ const formatTotalTime = (totalSeconds: number) => {
 };
 
 type FilterRange = '7d' | '30d' | 'all';
+
+interface SessionItemProps {
+    session: FocusSession;
+    isLinked: boolean;
+    onClick: () => void;
+}
+
+const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked, onClick }) => {
+    return (
+        <motion.button
+            onClick={onClick}
+            className="w-full flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl text-left"
+            variants={{
+                hidden: { opacity: 0, x: -20 },
+                visible: { opacity: 1, x: 0 }
+            }}
+            whileTap={{ scale: 0.98 }}
+            layout
+        >
+            <div>
+                <p className="font-medium flex items-center gap-2">
+                    <span>{session.name || 'Focus Session'}</span>
+                    {isLinked && (
+                        <BookOpen size={14} className="text-light-primary dark:text-dark-primary shrink-0" />
+                    )}
+                </p>
+                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
+                    {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, {new Date(session.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                </p>
+            </div>
+            <div className="font-medium text-right">
+                {Math.round(session.duration / 60)} min
+            </div>
+        </motion.button>
+    );
+});
 
 const FocusHistoryPage: React.FC = () => {
     const { focusHistory, navigateBack, navigateTo, focusSearchQuery, setFocusSearchQuery, journalEntries } = useAppContext();
@@ -179,32 +216,12 @@ const FocusHistoryPage: React.FC = () => {
                             variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
                         >
                             {filteredHistory.map(session => (
-                                <motion.button
+                               <SessionItem
                                     key={session.id}
+                                    session={session}
+                                    isLinked={linkedSessionIds.has(session.id)}
                                     onClick={() => navigateTo('linkedJournals', { session })}
-                                    className="w-full flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl text-left"
-                                    variants={{
-                                        hidden: { opacity: 0, x: -20 },
-                                        visible: { opacity: 1, x: 0 }
-                                    }}
-                                    whileTap={{ scale: 0.98 }}
-                                    layout
-                                >
-                                    <div>
-                                        <p className="font-medium flex items-center gap-2">
-                                            <span>{session.name || 'Focus Session'}</span>
-                                            {linkedSessionIds.has(session.id) && (
-                                                <BookOpen size={14} className="text-light-primary dark:text-dark-primary shrink-0" />
-                                            )}
-                                        </p>
-                                        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                                            {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, {new Date(session.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                                        </p>
-                                    </div>
-                                    <div className="font-medium text-right">
-                                        {Math.round(session.duration / 60)} min
-                                    </div>
-                                </motion.button>
+                                />
                             ))}
                         </motion.div>
                     </div>

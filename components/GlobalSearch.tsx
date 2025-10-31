@@ -48,8 +48,19 @@ const Highlight: React.FC<{ text: string; query: string }> = ({ text, query }) =
 const GlobalSearch: React.FC = () => {
     const { journalEntries, quotes, focusHistory, navigateTo, toggleSearch } = useAppContext();
     const [query, setQuery] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedQuery(query);
+        }, 250); // Debounce delay
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [query]);
 
     const searchableActions: Omit<SearchResult, 'id'>[] = useMemo(() => [
         { type: 'action', title: 'New Journal Entry', description: 'Start writing a new entry.', icon: <Plus size={18} />, action: () => navigateTo('journalEntry') },
@@ -58,9 +69,9 @@ const GlobalSearch: React.FC = () => {
     ], [navigateTo]);
 
     const allResults = useMemo((): SearchResult[] => {
-        if (!query.trim()) return [];
+        if (!debouncedQuery.trim()) return [];
 
-        const lowerCaseQuery = query.toLowerCase();
+        const lowerCaseQuery = debouncedQuery.toLowerCase();
         
         const actions = searchableActions
             .filter(a => a.title.toLowerCase().includes(lowerCaseQuery) || a.description?.toLowerCase().includes(lowerCaseQuery))
@@ -100,25 +111,25 @@ const GlobalSearch: React.FC = () => {
             }));
 
         return [...actions, ...journals, ...focusSessions, ...allQuotes];
-    }, [query, journalEntries, quotes, focusHistory, searchableActions, navigateTo]);
+    }, [debouncedQuery, journalEntries, quotes, focusHistory, searchableActions, navigateTo]);
     
     const groupedResults = useMemo(() => {
-        // Fix: Explicitly type the initial value for `reduce` to ensure `groupedResults` is correctly typed.
-        // This prevents `items` from being inferred as `unknown` when using `Object.entries`.
-        return allResults.reduce((acc, result) => {
+        // Fix: Use the generic parameter for `reduce` to explicitly set the accumulator's type.
+        // The previous type assertion on the initial value was not sufficient for correct type inference.
+        return allResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
             const key = result.type.charAt(0).toUpperCase() + result.type.slice(1) + 's';
             if (!acc[key]) {
                 acc[key] = [];
             }
             acc[key].push(result);
             return acc;
-        }, {} as Record<string, SearchResult[]>);
+        }, {});
     }, [allResults]);
 
     useEffect(() => {
-        // Reset active index when query changes
+        // Reset active index when debounced query changes
         setActiveIndex(0);
-    }, [query]);
+    }, [debouncedQuery]);
 
     useEffect(() => {
         inputRef.current?.focus();
@@ -161,7 +172,7 @@ const GlobalSearch: React.FC = () => {
 
     return (
         <motion.div
-            className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] md:pt-[15vh] bg-black/50 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] md:pt-[15vh] bg-black/50 backdrop-blur"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -193,7 +204,7 @@ const GlobalSearch: React.FC = () => {
 
                 <div className="overflow-y-auto max-h-[60vh] p-2">
                     <AnimatePresence>
-                        {query.trim() ? (
+                        {debouncedQuery.trim() ? (
                             allResults.length > 0 ? (
                                 Object.entries(groupedResults).map(([groupName, items]) => (
                                     <div key={groupName} className="mb-2">
@@ -212,8 +223,8 @@ const GlobalSearch: React.FC = () => {
                                                 >
                                                     <div className="text-light-primary dark:text-dark-primary">{result.icon}</div>
                                                     <div className="overflow-hidden">
-                                                        <p className="font-medium truncate"><Highlight text={result.title} query={query} /></p>
-                                                        {result.description && <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary truncate"><Highlight text={result.description} query={query} /></p>}
+                                                        <p className="font-medium truncate"><Highlight text={result.title} query={debouncedQuery} /></p>
+                                                        {result.description && <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary truncate"><Highlight text={result.description} query={debouncedQuery} /></p>}
                                                     </div>
                                                 </motion.button>
                                             );
@@ -222,7 +233,7 @@ const GlobalSearch: React.FC = () => {
                                 ))
                             ) : (
                                 <motion.div className="p-8 text-center text-light-text-secondary dark:text-dark-text-secondary" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                    No results found for "{query}"
+                                    No results found for "{debouncedQuery}"
                                 </motion.div>
                             )
                         ) : (

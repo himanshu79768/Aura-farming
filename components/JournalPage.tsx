@@ -1,10 +1,67 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon, Trash2, Check } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry } from '../types';
 import Header from './Header';
 import SearchBar from './SearchBar';
+
+interface JournalListItemProps {
+    entry: JournalEntry;
+    isSelected: boolean;
+    isSelectionMode: boolean;
+    onClick: (entry: JournalEntry) => void;
+    onPointerDown: (id: string) => void;
+    onPointerUpOrLeave: () => void;
+}
+
+const JournalListItem: React.FC<JournalListItemProps> = React.memo(({ entry, isSelected, isSelectionMode, onClick, onPointerDown, onPointerUpOrLeave }) => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{
+                opacity: 1,
+                y: 0,
+                scale: isSelected ? 0.98 : 1,
+            }}
+            exit={{ opacity: 0, y: -20 }}
+            onClick={() => onClick(entry)}
+            onPointerDown={() => onPointerDown(entry.id)}
+            onPointerUp={onPointerUpOrLeave}
+            onPointerLeave={onPointerUpOrLeave}
+            className={`w-full text-left p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 ${isSelected ? 'journal-item-selected border-light-primary dark:border-dark-primary' : 'border-white/10'}`}
+            style={{ contain: 'layout paint' }}
+        >
+            <AnimatePresence>
+                {isSelectionMode && (
+                    <motion.div
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        className="w-6 h-6 flex-shrink-0"
+                    >
+                        <div className={`w-full h-full rounded-full border-2 flex items-center justify-center transition-all duration-200 ${isSelected ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-500'}`}>
+                            {isSelected && <Check size={16} className="text-white" />}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <div className="flex-grow overflow-hidden">
+                <div className="flex items-center justify-between">
+                    <p className="font-semibold truncate pr-2 text-lg">{entry.title || 'Untitled Entry'}</p>
+                    {entry.linkedSessionIds && entry.linkedSessionIds.length > 0 && (
+                        <LinkIcon size={14} className="text-light-text-secondary dark:text-dark-text-secondary shrink-0" />
+                    )}
+                </div>
+                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
+                    {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}
+                </p>
+            </div>
+        </motion.div>
+    );
+});
+
 
 const JournalPage: React.FC = () => {
     const { journalEntries, navigateTo, focusHistory, deleteMultipleJournalEntries, showConfirmationModal } = useAppContext();
@@ -119,7 +176,7 @@ const JournalPage: React.FC = () => {
         });
     };
 
-    const handleItemClick = (entry: JournalEntry) => {
+    const handleItemClick = useCallback((entry: JournalEntry) => {
         if (isLongPress.current) {
             isLongPress.current = false;
             return;
@@ -140,9 +197,9 @@ const JournalPage: React.FC = () => {
         } else {
             navigateTo('journalView', { entry });
         }
-    };
+    }, [isSelectionMode, navigateTo]);
 
-    const handlePointerDown = (entryId: string) => {
+    const handlePointerDown = useCallback((entryId: string) => {
         isLongPress.current = false;
         longPressTimerRef.current = window.setTimeout(() => {
             isLongPress.current = true;
@@ -151,11 +208,11 @@ const JournalPage: React.FC = () => {
             }
             setSelectedIds(prev => (prev.includes(entryId) ? prev : [...prev, entryId]));
         }, 500);
-    };
+    }, [isSelectionMode]);
 
-    const handlePointerUpOrLeave = () => {
+    const handlePointerUpOrLeave = useCallback(() => {
         clearTimeout(longPressTimerRef.current);
-    };
+    }, []);
 
     const headerProps = isSelectionMode ? {
         leftAction: (
@@ -290,54 +347,17 @@ const JournalPage: React.FC = () => {
                             <div key={date} className="mb-6">
                                 <h2 className="font-medium text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-2 sticky top-0 bg-light-bg/80 dark:bg-dark-bg/80 backdrop-blur-md py-1.5 text-center">{date}</h2>
                                 <div className="space-y-3">
-                                {groupedEntries[date].map(entry => {
-                                    const isSelected = selectedIds.includes(entry.id);
-                                    return (
-                                        <motion.div
-                                            key={entry.id}
-                                            layout
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{
-                                                opacity: 1,
-                                                y: 0,
-                                                scale: isSelected ? 0.98 : 1,
-                                            }}
-                                            exit={{ opacity: 0, y: -20 }}
-                                            onClick={() => handleItemClick(entry)}
-                                            onPointerDown={() => handlePointerDown(entry.id)}
-                                            onPointerUp={handlePointerUpOrLeave}
-                                            onPointerLeave={handlePointerUpOrLeave}
-                                            className={`w-full text-left p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 ${isSelected ? 'journal-item-selected border-light-primary dark:border-dark-primary' : 'border-white/10'}`}
-                                        >
-                                            <AnimatePresence>
-                                                {isSelectionMode && (
-                                                    <motion.div
-                                                        initial={{ scale: 0, opacity: 0 }}
-                                                        animate={{ scale: 1, opacity: 1 }}
-                                                        exit={{ scale: 0, opacity: 0 }}
-                                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                                        className="w-6 h-6 flex-shrink-0"
-                                                    >
-                                                        <div className={`w-full h-full rounded-full border-2 flex items-center justify-center transition-all duration-200 ${isSelected ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-500'}`}>
-                                                            {isSelected && <Check size={16} className="text-white" />}
-                                                        </div>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                            <div className="flex-grow overflow-hidden">
-                                                <div className="flex items-center justify-between">
-                                                    <p className="font-semibold truncate pr-2 text-lg">{entry.title || 'Untitled Entry'}</p>
-                                                    {entry.linkedSessionIds && entry.linkedSessionIds.length > 0 && (
-                                                        <LinkIcon size={14} className="text-light-text-secondary dark:text-dark-text-secondary shrink-0" />
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
-                                                    {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}
-                                                </p>
-                                            </div>
-                                        </motion.div>
-                                    );
-                                })}
+                                {groupedEntries[date].map(entry => (
+                                    <JournalListItem
+                                        key={entry.id}
+                                        entry={entry}
+                                        isSelected={selectedIds.includes(entry.id)}
+                                        isSelectionMode={isSelectionMode}
+                                        onClick={handleItemClick}
+                                        onPointerDown={handlePointerDown}
+                                        onPointerUpOrLeave={handlePointerUpOrLeave}
+                                    />
+                                ))}
                                 </div>
                             </div>
                         ))}

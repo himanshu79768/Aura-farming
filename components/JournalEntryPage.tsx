@@ -159,7 +159,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const hasSetInitialContent = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
-    const historyDebounceTimeoutRef = useRef<number | null>(null);
+    const contentChangeDebounceRef = useRef<number | null>(null);
     const formattingMenuRef = useRef<HTMLDivElement>(null);
     const paletteRef = useRef<HTMLDivElement>(null);
     
@@ -604,13 +604,21 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         markAsChanged();
     };
     
-    const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
+    const handleContentChange = () => {
         markAsChanged();
-        const text = e.currentTarget.innerText || '';
-        const currentHtml = e.currentTarget.innerHTML || '';
-        setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
-        if (historyDebounceTimeoutRef.current) { clearTimeout(historyDebounceTimeoutRef.current); }
-        historyDebounceTimeoutRef.current = window.setTimeout(() => {
+
+        if (contentChangeDebounceRef.current) {
+            clearTimeout(contentChangeDebounceRef.current);
+        }
+
+        contentChangeDebounceRef.current = window.setTimeout(() => {
+            const editor = editorRef.current;
+            if (!editor) return;
+
+            const currentHtml = editor.innerHTML || '';
+            const text = editor.innerText || '';
+            setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
+
             setHistory(prevHistory => {
                 const newHistory = prevHistory.slice(0, historyIndex + 1);
                 if (newHistory[newHistory.length - 1] !== currentHtml) {
@@ -622,7 +630,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             });
         }, 500);
     };
-    
+
     const handleUndo = useCallback(() => {
         if (canUndo) {
             const newIndex = historyIndex - 1;
@@ -843,7 +851,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            transition={{ type: 'spring', stiffness: 600, damping: 35 }}
             onClick={(e) => e.stopPropagation()}
         >
             <p className="px-2 pt-1 pb-2 text-xs font-semibold uppercase text-light-text-secondary dark:text-dark-text-secondary">Blocks</p>
@@ -988,7 +996,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        transition={{ type: 'spring', stiffness: 700, damping: 40 }}
                         drag
                         dragConstraints={positioningContainerRef}
                         dragMomentum={false}
@@ -1016,7 +1024,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.15, ease: 'easeOut' }}
+                                transition={{ type: 'spring', stiffness: 600, damping: 35 }}
                             >
                                 {activePalette === 'font' && (
                                     <div className="flex gap-2">
@@ -1060,7 +1068,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     >
                       <div className="space-y-1">
                         <div className="relative mb-2">
