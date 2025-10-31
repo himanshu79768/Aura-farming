@@ -1,6 +1,6 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Zap, Droplet, Sun, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Zap, Droplet, Sun, Maximize2, Minimize2, Search } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Mood } from '../types';
 import Breadcrumbs from './Breadcrumbs';
@@ -58,7 +58,7 @@ const MoodSelector: React.FC = () => {
 }
 
 const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, leftAction, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
-    const { navigateBack, navigateForward, canGoBack, canGoForward, isImmersive, toggleImmersive } = useAppContext();
+    const { navigateBack, navigateForward, canGoBack, canGoForward, isImmersive, toggleImmersive, toggleSearch } = useAppContext();
     const measureRef = useRef<HTMLHeadingElement>(null);
     const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-base');
 
@@ -103,6 +103,18 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
             </AnimatePresence>
         </motion.button>
     );
+
+    const SearchButton = (
+        <motion.button
+          onClick={toggleSearch}
+          className="p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5"
+          aria-label="Search"
+          whileTap={{ scale: 0.9 }}
+          key="search-button"
+        >
+            <Search size={20} />
+        </motion.button>
+      );
     
     return (
         <header className="relative w-full min-h-[5rem] h-auto flex items-center p-4 z-20 flex-shrink-0">
@@ -141,8 +153,9 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                     </div>
                 )}
 
-                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     {rightAction ? rightAction : (!showCenteredMoodSelector && !showBackButton && !leftAction && <MoodSelector />)}
+                    {!showBackButton && SearchButton}
                 </div>
             </div>
 
@@ -185,6 +198,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                     <div className="flex items-center gap-2">
                         {rightAction ? rightAction : ((showCenteredMoodSelector || (!showBackButton && !leftAction)) && <MoodSelector />)}
                         {ImmersiveButton}
+                        {SearchButton}
                     </div>
                 </div>
                  <div className="mt-2">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Home, Timer, BookOpen, MessageSquare, User, Settings, Star } from 'lucide-react';
+import { Home, Timer, BookOpen, MessageSquare, User, Settings, Star, FileText } from 'lucide-react';
 import { View } from '../types';
 import { useAppContext } from '../App';
 
@@ -26,7 +26,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClic
       <div className="text-light-primary dark:text-dark-primary">
         {icon}
       </div>
-      <span className="flex-grow">{label}</span>
+      <span className="flex-grow truncate">{label}</span>
       {count !== undefined && (
         <span className={`px-2 py-0.5 text-xs rounded-full ${isActive ? 'bg-gray-400/50 dark:bg-gray-500/50' : 'bg-gray-300/70 dark:bg-gray-700/70'}`}>
           {count}
@@ -41,7 +41,7 @@ const SidebarHeader: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 );
 
 const Sidebar: React.FC = () => {
-    const { currentView, navigateTo, favoriteQuotes, journalEntries, focusHistory, userProfile } = useAppContext();
+    const { currentView, navigateTo, favoriteQuotes, journalEntries, focusHistory, userProfile, modalStack } = useAppContext();
     
     const navItems: { view: View; label: string; icon: React.ReactNode }[] = [
         { view: 'home', label: 'Home', icon: <Home size={20} /> },
@@ -50,8 +50,14 @@ const Sidebar: React.FC = () => {
         { view: 'quotes', label: 'Quotes', icon: <MessageSquare size={20} /> },
     ];
     
-    const profileItems: { view: View; label: string; icon: React.ReactNode }[] = [
+    const recentJournals = journalEntries.slice(0, 3);
+    const topModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
+
+    const accountItems: { view: View; label: string; icon: React.ReactNode; count?: number }[] = [
         { view: 'profile', label: 'Profile', icon: <User size={20} /> },
+        { view: 'favorites', label: 'Favorites', icon: <Star size={20} />, count: favoriteQuotes.length },
+        { view: 'focusHistory', label: 'History', icon: <Timer size={20} />, count: focusHistory.length },
+        { view: 'settings', label: 'Settings', icon: <Settings size={20} /> },
     ];
 
     return (
@@ -59,48 +65,51 @@ const Sidebar: React.FC = () => {
             <nav className="flex flex-col h-full">
                 <div className="flex-grow">
                     <motion.div layout transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}>
-                        <SidebarHeader>Main</SidebarHeader>
-                        {navItems.map(({ view, label, icon }) => (
-                            <SidebarItem
-                                key={view}
-                                icon={icon}
-                                label={label}
-                                isActive={currentView === view}
-                                onClick={() => navigateTo(view)}
-                                count={view === 'journal' ? journalEntries.length : undefined}
-                            />
-                        ))}
-                         <SidebarItem
-                            icon={<Star size={20} />}
-                            label="Favorites"
-                            isActive={false}
-                            onClick={() => navigateTo('favorites')}
-                            count={favoriteQuotes.length}
-                        />
-                         <SidebarItem
-                            icon={<Timer size={20} />}
-                            label="History"
-                            isActive={false}
-                            onClick={() => navigateTo('focusHistory')}
-                            count={focusHistory.length}
-                        />
+                        <div>
+                            <SidebarHeader>Main</SidebarHeader>
+                            {navItems.map(({ view, label, icon }) => (
+                                <SidebarItem
+                                    key={view}
+                                    icon={icon}
+                                    label={label}
+                                    isActive={currentView === view}
+                                    onClick={() => navigateTo(view)}
+                                    count={view === 'journal' ? journalEntries.length : undefined}
+                                />
+                            ))}
+                        </div>
+                        
+                        {recentJournals.length > 0 && (
+                            <div className="mt-4">
+                                <SidebarHeader>Recent Journals</SidebarHeader>
+                                {recentJournals.map((entry) => {
+                                    const isActive = topModal?.view === 'journalView' && topModal?.params?.entry?.id === entry.id;
+                                    return (
+                                        <SidebarItem
+                                            key={entry.id}
+                                            icon={<FileText size={20} />}
+                                            label={entry.title || 'Untitled Entry'}
+                                            isActive={isActive}
+                                            onClick={() => navigateTo('journalView', { entry })}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        )}
 
-                        <SidebarHeader>Account</SidebarHeader>
-                        {profileItems.map(({ view, label, icon }) => (
-                             <SidebarItem
-                                key={view}
-                                icon={icon}
-                                label={label}
-                                isActive={currentView === view}
-                                onClick={() => navigateTo(view)}
-                            />
-                        ))}
-                         <SidebarItem
-                            icon={<Settings size={20} />}
-                            label="Settings"
-                            isActive={false}
-                            onClick={() => navigateTo('settings')}
-                        />
+                        <div className="mt-4">
+                            <SidebarHeader>Account</SidebarHeader>
+                            {accountItems.map(({ view, label, icon, count }) => (
+                                <SidebarItem
+                                    key={view}
+                                    icon={icon}
+                                    label={label}
+                                    isActive={currentView === view || topModal?.view === view}
+                                    onClick={() => navigateTo(view)}
+                                    count={count}
+                                />
+                            ))}
+                        </div>
                     </motion.div>
                 </div>
                  <div className="flex-shrink-0">

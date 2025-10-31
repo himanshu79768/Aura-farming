@@ -29,6 +29,7 @@ import SessionLinkingPage from './components/SessionLinkingPage';
 import LinkedJournalsPage from './components/LinkedJournalsPage';
 import AttachmentViewerPage from './components/AttachmentViewerPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import GlobalSearch from './components/GlobalSearch';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -83,6 +84,7 @@ interface AppContextType {
   modalStack: { view: View; params?: any }[];
   isImmersive: boolean;
   toggleImmersive: () => void;
+  toggleSearch: () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -148,6 +150,7 @@ export default function App() {
   const [focusHistory, setFocusHistory] = useState<FocusSession[]>([]);
   const [focusSearchQuery, setFocusSearchQuery] = useState('');
   const [isImmersive, setIsImmersive] = useLocalStorage('isImmersive', false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   // Timer state
   const [timerState, setTimerState] = useState({ duration: 15 * 60, endTime: 0, isActive: false });
@@ -266,6 +269,11 @@ export default function App() {
       vibrate();
       setIsImmersive(prev => !prev);
   }, [vibrate, setIsImmersive]);
+
+  const toggleSearch = () => {
+    vibrate();
+    setIsSearchOpen(p => !p);
+  };
 
   const updateUserData = useCallback((data: Partial<UserData>) => {
     const dataPathUid = masterUid || currentUser?.uid;
@@ -651,6 +659,7 @@ export default function App() {
         currentUser,
         currentView, modalStack,
         isImmersive, toggleImmersive,
+        toggleSearch,
     }}>
       <main ref={constraintsRef} style={{ height: '100dvh' }} className={`w-screen relative font-sans text-light-text dark:text-dark-text bg-light-bg dark:bg-dark-bg transition-colors duration-500`}>
         <AnimatePresence mode="wait">
@@ -778,6 +787,9 @@ export default function App() {
             onClose={handleAlertClose}
             type={alertModalState.type}
         />
+        <AnimatePresence>
+            {isSearchOpen && <GlobalSearch />}
+        </AnimatePresence>
       </main>
     </AppContext.Provider>
   );
