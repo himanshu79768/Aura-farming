@@ -674,34 +674,32 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         if (!isDesktop) return;
     
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.target as HTMLElement).isContentEditable || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-                return;
-            }
-            
-            if (!e.shiftKey) return;
-    
-            let handled = false;
-            switch (e.key.toUpperCase()) {
-                case 'D':
-                    if (currentEntry) {
-                        handleDuplicate();
+            // The 'Fn' key is not reliably detectable in browsers.
+            // We use the 'Alt' key as a functional equivalent for a simpler, single-modifier shortcut.
+            if (e.altKey) {
+                let handled = false;
+                switch (e.key.toUpperCase()) {
+                    case 'D': // Duplicate
+                        if (currentEntry) {
+                            handleDuplicate();
+                            handled = true;
+                        }
+                        break;
+                    case 'T': // Trash
+                        if (currentEntry) {
+                            handleDelete();
+                            handled = true;
+                        }
+                        break;
+                    case 'C': // Connections
+                        handleLinkSession();
                         handled = true;
-                    }
-                    break;
-                case 'T':
-                    if (currentEntry) {
-                        handleDelete();
-                        handled = true;
-                    }
-                    break;
-                case 'C':
-                    handleLinkSession();
-                    handled = true;
-                    break;
-            }
-    
-            if (handled) {
-                e.preventDefault();
+                        break;
+                }
+        
+                if (handled) {
+                    e.preventDefault();
+                }
             }
         };
         
@@ -830,9 +828,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         );
     };
 
-    const MenuItem = ({ icon, label, onClick, danger = false, disabled = false }: { icon: React.ReactNode, label: string, onClick?: () => void, danger?: boolean, disabled?: boolean }) => (
+    const ShortcutDisplay = ({ shortcut }: { shortcut: string }) => {
+        if (!shortcut) return null;
+        return (
+            <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                {shortcut}
+            </span>
+        );
+    };
+
+    const MenuItem = ({ icon, label, onClick, danger = false, disabled = false, shortcut }: { icon: React.ReactNode, label: string, onClick?: () => void, danger?: boolean, disabled?: boolean, shortcut?: string }) => (
         <button onClick={onClick} disabled={disabled} className={`w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${danger ? 'text-red-500' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
             <div className="flex items-center gap-3">{icon}{label}</div>
+            {shortcut && <ShortcutDisplay shortcut={shortcut} />}
         </button>
     );
 
@@ -1163,15 +1171,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                             <MenuDivider/>
                         </>)}
                         <MenuItem icon={<Copy size={16}/>} label="Copy text" onClick={handleCopyText} />
-                        <MenuItem icon={<Repeat size={16}/>} label={`Duplicate ${isDesktop ? '(Shift+D)' : ''}`.trim()} onClick={handleDuplicate} disabled={!currentEntry} />
-                        <MenuItem icon={<Trash2 size={16}/>} label={`Move to Trash ${isDesktop ? '(Shift+T)' : ''}`.trim()} onClick={handleDelete} danger disabled={!currentEntry} />
+                        <MenuItem icon={<Repeat size={16}/>} label="Duplicate" shortcut={isDesktop ? 'Fn+D' : undefined} onClick={handleDuplicate} disabled={!currentEntry} />
+                        <MenuItem icon={<Trash2 size={16}/>} label="Move to Trash" shortcut={isDesktop ? 'Fn+T' : undefined} onClick={handleDelete} danger disabled={!currentEntry} />
                         <MenuDivider/>
                         <MenuToggleItem icon={<ArrowLeftRight size={16}/>} label="Small text" checked={isSmallText} onChange={() => {setIsSmallText(s => !s); markAsChanged();}} />
                         <MenuToggleItem icon={<ChevronsRight size={16}/>} label="Full width" checked={isFullWidth} onChange={() => {setIsFullWidth(s => !s); markAsChanged();}} />
                         <MenuDivider/>
                         <MenuToggleItem icon={<Lock size={16}/>} label="Lock page" checked={isLocked} onChange={() => {setIsLocked(l => !l); markAsChanged();}} />
                          <MenuDivider/>
-                         <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length}) ${isDesktop ? '(Shift+C)' : ''}`.trim()} onClick={handleLinkSession}/>
+                         <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length})`} shortcut={isDesktop ? 'Fn+C' : undefined} onClick={handleLinkSession}/>
                          <MenuDivider/>
                          <div className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-75 px-2 pt-2 space-y-1">
                              <p>Word count: {wordCount}</p>

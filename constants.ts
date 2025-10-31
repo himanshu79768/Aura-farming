@@ -19,6 +19,14 @@ export const VIEW_PARENTS: Partial<Record<View, View>> = {
     'linkedJournals': 'focusHistory',
 };
 
+export const MODAL_VIEWS: View[] = [
+    'settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 
+    'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 
+    'sessionLinking', 'linkedJournals', 'attachmentViewer'
+];
+export const ROOT_VIEWS: View[] = ['home', 'focus', 'journal', 'quotes', 'profile'];
+
+
 export const INITIAL_QUOTES: Quote[] = [
   { id: '1', text: "You have the right to work, but never to the fruit of work.", author: "Bhagavad Gita" },
   { id: '2', text: "Arise, awake, and stop not till the goal is reached.", author: "Swami Vivekananda" },
@@ -117,13 +125,13 @@ export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
     settings: 'Settings',
     breathing: 'Breathe',
     auraCheckin: 'Aura Check-in',
-    journalEntry: 'Journal Entry',
+    journalEntry: 'Editing Journal',
     journalView: 'View Entry',
     favorites: 'Favorites',
     focusHistory: 'Focus History',
     focusAnalytics: 'Analytics',
     soundOptions: 'Sound Options',
-    sessionLinking: 'Link Sessions',
+    sessionLinking: 'Connections',
     linkedJournals: 'Linked Journals',
     attachmentViewer: 'Attachments',
 };

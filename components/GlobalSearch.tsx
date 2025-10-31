@@ -6,7 +6,7 @@ import { JournalEntry, Quote, FocusSession } from '../types';
 
 const SearchIcon = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" fill="currentColor" className={className}>
-        <path d="M 21 3 C 11.622998 3 4 10.623005 4 20 C 4 29.376995 11.622998 37 21 37 C 24.712383 37 28.139151 35.791079 30.9375 33.765625 L 44.085938 46.914062 L 46.914062 44.085938 L 33.886719 31.058594 C 36.443536 28.083 38 24.223631 38 20 C 38 10.623005 30.377002 3 21 3 z M 21 5 C 29.296122 5 36 11.703883 36 20 C 36 28.296117 29.296122 35 21 35 C 12.703878 35 6 28.296117 6 20 C 6 11.703883 12.703878 5 21 5 z"></path>
+        <path d="M 21 3 C 11.601563 3 4 10.601563 4 20 C 4 29.398438 11.601563 37 21 37 C 24.355469 37 27.460938 36.015625 30.09375 34.34375 L 42.375 46.625 L 46.625 42.375 L 34.5 30.28125 C 36.679688 27.421875 38 23.878906 38 20 C 38 10.601563 30.398438 3 21 3 Z M 21 7 C 28.199219 7 34 12.800781 34 20 C 34 27.199219 28.199219 33 21 33 C 13.800781 33 8 27.199219 8 20 C 8 12.800781 13.800781 7 21 7 Z"></path>
     </svg>
 );
 
@@ -114,16 +114,15 @@ const GlobalSearch: React.FC = () => {
     }, [debouncedQuery, journalEntries, quotes, focusHistory, searchableActions, navigateTo]);
     
     const groupedResults = useMemo(() => {
-        // Fix: Use the generic parameter for `reduce` to explicitly set the accumulator's type.
-        // The previous type assertion on the initial value was not sufficient for correct type inference.
-        return allResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
+        // Fix: Explicitly typing the accumulator and casting the initial value for `reduce` ensures correct type inference.
+        return allResults.reduce((acc: Record<string, SearchResult[]>, result) => {
             const key = result.type.charAt(0).toUpperCase() + result.type.slice(1) + 's';
             if (!acc[key]) {
                 acc[key] = [];
             }
             acc[key].push(result);
             return acc;
-        }, {});
+        }, {} as Record<string, SearchResult[]>);
     }, [allResults]);
 
     useEffect(() => {
@@ -206,31 +205,35 @@ const GlobalSearch: React.FC = () => {
                     <AnimatePresence>
                         {debouncedQuery.trim() ? (
                             allResults.length > 0 ? (
-                                Object.entries(groupedResults).map(([groupName, items]) => (
-                                    <div key={groupName} className="mb-2">
-                                        <h3 className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">{groupName}</h3>
-                                        {items.map((result, index) => {
-                                            const globalIndex = allResults.findIndex(r => r.id === result.id);
-                                            return (
-                                                <motion.button
-                                                    key={result.id}
-                                                    id={`search-result-${globalIndex}`}
-                                                    onClick={() => handleAction(result)}
-                                                    className={`w-full flex items-center gap-3 p-2 text-left rounded-lg transition-colors ${activeIndex === globalIndex ? 'bg-light-primary/10 dark:bg-dark-primary/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    transition={{ delay: index * 0.02 }}
-                                                >
-                                                    <div className="text-light-primary dark:text-dark-primary">{result.icon}</div>
-                                                    <div className="overflow-hidden">
-                                                        <p className="font-medium truncate"><Highlight text={result.title} query={debouncedQuery} /></p>
-                                                        {result.description && <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary truncate"><Highlight text={result.description} query={debouncedQuery} /></p>}
-                                                    </div>
-                                                </motion.button>
-                                            );
-                                        })}
-                                    </div>
-                                ))
+                                // Fix: Switched from Object.entries to Object.keys to ensure proper type inference for the 'items' array, resolving the '.map' of unknown error.
+                                Object.keys(groupedResults).map((groupName) => {
+                                    const items = groupedResults[groupName];
+                                    return (
+                                        <div key={groupName} className="mb-2">
+                                            <h3 className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">{groupName}</h3>
+                                            {items.map((result, index) => {
+                                                const globalIndex = allResults.findIndex(r => r.id === result.id);
+                                                return (
+                                                    <motion.button
+                                                        key={result.id}
+                                                        id={`search-result-${globalIndex}`}
+                                                        onClick={() => handleAction(result)}
+                                                        className={`w-full flex items-center gap-3 p-2 text-left rounded-lg transition-colors ${activeIndex === globalIndex ? 'bg-light-primary/10 dark:bg-dark-primary/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                                        initial={{ opacity: 0, y: 10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: index * 0.02 }}
+                                                    >
+                                                        <div className="text-light-primary dark:text-dark-primary">{result.icon}</div>
+                                                        <div className="overflow-hidden">
+                                                            <p className="font-medium truncate"><Highlight text={result.title} query={debouncedQuery} /></p>
+                                                            {result.description && <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary truncate"><Highlight text={result.description} query={debouncedQuery} /></p>}
+                                                        </div>
+                                                    </motion.button>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })
                             ) : (
                                 <motion.div className="p-8 text-center text-light-text-secondary dark:text-dark-text-secondary" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                     No results found for "{debouncedQuery}"

@@ -15,7 +15,7 @@ import AuraCheckinPage from './components/AuraCheckinPage';
 import JournalPage from './components/JournalPage';
 import JournalEntryPage from './components/JournalEntryPage';
 import JournalViewPage from './components/JournalViewPage';
-import { INITIAL_QUOTES, ACCENT_COLORS, VIEW_PARENTS } from './constants';
+import { INITIAL_QUOTES, ACCENT_COLORS, VIEW_PARENTS, MODAL_VIEWS, ROOT_VIEWS } from './constants';
 import TimerPill from './components/TimerPill';
 import DeleteZone from './components/DeleteZone';
 import FavoritesPage from './components/FavoritesPage';
@@ -122,13 +122,6 @@ const DEFAULT_USER_DATA: UserData = {
     mood: Mood.Calm,
     favoriteQuotes: {},
 };
-
-const MODAL_VIEWS: View[] = [
-    'settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 
-    'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 
-    'sessionLinking', 'linkedJournals', 'attachmentViewer'
-];
-const ROOT_VIEWS: View[] = ['home', 'focus', 'journal', 'quotes', 'profile'];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
@@ -421,35 +414,40 @@ export default function App() {
   }, [timerState, sessionName, addFocusSession]);
   
     const navigateTo = useCallback((view: View, params?: any) => {
-        setForwardStack([]); // Clear forward history on new navigation
+        setForwardStack([]);
 
-        if (MODAL_VIEWS.includes(view)) {
-            // We are navigating to a modal view.
-            const newViewParent = VIEW_PARENTS[view];
-            const isTopLevelModal = newViewParent && ROOT_VIEWS.includes(newViewParent);
-            
-            // If the new modal's parent is a root view, and it's different from the current root view,
-            // we should switch the underlying root view to maintain context.
-            if (isTopLevelModal && newViewParent !== currentView) {
-                setCurrentView(newViewParent!);
-            }
-            
-            // Append the new modal to the stack. This fixes the bug where navigating from
-            // journalView to journalEntry would incorrectly replace the stack.
-            setModalStack(stack => [...stack, { view, params }]);
-
-        } else { // We are navigating to a root view.
+        if (ROOT_VIEWS.includes(view)) {
             if (currentView !== view) {
-                // Clear the entire modal stack and set the new root view.
                 setModalStack([]);
                 setCurrentView(view);
             } else {
-                // If we are already on the target root view, just clear the modals.
-                // This handles cases like being in settings and tapping the 'Profile' nav icon again.
                 setModalStack([]);
             }
+            return;
         }
-    }, [currentView]);
+
+        if (MODAL_VIEWS.includes(view)) {
+            const newViewParent = VIEW_PARENTS[view];
+
+            if (newViewParent && ROOT_VIEWS.includes(newViewParent) && newViewParent !== currentView) {
+                setCurrentView(newViewParent);
+                setModalStack([{ view, params }]);
+                return;
+            }
+            
+            const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
+            const currentModalParent = currentModal ? VIEW_PARENTS[currentModal.view] : null;
+            
+            const isSiblingNav = !!(currentModal && newViewParent && currentModalParent && newViewParent === currentModalParent);
+            const isEditingFromView = currentModal?.view === 'journalView' && view === 'journalEntry';
+
+            if (isSiblingNav && !isEditingFromView) {
+                setModalStack(stack => [...stack.slice(0, -1), { view, params }]);
+            } else {
+                setModalStack(stack => [...stack, { view, params }]);
+            }
+        }
+    }, [currentView, modalStack]);
 
 
   const navigateBack = useCallback(() => {
