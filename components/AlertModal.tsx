@@ -37,7 +37,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur"
           onClick={onClose}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -46,7 +46,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
         >
           {/* Modal Content */}
           <motion.div
-            className="relative w-full max-w-sm p-6 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 rounded-2xl border border-white/10 dark:border-white/5 shadow-3xl text-center"
+            className="relative w-full max-w-sm p-6 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 rounded-2xl border border-white/10 dark:border-white/5 shadow-3xl text-center"
             onClick={(e) => e.stopPropagation()}
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

@@ -98,7 +98,7 @@ const GlobalSearch: React.FC = () => {
     
     // Fix: Explicitly type the accumulator in the `reduce` function to ensure correct type inference for `groupedResults`.
     const groupedResults = useMemo(() => {
-        return allResults.reduce((acc: Record<string, SearchResult[]>, result) => {
+        return allResults.reduce<Record<string, SearchResult[]>>((acc, result) => {
             const key = result.type.charAt(0).toUpperCase() + result.type.slice(1) + 's';
             if (!acc[key]) {
                 acc[key] = [];
@@ -154,7 +154,7 @@ const GlobalSearch: React.FC = () => {
 
     return (
         <motion.div
-            className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] md:pt-[15vh] bg-black/30 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] md:pt-[15vh] bg-black/50 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -162,7 +162,7 @@ const GlobalSearch: React.FC = () => {
             onClick={toggleSearch}
         >
             <motion.div
-                className="w-full max-w-2xl bg-light-bg-secondary/80 dark:bg-dark-bg-secondary/80 rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
+                className="w-full max-w-2xl bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
                 initial={{ scale: 0.95, y: -20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.95, y: -20 }}
@@ -188,6 +188,7 @@ const GlobalSearch: React.FC = () => {
                     <AnimatePresence>
                         {query.trim() ? (
                             allResults.length > 0 ? (
+                                // Fix: Correctly type the `reduce` function for `groupedResults` to ensure `Object.entries` works correctly.
                                 Object.entries(groupedResults).map(([groupName, items]) => (
                                     <div key={groupName} className="mb-2">
                                         <h3 className="px-2 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">{groupName}</h3>

@@ -839,7 +839,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
      const SlashCommandMenu = () => (
         <motion.div
             style={{ top: slashMenuPosition.top, left: slashMenuPosition.left }}
-            className="absolute z-50 w-64 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
+            className="absolute z-50 w-64 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -983,7 +983,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         onMouseEnter={() => setIsMouseOverMenu(true)}
                         onMouseLeave={() => setIsMouseOverMenu(false)}
                     >
-                        <div className="p-1 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
+                        <div className="p-1 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className={`p-2 rounded ${activeFormats.bold ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Bold size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className={`p-2 rounded ${activeFormats.italic ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Italic size={18} /></button>
                             <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('underline')} className={`p-2 rounded ${activeFormats.underline ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Underline size={18} /></button>
@@ -998,7 +998,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         {activePalette && (
                             <motion.div
                                 ref={paletteRef}
-                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-lg shadow-xl border border-white/10"
+                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-lg shadow-xl border border-white/10"
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
@@ -1042,7 +1042,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                      <motion.div
                         key="journal-options-menu"
                         ref={menuRef}
-                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary/60 dark:bg-dark-bg-secondary/60 backdrop-blur-md rounded-xl border border-white/10 dark:border-white/5 shadow-3xl origin-top-right z-30 p-3 text-base"
+                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 backdrop-blur-md rounded-xl border border-white/10 dark:border-white/5 shadow-3xl origin-top-right z-30 p-3 text-base"
                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
