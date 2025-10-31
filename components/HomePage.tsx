@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Zap, Wind } from 'lucide-react';
+import { RefreshCw, Sparkles, Wind } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { MORNING_GREETINGS, AFTERNOON_GREETINGS, EVENING_GREETINGS, DAILY_THOUGHTS } from '../constants';
@@ -17,6 +17,24 @@ const HomePage: React.FC = () => {
   const { userProfile, vibrate, navigateTo } = useAppContext();
   const [greeting, setGreeting] = useState('');
   const [thought, setThought] = useState('');
+
+  const greetingContent = useMemo(() => {
+    if (!greeting) return '';
+    const firstDotIndex = greeting.indexOf('.');
+    // Ensure there's text after the first period to break onto a new line.
+    if (firstDotIndex > -1 && firstDotIndex < greeting.length - 1) {
+        const part1 = greeting.substring(0, firstDotIndex + 1);
+        const part2 = greeting.substring(firstDotIndex + 1);
+        return (
+            <>
+                {part1}
+                <br className="hidden md:block" />
+                {part2.trim()}
+            </>
+        );
+    }
+    return greeting;
+  }, [greeting]);
 
   const refreshContent = useCallback(() => {
     const tod = getTimeOfDay();
@@ -57,7 +75,7 @@ const HomePage: React.FC = () => {
               className="flex flex-col items-center"
             >
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-light-text dark:from-dark-text to-light-text-secondary dark:to-dark-text-secondary">
-                {greeting}
+                {greetingContent}
               </h1>
               <p className="mt-4 max-w-md text-lg md:text-xl font-light text-light-text-secondary dark:text-dark-text-secondary">
                 {thought}
@@ -75,7 +93,7 @@ const HomePage: React.FC = () => {
           >
             <div className="absolute -inset-px bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-sm opacity-75 group-hover:opacity-100 transition duration-500"></div>
             <div className="relative flex items-center gap-2 px-6 py-3 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
-                <Zap className="w-5 h-5 text-purple-400" />
+                <Sparkles className="w-5 h-5 text-purple-400" />
                 <span>Flow Mode</span>
             </div>
         </motion.button>
