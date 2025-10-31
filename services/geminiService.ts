@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Quote, Mood } from '../types';
+import { Quote, Mood, AuraData } from '../types';
 
 export const fetchQuotes = async (): Promise<Quote[]> => {
   try {
@@ -41,71 +41,6 @@ export const fetchQuotes = async (): Promise<Quote[]> => {
   }
 };
 
-export const fetchHomepageContent = async (mood: Mood, name: string, timeOfDay: 'morning' | 'afternoon' | 'evening'): Promise<{ greeting: string; thought: string; }> => {
-    const fallback = { greeting: `Hello, ${name}`, thought: "Welcome to your peaceful space. Tap the refresh icon for a new thought." };
-
-    try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Generate a short, fresh, and welcoming homepage message for a wellness app. It's currently the ${timeOfDay}. The user's name is ${name} and their current mood is set to '${mood}'. Provide a friendly, time-appropriate greeting and a very short (1-2 sentence) "thought for the day" that matches the mood.`,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        greeting: { type: Type.STRING, description: `A friendly, time-appropriate greeting for the ${timeOfDay}, like 'Good ${timeOfDay}, [Name]'` },
-                        thought: { type: Type.STRING, description: "A short, mood-appropriate thought for the day." }
-                    },
-                    required: ['greeting', 'thought']
-                }
-            }
-        });
-        
-        const jsonString = response.text.trim();
-        return JSON.parse(jsonString);
-
-    } catch (error) {
-        console.error("Error fetching homepage content from Gemini:", error);
-        return fallback;
-    }
-};
-
-export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'morning' | 'afternoon' | 'evening'): Promise<{ auraReading: string; affirmation: string; suggestion: string; }> => {
-    const fallback = { 
-        auraReading: "Your energy is bright and full of potential today.",
-        affirmation: "I am open to the possibilities of this beautiful day.",
-        suggestion: "Take a moment to close your eyes and take three deep breaths."
-    };
-
-    try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `You are an AI wellness guide for an app called Aura. The user, ${name}, has selected their current mood as '${mood}'. It's currently the ${timeOfDay}. Generate a personalized 'Aura Check-in'. Provide a response in JSON format with three keys: "auraReading" (a short, 1-2 sentence encouraging paragraph about their current energy), "affirmation" (a single, powerful affirmation sentence), and "suggestion" (a short, actionable suggestion, like 'Try a 5-minute breathing exercise' or 'Stretch for 2 minutes'). The tone should be positive, insightful, and slightly mystical, fitting the 'Aura' theme.`,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        auraReading: { type: Type.STRING, description: "A short, encouraging paragraph about the user's current energy." },
-                        affirmation: { type: Type.STRING, description: "A single, powerful affirmation sentence." },
-                        suggestion: { type: Type.STRING, description: "A short, actionable wellness suggestion." }
-                    },
-                    required: ['auraReading', 'affirmation', 'suggestion']
-                }
-            }
-        });
-        
-        const jsonString = response.text.trim();
-        return JSON.parse(jsonString);
-
-    } catch (error) {
-        console.error("Error fetching aura check-in from Gemini:", error);
-        return fallback;
-    }
-};
-
 export const fetchJournalPrompt = async (): Promise<string> => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -124,4 +59,47 @@ export const fetchJournalPrompt = async (): Promise<string> => {
         console.error("Error fetching journal prompt from Gemini:", error);
         return "What are you grateful for today?";
     }
+};
+
+// FIX: Implemented the missing 'fetchAuraCheckin' function to resolve the import error.
+export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'morning' | 'afternoon' | 'evening'): Promise<AuraData> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const prompt = `Generate a personalized "aura check-in" for a user named ${name}. The user is feeling ${mood} during the ${timeOfDay}.
+      The response should be encouraging, insightful, and slightly mystical.
+      Provide the following in a JSON object:
+      1. "auraReading": A short, imaginative description of their current aura (e.g., "a gentle, glowing lavender with flecks of silver").
+      2. "affirmation": A short, powerful affirmation for them to repeat.
+      3. "suggestion": A simple, actionable suggestion for their current state (e.g., "Try a 5-minute breathing exercise.").`;
+      
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            auraReading: { type: Type.STRING },
+            affirmation: { type: Type.STRING },
+            suggestion: { type: Type.STRING },
+          },
+          required: ['auraReading', 'affirmation', 'suggestion'],
+        },
+      },
+    });
+
+    const jsonString = response.text.trim();
+    return JSON.parse(jsonString);
+
+  } catch (error) {
+    console.error("Error fetching aura check-in from Gemini:", error);
+    // Return a default/fallback response
+    return {
+      auraReading: "A calm, steady glow of deep blue.",
+      affirmation: "I am centered, calm, and in control.",
+      suggestion: "Take a few deep, slow breaths.",
+    };
+  }
 };

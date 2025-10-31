@@ -1,8 +1,10 @@
 import { Quote, FocusMusic, AccentColor, View } from './types';
 
+// FIX: Added 'auraCheckin' as a child of 'home' for proper navigation hierarchy.
 export const VIEW_PARENTS: Partial<Record<View, View>> = {
     // Home children
     'breathing': 'home',
+    'flow': 'home',
     'auraCheckin': 'home',
     // Focus children
     'soundOptions': 'focus',
@@ -19,10 +21,11 @@ export const VIEW_PARENTS: Partial<Record<View, View>> = {
     'linkedJournals': 'focusHistory',
 };
 
+// FIX: Added 'auraCheckin' to the list of modal views.
 export const MODAL_VIEWS: View[] = [
-    'settings', 'breathing', 'auraCheckin', 'journalEntry', 'journalView', 
+    'settings', 'breathing', 'flow', 'journalEntry', 'journalView', 
     'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 
-    'sessionLinking', 'linkedJournals', 'attachmentViewer'
+    'sessionLinking', 'linkedJournals', 'attachmentViewer', 'auraCheckin'
 ];
 export const ROOT_VIEWS: View[] = ['home', 'focus', 'journal', 'quotes', 'profile'];
 
@@ -115,6 +118,7 @@ export const ACCENT_COLORS: Record<AccentColor, { name: string; light: string; d
     indigo: { name: 'Twilight', light: '250 75% 62%', dark: '250 70% 68%' },
 };
 
+// FIX: Added 'auraCheckin' to the breadcrumb titles.
 export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
     home: 'Home',
     focus: 'Focus',
@@ -124,7 +128,8 @@ export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
     // Modals
     settings: 'Settings',
     breathing: 'Breathe',
-    auraCheckin: 'Aura Check-in',
+    flow: 'Flow Mode',
+    auraCheckin: 'Your Aura',
     journalEntry: 'Editing Journal',
     journalView: 'View Entry',
     favorites: 'Favorites',
@@ -135,3 +140,105 @@ export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
     linkedJournals: 'Linked Journals',
     attachmentViewer: 'Attachments',
 };
+
+export const MORNING_GREETINGS = [
+    "Good morning, {name}. A new day brings new possibilities.",
+    "Rise and shine, {name}! Let's make today amazing.",
+    "Hello, {name}. Wishing you a peaceful and productive morning.",
+    "Top of the morning to you, {name}!",
+    "Good morning, {name}. May your coffee be strong and your day be bright.",
+    "Welcome to a new day, {name}. Let's get started.",
+    "Morning, {name}! Hope you have a wonderful start to your day.",
+    "A fresh start for you, {name}. Good morning.",
+    "Hello, {name}. The morning is full of potential.",
+    "Wishing you a calm and focused morning, {name}.",
+    "Good morning, {name}. Embrace the opportunities of today.",
+    "The sun is up, the sky is blue. Good morning, {name}, this day's for you.",
+    "Hey {name}, hope you're ready to conquer the day!",
+    "A beautiful morning to you, {name}.",
+    "Good morning, {name}. Remember to take a deep breath and smile.",
+    "Let the morning light energize you, {name}.",
+    "Hello, {name}. May your day be as bright as the morning sun.",
+    "Wishing you a day filled with joy and success, {name}.",
+    "Good morning, {name}! Today is a blank page, write a good story.",
+    "Start your day with a positive thought, {name}."
+];
+
+export const AFTERNOON_GREETINGS = [
+    "Good afternoon, {name}. Hope your day is going well.",
+    "Hello, {name}. Taking a moment to reset?",
+    "Hope you're having a productive afternoon, {name}.",
+    "Keep up the great work, {name}. Good afternoon.",
+    "Hello, {name}. Time for a short break to recharge.",
+    "Good afternoon, {name}. Stay focused and keep shining.",
+    "Wishing you a wonderful rest of your day, {name}.",
+    "Hello there, {name}. Let's power through the afternoon.",
+    "Good afternoon, {name}. Remember to stay hydrated.",
+    "Hope you're finding your flow this afternoon, {name}.",
+    "A pleasant afternoon to you, {name}.",
+    "Hey {name}, take a deep breath. You've got this.",
+    "Good afternoon, {name}. Just a little push till the end of the day.",
+    "Keep that positive energy going, {name}.",
+    "Hello, {name}. Hope your afternoon is as bright as your potential.",
+    "Wishing you clarity and calm this afternoon, {name}.",
+    "Good afternoon. You're doing great, {name}.",
+    "A moment of peace for you this afternoon, {name}.",
+    "Keep the momentum going, {name}. It's a great afternoon.",
+    "Hello, {name}. Finish the day strong."
+];
+
+export const EVENING_GREETINGS = [
+    "Good evening, {name}. Time to relax and unwind.",
+    "Hello, {name}. Hope you had a fulfilling day.",
+    "Wishing you a peaceful evening, {name}.",
+    "The day is done. Relax, {name}.",
+    "Good evening, {name}. Let go of the day's stress.",
+    "Time to reflect on the day, {name}. Good evening.",
+    "Hope you have a cozy and restful evening, {name}.",
+    "Hello, {name}. Enjoy the quiet moments of the evening.",
+    "Good evening. May your night be filled with peace.",
+    "Unwind and recharge, {name}. The evening is yours.",
+    "Wishing you a calm and serene evening, {name}.",
+    "Good evening, {name}. Let the stars light up your dreams.",
+    "The day is over, the night has come. Relax, {name}.",
+    "Hello, {name}. Enjoy a quiet evening.",
+    "Good evening. Take this time for yourself, {name}.",
+    "May your evening be a peaceful one, {name}.",
+    "Relax and let the day fade away, {name}.",
+    "A restful evening to you, {name}.",
+    "Good evening, {name}. Thank you for your efforts today.",
+    "Time to close the chapter of today, {name}. Good evening."
+];
+
+export const DAILY_THOUGHTS = [
+    "The only way to do great work is to love what you do.",
+    "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+    "Believe you can and you're halfway there.",
+    "The future belongs to those who believe in the beauty of their dreams.",
+    "What you get by achieving your goals is not as important as what you become by achieving your goals.",
+    "The secret of getting ahead is getting started.",
+    "It does not matter how slowly you go as long as you do not stop.",
+    "The best time to plant a tree was 20 years ago. The second best time is now.",
+    "Your limitation—it's only your imagination.",
+    "Push yourself, because no one else is going to do it for you.",
+    "Great things never come from comfort zones.",
+    "Dream it. Wish it. Do it.",
+    "Success doesn’t just find you. You have to go out and get it.",
+    "The harder you work for something, the greater you’ll feel when you achieve it.",
+    "Dream bigger. Do bigger.",
+    "Don’t stop when you’re tired. Stop when you’re done.",
+    "Wake up with determination. Go to bed with satisfaction.",
+    "Do something today that your future self will thank you for.",
+    "Little things make big days.",
+    "It’s going to be hard, but hard does not mean impossible.",
+    "Don’t wait for an opportunity. Create it.",
+    "Sometimes we’re tested not to show our weaknesses, but to discover our strengths.",
+    "The key to success is to focus on goals, not obstacles.",
+    "You've got to get up every morning with determination if you're going to go to bed with satisfaction.",
+    "The journey of a thousand miles begins with a single step.",
+    "Small steps every day.",
+    "It's not about being the best. It's about being better than you were yesterday.",
+    "Your calm mind is the ultimate weapon against your challenges.",
+    "In the middle of difficulty lies opportunity.",
+    "A calm sea does not make a skilled sailor."
+];

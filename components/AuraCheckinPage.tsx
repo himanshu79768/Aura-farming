@@ -4,19 +4,14 @@ import { Wind, CheckCircle, Zap, Heart } from 'lucide-react';
 import { useAppContext } from '../App';
 import { fetchAuraCheckin } from '../services/geminiService';
 import Header from './Header';
-import { Mood } from '../types';
+// FIX: Imported AuraData from the central types file instead of defining it locally.
+import { Mood, AuraData } from '../types';
 
 const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return 'morning';
   if (hour >= 12 && hour < 17) return 'afternoon';
   return 'evening';
-}
-
-interface AuraData {
-    auraReading: string;
-    affirmation: string;
-    suggestion: string;
 }
 
 const moodStyles: Record<Mood, { color: string; button: string, aura: { main: string; glow: string; scan: string } }> = {

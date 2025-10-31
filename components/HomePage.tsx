@@ -1,12 +1,12 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Loader, Sparkles, Wind } from 'lucide-react';
+import { RefreshCw, Zap, Wind } from 'lucide-react';
 import { useAppContext } from '../App';
-import { fetchHomepageContent } from '../services/geminiService';
 import Header from './Header';
+import { MORNING_GREETINGS, AFTERNOON_GREETINGS, EVENING_GREETINGS, DAILY_THOUGHTS } from '../constants';
 
 const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
-  // Fix: Removed extra 'new' keyword.
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return 'morning';
   if (hour >= 12 && hour < 17) return 'afternoon';
@@ -14,38 +14,33 @@ const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
 }
 
 const HomePage: React.FC = () => {
-  const { mood, userProfile, playSound, vibrate, navigateTo } = useAppContext();
-  const [content, setContent] = useState({ greeting: '', thought: '' });
-  const [isLoading, setIsLoading] = useState(true);
-  const [timeOfDay, setTimeOfDay] = useState(getTimeOfDay());
+  const { userProfile, vibrate, navigateTo } = useAppContext();
+  const [greeting, setGreeting] = useState('');
+  const [thought, setThought] = useState('');
 
-  const loadContent = useCallback(async () => {
-    setIsLoading(true);
-    const newContent = await fetchHomepageContent(mood, userProfile.name || 'friend', timeOfDay);
-    setContent(newContent);
-    setIsLoading(false);
-  }, [mood, userProfile.name, timeOfDay]);
+  const refreshContent = useCallback(() => {
+    const tod = getTimeOfDay();
+    
+    let greetingList: string[];
+    if (tod === 'morning') greetingList = MORNING_GREETINGS;
+    else if (tod === 'afternoon') greetingList = AFTERNOON_GREETINGS;
+    else greetingList = EVENING_GREETINGS;
+
+    const randomGreeting = greetingList[Math.floor(Math.random() * greetingList.length)];
+    const randomThought = DAILY_THOUGHTS[Math.floor(Math.random() * DAILY_THOUGHTS.length)];
+
+    setGreeting(randomGreeting.replace('{name}', userProfile.name || 'friend'));
+    setThought(randomThought);
+  }, [userProfile.name]);
+
 
   useEffect(() => {
-    const intervalId = setInterval(() => {
-        setTimeOfDay(getTimeOfDay());
-    }, 5 * 60 * 1000); // Update every 5 minutes
-    return () => clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    if (userProfile.name) {
-      loadContent();
-    } else {
-        setContent({ greeting: `Good ${timeOfDay}, friend.`, thought: 'Let\'s get you set up. Your name can be added in your profile.' });
-        setIsLoading(false);
-    }
-  }, [loadContent, userProfile.name, timeOfDay]);
+    refreshContent();
+  }, [refreshContent, userProfile.name]);
 
   const handleRefresh = () => {
     vibrate();
-    setTimeOfDay(getTimeOfDay());
-    loadContent();
+    refreshContent();
   };
 
   return (
@@ -53,44 +48,36 @@ const HomePage: React.FC = () => {
       <Header showCenteredMoodSelector={true} />
       <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
         <AnimatePresence mode="wait">
-          {isLoading ? (
             <motion.div
-              key="loader"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <Loader className="w-12 h-12 animate-spin text-light-text-secondary dark:text-dark-text-secondary" />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="content"
+              key={greeting + thought} // Change key to trigger animation on refresh
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ type: "spring", stiffness: 100, damping: 20, duration: 0.8 }}
               className="flex flex-col items-center"
             >
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-light-text dark:from-dark-text to-light-text-secondary dark:to-dark-text-secondary">
-                {content.greeting}
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-light-text dark:from-dark-text to-light-text-secondary dark:to-dark-text-secondary">
+                {greeting}
               </h1>
               <p className="mt-4 max-w-md text-lg md:text-xl font-light text-light-text-secondary dark:text-dark-text-secondary">
-                {content.thought}
+                {thought}
               </p>
             </motion.div>
-          )}
         </AnimatePresence>
       </div>
 
       <div className="flex items-center justify-center gap-4 pb-28">
-         <motion.button 
-            onClick={() => navigateTo('auraCheckin')}
-            className="flex items-center gap-2 px-6 py-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"
+         <motion.button
+            onClick={() => navigateTo('flow')}
+            className="relative inline-flex items-center justify-center rounded-full group"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <Sparkles className="w-5 h-5 text-yellow-400" />
-            <span>Check Aura</span>
+            <div className="absolute -inset-px bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-sm opacity-75 group-hover:opacity-100 transition duration-500"></div>
+            <div className="relative flex items-center gap-2 px-6 py-3 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
+                <Zap className="w-5 h-5 text-purple-400" />
+                <span>Flow Mode</span>
+            </div>
         </motion.button>
         <motion.button 
             onClick={() => navigateTo('breathing')}
@@ -105,11 +92,10 @@ const HomePage: React.FC = () => {
           onClick={handleRefresh} 
           className="p-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"
           aria-label="Refresh content"
-          disabled={isLoading}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+          <RefreshCw className="w-5 h-5" />
         </motion.button>
       </div>
     </div>

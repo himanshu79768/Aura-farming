@@ -73,35 +73,40 @@ const FocusPage: React.FC = () => {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (isTimerActive && settings.focusMusic !== 'None') {
-        audio.play().catch(e => console.error("Audio play failed:", e));
-    } else {
-        audio.pause();
-    }
-  }, [isTimerActive, settings.focusMusic]);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    // Mute/unmute based on settings
     audio.muted = !settings.sound;
-  }, [settings.sound]);
 
-  useEffect(() => {
-      const audio = audioRef.current;
-      if (!audio) return;
-      const selectedMusic = MUSIC_PRESETS.find(m => m.name === settings.focusMusic);
-      const newSrc = selectedMusic ? selectedMusic.src : '';
-      if (audio.src !== newSrc) {
+    const manageAudioPlayback = async () => {
+      try {
+        const selectedMusic = MUSIC_PRESETS.find(m => m.name === settings.focusMusic);
+        const newSrc = selectedMusic ? selectedMusic.src : '';
+
+        // Update source if necessary
+        if (audio.src !== newSrc) {
           audio.src = newSrc;
-          if (isTimerActive && newSrc) {
-              audio.play().catch(e => console.error("Audio play failed:", e));
+        }
+
+        const shouldPlay = isTimerActive && settings.focusMusic !== 'None';
+
+        if (shouldPlay) {
+          if (audio.paused && audio.src) {
+            await audio.play();
           }
+        } else {
+          if (!audio.paused) {
+            audio.pause();
+          }
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error("Audio operation failed:", error);
+        }
       }
-      if (settings.focusMusic === 'None') {
-          audio.pause();
-          audio.src = '';
-      }
-  }, [settings.focusMusic, isTimerActive]);
+    };
+
+    manageAudioPlayback();
+  }, [isTimerActive, settings.focusMusic, settings.sound]);
 
 
   const handleToggleTimer = () => {

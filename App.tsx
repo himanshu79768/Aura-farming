@@ -11,7 +11,7 @@ import OnboardingScreen from './components/OnboardingScreen';
 import IntroductionScreen from './components/IntroductionScreen';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
-import AuraCheckinPage from './components/AuraCheckinPage';
+import FlowPage from './components/FlowPage';
 import JournalPage from './components/JournalPage';
 import JournalEntryPage from './components/JournalEntryPage';
 import JournalViewPage from './components/JournalViewPage';
@@ -30,6 +30,8 @@ import LinkedJournalsPage from './components/LinkedJournalsPage';
 import AttachmentViewerPage from './components/AttachmentViewerPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import GlobalSearch from './components/GlobalSearch';
+// FIX: Import AuraCheckinPage to render it in the modal stack.
+import AuraCheckinPage from './components/AuraCheckinPage';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -706,6 +708,9 @@ export default function App() {
                                         break;
                                     case 'breathing':
                                         modalContent = <BreathingPage />;
+                                        break;
+                                    case 'flow':
+                                        modalContent = <FlowPage />;
                                         break;
                                     case 'auraCheckin':
                                         modalContent = <AuraCheckinPage />;
