@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
+import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip } from 'lucide-react';
 import { GoogleGenAI, Chat } from "@google/genai";
 import { useAppContext } from '../App';
 import Header from './Header';
 import { ChatMessage } from '../types';
 
-const GEMINI_API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
-
-// FIX: Added a helper function to extract the direct URL from Google's redirect links to ensure correct favicon fetching and navigation.
+// Helper function to extract the direct URL from Google's redirect links.
 const getDirectUrl = (uri: string): string => {
     try {
         const url = new URL(uri);
@@ -40,7 +38,7 @@ const MarkdownRenderer: React.FC<{ text: string }> = ({ text }) => {
         };
 
         lines.forEach(line => {
-            // FIX: Corrected the order of replacements. Bold (**) must be processed before italic (*) to prevent incorrect parsing.
+            // Corrected the order of replacements. Bold (**) must be processed before italic (*).
             let processedLine = line
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>');
@@ -120,7 +118,7 @@ const SourcesPill: React.FC<{ message: ChatMessage; onOpen: (sources: ChatMessag
             <div className="flex items-center -space-x-2">
                 {message.sources.slice(0, 3).map((source, i) => {
                     try {
-                        // FIX: Use the helper to get the direct URL's domain for the favicon.
+                        // Use the helper to get the direct URL's domain for the favicon.
                         const directUrl = getDirectUrl(source.uri);
                         const domain = new URL(directUrl).hostname;
                         return (
@@ -163,7 +161,7 @@ const SourcesSheet: React.FC<{ sources: ChatMessage['sources']; onClose: () => v
                 <h2 className="text-lg font-semibold mb-4 text-center">Sources</h2>
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto">
                     {sources?.map((source, index) => {
-                        // FIX: Use the helper to get direct URLs for links and favicons.
+                        // Use the helper to get direct URLs for links and favicons.
                         const directUrl = getDirectUrl(source.uri);
                         const domain = new URL(directUrl).hostname;
                         return (
@@ -214,7 +212,7 @@ const AuraAiPage: React.FC = () => {
     // Initialize Chat
     useEffect(() => {
         try {
-            const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
@@ -298,6 +296,10 @@ const AuraAiPage: React.FC = () => {
             setIsLoading(false);
         }
     };
+    
+    const handleUnsupported = () => {
+        showAlertModal({ title: "Coming Soon", message: "This feature is not yet implemented."});
+    };
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
@@ -324,7 +326,11 @@ const AuraAiPage: React.FC = () => {
                                 style={ msg.role === 'user' ? { whiteSpace: 'pre-wrap', wordWrap: 'break-word' } : { wordWrap: 'break-word' } }
                             >
                                 {msg.role === 'model' ? 
-                                    (msg.parts[0].text ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>) : 
+                                    (
+                                        <div className={isLoading && index === messages.length - 1 ? 'typing-cursor' : ''}>
+                                            {msg.parts[0].text ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
+                                        </div>
+                                    ) : 
                                     (msg.parts[0].text || <span className="opacity-0">.</span>)
                                 }
                             </div>
@@ -348,41 +354,35 @@ const AuraAiPage: React.FC = () => {
                         )}
                     </div>
                 ))}
-                {isLoading && messages[messages.length-1]?.role !== 'user' && (
-                     <motion.div
-                        className="flex items-start gap-3 w-full justify-start"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                    >
-                         <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-purple-500/10 text-purple-400">
-                            <Sparkles size={18} />
-                        </div>
-                         <div className="p-3 rounded-2xl bg-light-glass dark:bg-dark-glass rounded-bl-lg flex items-center gap-2">
-                             <motion.div className="w-2 h-2 bg-purple-400 rounded-full" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0 }} />
-                             <motion.div className="w-2 h-2 bg-purple-400 rounded-full" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}/>
-                             <motion.div className="w-2 h-2 bg-purple-400 rounded-full" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}/>
-                         </div>
-                    </motion.div>
-                )}
             </div>
             <div className="p-4 border-t border-white/10">
-                <form onSubmit={handleSend} className="relative">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        placeholder="Ask a doubt..."
-                        disabled={isLoading}
-                        className="w-full pl-4 pr-12 py-3 bg-light-glass dark:bg-dark-glass rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                    />
-                    <button
-                        type="submit"
-                        disabled={!input.trim() || isLoading}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 transition-transform duration-200"
-                        aria-label="Send message"
-                    >
-                       <Send size={18} />
+                <form onSubmit={handleSend} className="flex items-center gap-2">
+                    <button type="button" onClick={handleUnsupported} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
+                        <Paperclip size={20} />
                     </button>
+                    <div className="relative flex-grow">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            placeholder="Ask a doubt..."
+                            disabled={isLoading}
+                            className="w-full pl-4 pr-24 py-3 bg-light-glass dark:bg-dark-glass rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                             <button type="button" onClick={handleUnsupported} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors">
+                                <Mic size={20} />
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isLoading}
+                                className="w-9 h-9 flex items-center justify-center bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 transition-transform duration-200 flex-shrink-0"
+                                aria-label="Send message"
+                            >
+                               <Send size={18} />
+                            </button>
+                        </div>
+                    </div>
                 </form>
             </div>
             <AnimatePresence>
@@ -391,6 +391,18 @@ const AuraAiPage: React.FC = () => {
                 )}
             </AnimatePresence>
              <style>{`
+                @keyframes blink-cursor {
+                    50% { opacity: 0; }
+                }
+                .typing-cursor::after {
+                    content: '▋';
+                    animation: blink-cursor 1s step-end infinite;
+                    display: inline-block;
+                    margin-left: 2px;
+                    font-weight: 300;
+                    color: currentColor;
+                    opacity: 0.7;
+                }
                 .dark\\:bg-dark-primary {
                     background-color: hsl(var(--accent-dark));
                 }
