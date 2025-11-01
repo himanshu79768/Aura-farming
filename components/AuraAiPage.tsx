@@ -6,8 +6,6 @@ import { useAppContext } from '../App';
 import Header from './Header';
 import { ChatMessage } from '../types';
 
-const API_KEY = 'AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s';
-
 const AuraAiPage: React.FC = () => {
     const { navigateBack, vibrate, showAlertModal } = useAppContext();
     const [chat, setChat] = useState<Chat | null>(null);
@@ -19,11 +17,12 @@ const AuraAiPage: React.FC = () => {
     // Initialize Chat
     useEffect(() => {
         try {
-            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-flash-lite-latest',
                 config: {
-                    systemInstruction: "You are Aura, a helpful and friendly AI assistant within a focus and wellness app. Your goal is to provide clear, concise, and supportive answers to user's doubts. Keep your responses encouraging and brief."
+                    systemInstruction: "You are Aura, a helpful and friendly AI assistant within a focus and wellness app. Your goal is to provide clear, concise, and supportive answers to user's doubts. When appropriate, use Google Search to find up-to-date and accurate information. Keep your responses encouraging and brief.",
+                    tools: [{googleSearch: {}}],
                 }
             });
             setChat(newChat);
@@ -60,18 +59,37 @@ const AuraAiPage: React.FC = () => {
             
             let modelResponse = '';
             const modelMessageId = crypto.randomUUID();
+            let groundingChunks: any[] = [];
 
             // Add an empty model message to start streaming into
             setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
 
             for await (const chunk of result) {
                 modelResponse += chunk.text;
+                if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+                    groundingChunks = chunk.candidates[0].groundingMetadata.groundingChunks;
+                }
                 setMessages(prev => prev.map(msg => 
                     msg.id === modelMessageId 
                     ? { ...msg, parts: [{ text: modelResponse }] }
                     : msg
                 ));
             }
+
+            if (groundingChunks.length > 0) {
+                const sources = groundingChunks
+                    .map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
+                    .filter(Boolean) as { title: string; uri: string }[];
+                
+                if (sources.length > 0) {
+                    setMessages(prev => prev.map(msg => 
+                        msg.id === modelMessageId 
+                        ? { ...msg, sources }
+                        : msg
+                    ));
+                }
+            }
+
         } catch (error) {
             console.error("Aura AI Error:", error);
             setMessages(prev => [...prev, {
@@ -105,7 +123,22 @@ const AuraAiPage: React.FC = () => {
                             className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-light-primary dark:bg-dark-primary text-white rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass rounded-bl-lg'}`}
                             style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
                         >
-                            {msg.parts[0].text}
+                             {msg.parts[0].text}
+                            {msg.sources && msg.sources.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-white/10">
+                                    <h4 className="text-xs font-semibold mb-2 text-light-text-secondary dark:text-dark-text-secondary">Sources:</h4>
+                                    <ul className="text-sm space-y-1.5">
+                                        {msg.sources.map((source, index) => (
+                                            <li key={index} className="flex items-start gap-2">
+                                                <span className="opacity-75 mt-0.5">{index + 1}.</span>
+                                                <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline break-all">
+                                                    {source.title || source.uri}
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                         {msg.role === 'user' && (
                             <div className="w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400">

@@ -91,6 +91,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   parts: { text: string }[];
+  sources?: { title: string; uri: string }[];
 }
 
 export interface AuraData {
