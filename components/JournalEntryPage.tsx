@@ -107,182 +107,10 @@ const AttachmentIcon = ({ type }: { type: string }) => {
 };
 
 
-// --- New AI Loading Animation Components ---
-
-const ShootingStars = () => {
-    const stars = Array.from({ length: 25 }); // Increased star count
-    return (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {stars.map((_, i) => {
-                const duration = Math.random() * 3 + 3; // Duration: 3s to 6s
-                const delay = Math.random() * 5;
-                const startY = `${Math.random() * 100}vh`;
-                const startXOffset = `${Math.random() * 50 - 25}vw`;
-                const verticalMovement = `${Math.random() * 30 + 10}vh`; // Varied vertical movement
-
-                return (
-                    <motion.div
-                        key={i}
-                        className="absolute rounded-full bg-white"
-                        style={{
-                            width: `${Math.random() * 2 + 1}px`,
-                            height: `${Math.random() * 2 + 1}px`,
-                            boxShadow: '0 0 10px 2px rgba(255,255,255,0.8)',
-                        }}
-                        initial={{
-                            x: `calc(-20vw + ${startXOffset})`,
-                            y: startY,
-                            opacity: 0,
-                        }}
-                        animate={{
-                            x: `calc(120vw + ${startXOffset})`,
-                            y: `calc(${startY} - ${verticalMovement})`,
-                            opacity: [0, 0.8, 0.8, 0], // Fade in and out
-                        }}
-                        transition={{
-                            duration,
-                            delay,
-                            repeat: Infinity,
-                            repeatType: 'loop',
-                            ease: 'linear',
-                            times: [0, 0.2, 0.8, 1], // Control opacity timing
-                        }}
-                    />
-                );
-            })}
-        </div>
-    );
-};
-
-const SparkleIcon = () => (
-    <motion.div
-        className="relative w-20 h-20"
-        animate={{ scale: [1, 1.1, 1], rotate: [0, 10, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-    >
-        <motion.svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 text-white"
-            style={{ filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.8))' }}
-        >
-            <path d="M12 2 L14.5 9.5 L22 12 L14.5 14.5 L12 22 L9.5 14.5 L2 12 L9.5 9.5 Z" />
-        </motion.svg>
-        <motion.svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="absolute top-1 left-1 w-6 h-6 text-white/90"
-            animate={{ scale: [1, 0.8, 1], opacity: [0.8, 1, 0.8], rotate: '360deg' }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'linear', delay: 0.5 }}
-        >
-            <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
-        </motion.svg>
-        <motion.svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="absolute bottom-1 right-1 w-6 h-6 text-white/90"
-            animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1], rotate: '-360deg' }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-        >
-            <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
-        </motion.svg>
-    </motion.div>
-);
-
-const FadingSubtitles = () => {
-    const subtitles = [
-        "Transforming sketch into substance...",
-        "Weaving words into wisdom...",
-        "Converting creativity into existence...",
-        "Polishing your thoughts...",
-        "Finding the right expression...",
-        "Unlocking new perspectives...",
-    ];
-    const [index, setIndex] = useState(0);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setIndex((prevIndex) => (prevIndex + 1) % subtitles.length);
-        }, 2500);
-
-        return () => clearInterval(interval);
-    }, [subtitles.length]);
-
-    return (
-        <div className="h-8 text-center">
-            <AnimatePresence mode="wait">
-                <motion.p
-                    key={index}
-                    className="mt-4 text-white/80 font-medium text-lg"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.5, ease: 'easeInOut' }}
-                >
-                    {subtitles[index]}
-                </motion.p>
-            </AnimatePresence>
-        </div>
-    );
-};
-
-const GlisterEffect = () => {
-    const glints = Array.from({ length: 7 });
-
-    return (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {glints.map((_, i) => (
-                <motion.div
-                    key={i}
-                    className="absolute rounded-full"
-                    style={{
-                        background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%)',
-                    }}
-                    initial={{
-                        x: `${Math.random() * 100}vw`,
-                        y: `${Math.random() * 100}vh`,
-                        scale: 0,
-                        opacity: 0,
-                    }}
-                    animate={{
-                        scale: [0, Math.random() * 0.8 + 0.3, 0],
-                        opacity: [0, 1, 0],
-                        x: `${Math.random() * 100}vw`,
-                        y: `${Math.random() * 100}vh`,
-                    }}
-                    transition={{
-                        duration: Math.random() * 4 + 3,
-                        repeat: Infinity,
-                        repeatType: 'loop',
-                        delay: Math.random() * 3,
-                        ease: 'easeInOut',
-                    }}
-                />
-            ))}
-        </div>
-    );
-};
-
-
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
         settings, navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry, vibrate, 
-        showConfirmationModal, navigateTo, showAlertModal, userProfile
+        showConfirmationModal, navigateTo, showAlertModal, userProfile, setIsAiLoading
     } = useAppContext();
 
     const [currentEntry, setCurrentEntry] = useState<JournalEntry | undefined>(entry);
@@ -331,7 +159,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
     // AI State
     const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-    const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiCustomPrompt, setAiCustomPrompt] = useState('');
     const [currentAiTask, setCurrentAiTask] = useState<AITask | null>(null);
 
@@ -1365,21 +1192,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
-            <AnimatePresence>
-                {isAiLoading && (
-                    <motion.div
-                        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                    >
-                        <ShootingStars />
-                        <GlisterEffect />
-                        <SparkleIcon />
-                        <FadingSubtitles />
-                    </motion.div>
-                )}
-            </AnimatePresence>
             <AnimatePresence>
                 {isSlashMenuOpen && <SlashCommandMenu />}
             </AnimatePresence>
