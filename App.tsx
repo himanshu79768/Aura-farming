@@ -30,8 +30,8 @@ import LinkedJournalsPage from './components/LinkedJournalsPage';
 import AttachmentViewerPage from './components/AttachmentViewerPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import GlobalSearch from './components/GlobalSearch';
-// FIX: Import AuraCheckinPage to render it in the modal stack.
 import AuraCheckinPage from './components/AuraCheckinPage';
+import AuraAiPage from './components/AuraAiPage';
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -714,6 +714,9 @@ export default function App() {
                                         break;
                                     case 'auraCheckin':
                                         modalContent = <AuraCheckinPage />;
+                                        break;
+                                    case 'auraAI':
+                                        modalContent = <AuraAiPage />;
                                         break;
                                     case 'journalEntry':
                                         modalContent = <JournalEntryPage {...modal.params} />;

@@ -48,8 +48,7 @@ export interface FocusSession {
   createdAt?: any; // For Firestore serverTimestamp
 }
 
-// FIX: Added 'auraCheckin' to the View type to resolve typing errors.
-export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'flow' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView' | 'sessionLinking' | 'linkedJournals' | 'attachmentViewer' | 'auraCheckin';
+export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'flow' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView' | 'sessionLinking' | 'linkedJournals' | 'attachmentViewer' | 'auraCheckin' | 'auraAI';
 
 export interface UserProfile {
   name: string;
@@ -79,7 +78,6 @@ export interface Settings {
 
 export interface UserData extends Settings, UserProfile {
     mood: Mood;
-    // Fix: Changed favoriteQuotes to Record<string, boolean> to match Firebase structure.
     favoriteQuotes: Record<string, boolean>;
 }
 
@@ -89,7 +87,12 @@ export interface MoodConfig {
   icon: (props: React.ComponentProps<'svg'>) => React.ReactElement;
 }
 
-// FIX: Added AuraData interface for the Gemini service aura check-in feature.
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  parts: { text: string }[];
+}
+
 export interface AuraData {
     auraReading: string;
     affirmation: string;

@@ -1,6 +1,5 @@
 import { Quote, FocusMusic, AccentColor, View } from './types';
 
-// FIX: Added 'auraCheckin' as a child of 'home' for proper navigation hierarchy.
 export const VIEW_PARENTS: Partial<Record<View, View>> = {
     // Home children
     'breathing': 'home',
@@ -8,6 +7,7 @@ export const VIEW_PARENTS: Partial<Record<View, View>> = {
     'auraCheckin': 'home',
     // Focus children
     'soundOptions': 'focus',
+    'auraAI': 'focus',
     // Journal children
     'journalEntry': 'journal',
     'journalView': 'journal',
@@ -21,11 +21,11 @@ export const VIEW_PARENTS: Partial<Record<View, View>> = {
     'linkedJournals': 'focusHistory',
 };
 
-// FIX: Added 'auraCheckin' to the list of modal views.
 export const MODAL_VIEWS: View[] = [
     'settings', 'breathing', 'flow', 'journalEntry', 'journalView', 
     'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 
-    'sessionLinking', 'linkedJournals', 'attachmentViewer', 'auraCheckin'
+    'sessionLinking', 'linkedJournals', 'attachmentViewer', 'auraCheckin',
+    'auraAI'
 ];
 export const ROOT_VIEWS: View[] = ['home', 'focus', 'journal', 'quotes', 'profile'];
 
@@ -118,7 +118,6 @@ export const ACCENT_COLORS: Record<AccentColor, { name: string; light: string; d
     indigo: { name: 'Twilight', light: '250 75% 62%', dark: '250 70% 68%' },
 };
 
-// FIX: Added 'auraCheckin' to the breadcrumb titles.
 export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
     home: 'Home',
     focus: 'Focus',
@@ -130,6 +129,7 @@ export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
     breathing: 'Breathe',
     flow: 'Flow Mode',
     auraCheckin: 'Your Aura',
+    auraAI: 'Aura AI',
     journalEntry: 'Editing Journal',
     journalView: 'View Entry',
     favorites: 'Favorites',
