@@ -6,6 +6,8 @@ import { useAppContext } from '../App';
 import Header from './Header';
 import { ChatMessage } from '../types';
 
+const API_KEY = 'AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s';
+
 const AuraAiPage: React.FC = () => {
     const { navigateBack, vibrate, showAlertModal } = useAppContext();
     const [chat, setChat] = useState<Chat | null>(null);
@@ -17,7 +19,7 @@ const AuraAiPage: React.FC = () => {
     // Initialize Chat
     useEffect(() => {
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-flash-lite-latest',
                 config: {

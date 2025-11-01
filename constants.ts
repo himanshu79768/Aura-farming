@@ -5,9 +5,9 @@ export const VIEW_PARENTS: Partial<Record<View, View>> = {
     'breathing': 'home',
     'flow': 'home',
     'auraCheckin': 'home',
+    'auraAI': 'home',
     // Focus children
     'soundOptions': 'focus',
-    'auraAI': 'focus',
     // Journal children
     'journalEntry': 'journal',
     'journalView': 'journal',

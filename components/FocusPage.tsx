@@ -1,12 +1,18 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Edit, Sparkles } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Edit, Sparkles, Coffee, Book } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { Mood } from '../types';
 import { MUSIC_PRESETS } from '../constants';
 
 const FOCUS_DURATIONS = [5, 10, 15, 20]; // in minutes
+const POMODORO_DURATIONS = {
+    focus: 25 * 60,
+    shortBreak: 5 * 60,
+    longBreak: 15 * 60,
+};
+const SESSIONS_BEFORE_LONG_BREAK = 3;
 
 const moodColors: Record<Mood, { gradient: [string, string, string], shine: string }> = {
     [Mood.Calm]: { gradient: ['#3b82f6', '#60a5fa', '#818cf8'], shine: '#60a5fa' }, // blue-500, blue-400, indigo-400
@@ -55,8 +61,11 @@ const TimerRing: React.FC<{ progress: number; mood: Mood; isShining: boolean }> 
     );
 };
 
+type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak';
 
 const FocusPage: React.FC = () => {
+  const [mode, setMode] = useState<'timer' | 'pomodoro'>('timer');
+  const [pomodoroState, setPomodoroState] = useState<{ round: number; phase: PomodoroPhase }>({ round: 1, phase: 'focus' });
   const [isCustomInput, setIsCustomInput] = useState(false);
   const [customMinutes, setCustomMinutes] = useState('');
   const [showShine, setShowShine] = useState(false);
@@ -65,11 +74,35 @@ const FocusPage: React.FC = () => {
   const {
       settings, vibrate, mood,
       timeLeft, timerDuration, isTimerActive, isTimerFinished,
-      selectTimerDuration, toggleTimer, resetTimer,
-      sessionName, setSessionName, navigateTo
+      selectTimerDuration, toggleTimer, resetTimer: resetTimerContext,
+      sessionName, setSessionName, navigateTo, addFocusSession
   } = useAppContext();
+  
+  // Pomodoro Logic
+  useEffect(() => {
+    if (mode !== 'pomodoro' || !isTimerActive) return;
+    if (timeLeft > 1) return;
 
-  // --- Audio Logic ---
+    const currentPhaseDuration = POMODORO_DURATIONS[pomodoroState.phase];
+    addFocusSession(currentPhaseDuration, sessionName || `Pomodoro Cycle ${pomodoroState.round}`);
+    
+    if (pomodoroState.phase === 'focus') {
+      const isLongBreak = pomodoroState.round % SESSIONS_BEFORE_LONG_BREAK === 0;
+      if (isLongBreak) {
+        setPomodoroState(prev => ({ ...prev, phase: 'longBreak' }));
+        selectTimerDuration(POMODORO_DURATIONS.longBreak / 60);
+      } else {
+        setPomodoroState(prev => ({ ...prev, phase: 'shortBreak' }));
+        selectTimerDuration(POMODORO_DURATIONS.shortBreak / 60);
+      }
+    } else { // 'shortBreak' or 'longBreak'
+      setPomodoroState(prev => ({ round: prev.round + 1, phase: 'focus' }));
+      selectTimerDuration(POMODORO_DURATIONS.focus / 60);
+    }
+  }, [timeLeft, isTimerActive, mode, pomodoroState]);
+
+
+  // Audio Logic
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -105,6 +138,22 @@ const FocusPage: React.FC = () => {
 
     manageAudioPlayback();
   }, [isTimerActive, settings.focusMusic, settings.sound]);
+  
+  const resetPomodoro = () => {
+      setPomodoroState({ round: 1, phase: 'focus' });
+      selectTimerDuration(POMODORO_DURATIONS.focus / 60);
+      resetTimerContext();
+      setSessionName('');
+  };
+  
+  const handleReset = () => {
+    vibrate();
+    if (mode === 'pomodoro') {
+      resetPomodoro();
+    } else {
+      resetTimerContext();
+    }
+  };
 
   const handleToggleTimer = () => {
     if (!isTimerActive && timeLeft > 0 && timeLeft === timerDuration) {
@@ -137,11 +186,30 @@ const FocusPage: React.FC = () => {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+  
+  const ModeSelector = () => (
+    <div className="flex justify-center items-center bg-black/5 dark:bg-white/5 p-1 rounded-full w-full max-w-xs mb-4">
+      {(['timer', 'pomodoro'] as const).map(m => (
+        <button 
+            key={m} 
+            onClick={() => {
+              setMode(m);
+              if (m === 'pomodoro') { resetPomodoro(); } 
+              else { resetTimerContext(); }
+            }} 
+            className="relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors"
+        >
+          <span>{m}</span>
+          {mode === m && <motion.div layoutId="focus-mode-selector" className="absolute inset-0 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-md z-[-1]" />}
+        </button>
+      ))}
+    </div>
+  );
 
   const renderTimerContent = () => (
     <AnimatePresence mode="wait">
         {isTimerFinished ? (
-          <motion.div key="finished" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="text-center">
+          <motion.div key="finished-timer" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="text-center">
             <h2 className="text-3xl font-bold">Done beautifully.</h2>
             <p className="mt-2 text-light-text-secondary dark:text-dark-text-secondary">{sessionName}</p>
             <button onClick={toggleTimer} className="mt-8 flex items-center gap-2 px-6 py-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg">
@@ -150,13 +218,13 @@ const FocusPage: React.FC = () => {
             </button>
           </motion.div>
         ) : (
-          <motion.div key="timer" className="flex flex-col items-center justify-center w-full">
+          <motion.div key="timer-active" initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-col items-center justify-center w-full">
               <div className="relative flex items-center justify-center">
                   <TimerRing progress={progress} mood={mood} isShining={showShine} />
                   <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
               </div>
               <div className="w-full max-w-xs my-6">
-                  <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session (e.g., Chapter 1)" className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary"/>
+                  <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session (e.g., Chapter 1)" disabled={isTimerActive} className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary disabled:opacity-50"/>
               </div>
               <div className="flex space-x-2 mb-8 items-center justify-center h-10">
                   <AnimatePresence mode="wait">
@@ -175,7 +243,7 @@ const FocusPage: React.FC = () => {
                   </AnimatePresence>
               </div>
               <div className="relative flex items-center space-x-6">
-                  <button onClick={() => resetTimer()} className="p-4 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"><RotateCcw className="w-6 h-6" /></button>
+                  <button onClick={() => handleReset()} className="p-4 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"><RotateCcw className="w-6 h-6" /></button>
                   <button onClick={handleToggleTimer} className="w-20 h-20 bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full flex items-center justify-center shadow-lg">{isTimerActive ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}</button>
                   <button onClick={() => navigateTo('soundOptions')} className="p-4 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg">{settings.sound ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}</button>
               </div>
@@ -184,26 +252,58 @@ const FocusPage: React.FC = () => {
       </AnimatePresence>
   );
 
+  const PomodoroStatus = () => {
+    let icon, text;
+    switch(pomodoroState.phase) {
+      case 'focus':
+        icon = <Book size={16}/>;
+        text = `Focus #${pomodoroState.round}`;
+        break;
+      case 'shortBreak':
+        icon = <Coffee size={16}/>;
+        text = 'Short Break';
+        break;
+      case 'longBreak':
+        icon = <Coffee size={16}/>;
+        text = 'Long Break';
+        break;
+    }
+    return (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-light-glass dark:bg-dark-glass rounded-full border border-white/10 text-sm mb-8">
+            {icon}
+            <span>{text}</span>
+        </div>
+    )
+  };
+
+  const renderPomodoroContent = () => (
+    <motion.div key="pomodoro-active" initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-col items-center justify-center w-full">
+        <PomodoroStatus />
+        <div className="relative flex items-center justify-center">
+            <TimerRing progress={progress} mood={mood} isShining={showShine} />
+            <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
+        </div>
+        <div className="w-full max-w-xs my-6">
+             <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session..." disabled={isTimerActive} className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary disabled:opacity-50"/>
+        </div>
+        <div className="h-10 mb-8" />
+        <div className="relative flex items-center space-x-6">
+            <button onClick={() => handleReset()} className="p-4 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"><RotateCcw className="w-6 h-6" /></button>
+            <button onClick={handleToggleTimer} className="w-20 h-20 bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full flex items-center justify-center shadow-lg">{isTimerActive ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}</button>
+            <button onClick={() => navigateTo('soundOptions')} className="p-4 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg">{settings.sound ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}</button>
+        </div>
+    </motion.div>
+  );
+
   return (
     <div className="w-full h-full flex flex-col">
        <audio ref={audioRef} loop />
        <Header title="Focus"/>
        <div className="flex-grow p-4 overflow-y-auto flex flex-col items-center justify-center">
+        <ModeSelector />
         <div className="flex flex-col items-center justify-center flex-grow w-full">
-          {renderTimerContent()}
+          {mode === 'timer' ? renderTimerContent() : renderPomodoroContent()}
         </div>
-        <motion.button
-            onClick={() => navigateTo('auraAI')}
-            className="relative inline-flex items-center justify-center rounded-full group mt-8"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <div className="absolute -inset-px bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-sm opacity-75 group-hover:opacity-100 transition duration-500"></div>
-            <div className="relative flex items-center gap-2 px-6 py-3 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
-                <Sparkles className="w-5 h-5 text-purple-400" />
-                <span>Ask Aura AI</span>
-            </div>
-        </motion.button>
        </div>
     </div>
   );
