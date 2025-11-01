@@ -1,16 +1,19 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Trash2, Loader, Link as LinkIcon, Paperclip, 
     LoaderCircle, FileImage, FileText, FileQuestion, MoreHorizontal, Search, Copy, Repeat, ArrowLeftRight,
     Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus,
-    Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon, TextSelect
+    Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon, TextSelect,
+    Sparkles, Wand2, BookText, BrainCircuit, MessageSquare, ArrowLeft
 } from 'lucide-react';
 import { useAppContext } from '../App';
-import { JournalEntry, Attachment } from '../types';
+import { JournalEntry, Attachment, AITask } from '../types';
 import Header from './Header';
 import AttachmentTypeModal from './AttachmentTypeModal';
 import PdfViewer from './PdfViewer';
+import { processJournalWithAI } from '../services/geminiService';
 
 const FONT_COLORS = [
   { name: 'Default', value: 'inherit', isDefault: true },
@@ -103,6 +106,179 @@ const AttachmentIcon = ({ type }: { type: string }) => {
     return <FileQuestion size={24} className="text-gray-400 shrink-0" />;
 };
 
+
+// --- New AI Loading Animation Components ---
+
+const ShootingStars = () => {
+    const stars = Array.from({ length: 25 }); // Increased star count
+    return (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {stars.map((_, i) => {
+                const duration = Math.random() * 3 + 3; // Duration: 3s to 6s
+                const delay = Math.random() * 5;
+                const startY = `${Math.random() * 100}vh`;
+                const startXOffset = `${Math.random() * 50 - 25}vw`;
+                const verticalMovement = `${Math.random() * 30 + 10}vh`; // Varied vertical movement
+
+                return (
+                    <motion.div
+                        key={i}
+                        className="absolute rounded-full bg-white"
+                        style={{
+                            width: `${Math.random() * 2 + 1}px`,
+                            height: `${Math.random() * 2 + 1}px`,
+                            boxShadow: '0 0 10px 2px rgba(255,255,255,0.8)',
+                        }}
+                        initial={{
+                            x: `calc(-20vw + ${startXOffset})`,
+                            y: startY,
+                            opacity: 0,
+                        }}
+                        animate={{
+                            x: `calc(120vw + ${startXOffset})`,
+                            y: `calc(${startY} - ${verticalMovement})`,
+                            opacity: [0, 0.8, 0.8, 0], // Fade in and out
+                        }}
+                        transition={{
+                            duration,
+                            delay,
+                            repeat: Infinity,
+                            repeatType: 'loop',
+                            ease: 'linear',
+                            times: [0, 0.2, 0.8, 1], // Control opacity timing
+                        }}
+                    />
+                );
+            })}
+        </div>
+    );
+};
+
+const SparkleIcon = () => (
+    <motion.div
+        className="relative w-20 h-20"
+        animate={{ scale: [1, 1.1, 1], rotate: [0, 10, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+    >
+        <motion.svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 text-white"
+            style={{ filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.8))' }}
+        >
+            <path d="M12 2 L14.5 9.5 L22 12 L14.5 14.5 L12 22 L9.5 14.5 L2 12 L9.5 9.5 Z" />
+        </motion.svg>
+        <motion.svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="absolute top-1 left-1 w-6 h-6 text-white/90"
+            animate={{ scale: [1, 0.8, 1], opacity: [0.8, 1, 0.8], rotate: '360deg' }}
+            transition={{ duration: 5, repeat: Infinity, ease: 'linear', delay: 0.5 }}
+        >
+            <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
+        </motion.svg>
+        <motion.svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="absolute bottom-1 right-1 w-6 h-6 text-white/90"
+            animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1], rotate: '-360deg' }}
+            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+        >
+            <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
+        </motion.svg>
+    </motion.div>
+);
+
+const FadingSubtitles = () => {
+    const subtitles = [
+        "Transforming sketch into substance...",
+        "Weaving words into wisdom...",
+        "Converting creativity into existence...",
+        "Polishing your thoughts...",
+        "Finding the right expression...",
+        "Unlocking new perspectives...",
+    ];
+    const [index, setIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setIndex((prevIndex) => (prevIndex + 1) % subtitles.length);
+        }, 2500);
+
+        return () => clearInterval(interval);
+    }, [subtitles.length]);
+
+    return (
+        <div className="h-8 text-center">
+            <AnimatePresence mode="wait">
+                <motion.p
+                    key={index}
+                    className="mt-4 text-white/80 font-medium text-lg"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.5, ease: 'easeInOut' }}
+                >
+                    {subtitles[index]}
+                </motion.p>
+            </AnimatePresence>
+        </div>
+    );
+};
+
+const GlisterEffect = () => {
+    const glints = Array.from({ length: 7 });
+
+    return (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {glints.map((_, i) => (
+                <motion.div
+                    key={i}
+                    className="absolute rounded-full"
+                    style={{
+                        background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%)',
+                    }}
+                    initial={{
+                        x: `${Math.random() * 100}vw`,
+                        y: `${Math.random() * 100}vh`,
+                        scale: 0,
+                        opacity: 0,
+                    }}
+                    animate={{
+                        scale: [0, Math.random() * 0.8 + 0.3, 0],
+                        opacity: [0, 1, 0],
+                        x: `${Math.random() * 100}vw`,
+                        y: `${Math.random() * 100}vh`,
+                    }}
+                    transition={{
+                        duration: Math.random() * 4 + 3,
+                        repeat: Infinity,
+                        repeatType: 'loop',
+                        delay: Math.random() * 3,
+                        ease: 'easeInOut',
+                    }}
+                />
+            ))}
+        </div>
+    );
+};
+
+
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
         settings, navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry, vibrate, 
@@ -152,6 +328,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     });
     const [isMouseOverMenu, setIsMouseOverMenu] = useState(false);
     const [isDesktop, setIsDesktop] = useState(false);
+
+    // AI State
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [aiCustomPrompt, setAiCustomPrompt] = useState('');
+    const [currentAiTask, setCurrentAiTask] = useState<AITask | null>(null);
 
 
     const editorRef = useRef<HTMLDivElement>(null);
@@ -810,6 +992,66 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     };
      // --- End Slash Command Logic ---
 
+     // --- AI Logic ---
+    const handleAiAction = async (task: AITask, promptOverride?: string) => {
+        vibrate();
+        setIsAiModalOpen(false);
+        setIsAiLoading(true);
+        setCurrentAiTask(null);
+
+        const currentContent = editorRef.current?.innerHTML || '';
+        const currentTextContent = editorRef.current?.innerText || '';
+        const customPrompt = promptOverride || aiCustomPrompt;
+
+        if (task === 'ASK') {
+            const answer = await processJournalWithAI(task, currentTextContent, customPrompt);
+            setIsAiLoading(false);
+            showAlertModal({ title: "Aura's Insight", message: answer });
+            setAiCustomPrompt('');
+            return;
+        }
+
+        const result = await processJournalWithAI(task, currentContent, customPrompt);
+
+        if (result.includes("couldn't process that request")) {
+            showAlertModal({ title: "AI Error", message: result });
+        } else if (editorRef.current) {
+            switch (task) {
+                case 'GENERATE':
+                case 'IMPROVE':
+                    editorRef.current.innerHTML = result;
+                    break;
+                case 'CONTINUE':
+                    editorRef.current.innerHTML += `<p>${result}</p>`;
+                    break;
+                case 'SUMMARIZE':
+                    const formattedSummary = '<ul>' + result.trim().replace(/^\s*[\*\-]\s*/gm, '<li>').replace(/(\r\n|\n|\r)/gm, '</li>') + '</li></ul>';
+                    editorRef.current.innerHTML = `<h2>Summary</h2><hr>${formattedSummary}<br>` + currentContent;
+                    break;
+            }
+            
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(editorRef.current);
+            range.collapse(false);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            editorRef.current.focus();
+
+            handleContentChange();
+        }
+
+        setIsAiLoading(false);
+        setAiCustomPrompt('');
+    };
+
+    const handleAiModalClose = () => {
+        setIsAiModalOpen(false);
+        setCurrentAiTask(null);
+        setAiCustomPrompt('');
+    };
+     // --- End AI Logic ---
+
     const fontClasses: Record<typeof fontStyle, string> = { default: 'font-sans', serif: 'font-serif', mono: 'font-mono' };
 
     const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
@@ -1108,8 +1350,36 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         );
     };
 
+    const AiTaskButton = ({ icon, title, description, task, requiresInput = false }: { icon: React.ReactNode, title: string, description: string, task: AITask, requiresInput?: boolean }) => (
+        <button
+            onClick={() => requiresInput ? setCurrentAiTask(task) : handleAiAction(task)}
+            className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        >
+            <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg">{icon}</div>
+            <div>
+                <p className="font-semibold">{title}</p>
+                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{description}</p>
+            </div>
+        </button>
+    );
+
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
+            <AnimatePresence>
+                {isAiLoading && (
+                    <motion.div
+                        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        <ShootingStars />
+                        <GlisterEffect />
+                        <SparkleIcon />
+                        <FadingSubtitles />
+                    </motion.div>
+                )}
+            </AnimatePresence>
             <AnimatePresence>
                 {isSlashMenuOpen && <SlashCommandMenu />}
             </AnimatePresence>
@@ -1250,6 +1520,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 </div>
                 <AnimatePresence>
                     {!isLocked && (
+                        <>
+                        <motion.button
+                            onClick={() => {vibrate(); setIsAiModalOpen(true);}}
+                            className="absolute bottom-6 left-6 w-16 h-16 bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full flex items-center justify-center shadow-lg z-20"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            aria-label="Aura AI Assistant"
+                            initial={{ scale: 0, y: 50 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0, y: 50 }}
+                        >
+                           <Sparkles size={24} />
+                        </motion.button>
                         <motion.button
                             onClick={() => setShowAttachmentModal(true)}
                             disabled={isUploading}
@@ -1268,11 +1551,74 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                             }
                             </AnimatePresence>
                         </motion.button>
+                        </>
                     )}
                 </AnimatePresence>
                 <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
             </div>
             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
+            <AnimatePresence>
+                {isAiModalOpen && (
+                    <motion.div
+                        className="fixed inset-0 z-40 flex flex-col justify-end bg-black/50"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={handleAiModalClose}
+                    >
+                        <motion.div
+                            className="w-full bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-t-2xl border-t border-white/10 shadow-3xl p-4"
+                            initial={{ y: "100%" }}
+                            animate={{ y: "0%" }}
+                            exit={{ y: "100%" }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                           <AnimatePresence mode="wait">
+                            {currentAiTask ? (
+                                <motion.div
+                                    key="ai-input"
+                                    initial={{ opacity: 0, x: 50 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -50 }}
+                                >
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <button onClick={() => setCurrentAiTask(null)} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ArrowLeft size={18}/></button>
+                                        <h3 className="text-lg font-semibold">{currentAiTask === 'GENERATE' ? 'Generate from Prompt' : 'Ask about your entry'}</h3>
+                                    </div>
+                                    <textarea
+                                        value={aiCustomPrompt}
+                                        onChange={(e) => setAiCustomPrompt(e.target.value)}
+                                        placeholder={currentAiTask === 'GENERATE' ? 'e.g., about my productive day...' : 'e.g., what themes are present?'}
+                                        className="w-full h-24 p-2 bg-light-glass dark:bg-dark-glass rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
+                                        autoFocus
+                                    />
+                                    <button onClick={() => handleAiAction(currentAiTask)} className="w-full mt-2 py-3 bg-light-primary dark:bg-dark-primary text-white rounded-full font-semibold">
+                                        {currentAiTask === 'GENERATE' ? 'Generate' : 'Ask'}
+                                    </button>
+                                </motion.div>
+                            ) : (
+                                <motion.div 
+                                    key="ai-menu"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <h3 className="text-lg font-semibold text-center mb-3">Aura AI Assistant</h3>
+                                    <div className="space-y-2">
+                                        <AiTaskButton icon={<Wand2 size={20}/>} title="Organize & Refine" description="Automatically structure, format, and proofread." task="IMPROVE" />
+                                        <AiTaskButton icon={<BookText size={20}/>} title="Continue Writing" description="Generate what comes next" task="CONTINUE" />
+                                        <AiTaskButton icon={<BrainCircuit size={20}/>} title="Summarize" description="Get the key points" task="SUMMARIZE" />
+                                        <AiTaskButton icon={<Sparkles size={20}/>} title="Generate from Prompt" description="Create a new entry from an idea" task="GENERATE" requiresInput/>
+                                        <AiTaskButton icon={<MessageSquare size={20}/>} title="Ask a Question" description="Get insights about your entry" task="ASK" requiresInput/>
+                                    </div>
+                                </motion.div>
+                            )}
+                            </AnimatePresence>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             <style>{`
                 .journal-editor-container [contentEditable=true] { -webkit-user-select: text; user-select: text; }
                 .journal-editor-container [contentEditable=true]:empty:before { content: attr(data-placeholder); color: #a0a0a0; opacity: 0.5; }

@@ -114,3 +114,5 @@ export interface AuraData {
     affirmation: string;
     suggestion: string;
 }
+
+export type AITask = 'GENERATE' | 'CONTINUE' | 'SUMMARIZE' | 'IMPROVE' | 'ASK';

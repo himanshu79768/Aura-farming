@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Quote, Mood, AuraData } from '../types';
+import { Quote, Mood, AuraData, AITask } from '../types';
 
 const GEMINI_API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
 
@@ -104,4 +104,59 @@ export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'mor
       suggestion: "Take a few deep, slow breaths.",
     };
   }
+};
+
+export const processJournalWithAI = async (
+  task: AITask,
+  content: string,
+  customPrompt: string = ''
+): Promise<string> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+        let prompt = '';
+
+        switch (task) {
+            case 'GENERATE':
+                prompt = `Generate a thoughtful and reflective journal entry based on the following prompt. Use markdown for formatting like headings, lists, bold, and italics where appropriate. Prompt: "${customPrompt}"`;
+                break;
+            case 'CONTINUE':
+                prompt = `You are a creative writing assistant. Continue the following journal entry naturally from where it left off, maintaining the same tone and style. Add about 2-3 more paragraphs. Return only the new paragraphs, without repeating any of the original text. Here is the entry so far:\n\n---\n\n${content}`;
+                break;
+            case 'SUMMARIZE':
+                prompt = `Summarize the key points, themes, and feelings of the following journal entry into 2-3 concise bullet points starting with '*'. Return only the bullet points. Here is the entry:\n\n---\n\n${content}`;
+                break;
+            case 'IMPROVE':
+                prompt = `You are an expert editor and content organizer. Your task is to proofread, refine, and restructure the following journal entry.
+1.  **Title:** If the entry doesn't seem to have a clear title within its content, add a suitable one as an <h2> heading at the very beginning.
+2.  **Proofread:** Correct all grammar, spelling, and punctuation errors.
+3.  **Formatting:**
+    -   Remove any stray or unintentional formatting symbols (like stray * or #).
+    -   Use clean HTML for formatting (e.g., <p>, <h2>, <strong>, <em>, <ul>, <li>). Ensure proper paragraph breaks with <p> tags.
+    -   If the content is a Q&A, wrap the questions in <strong> tags.
+    -   Insert <hr> tags where you see a clear thematic shift or separation of ideas.
+4.  **Structure:** Organize the content logically.
+5.  **Voice:** Preserve the original author's voice and tone.
+6.  **Output:** Return ONLY the improved and fully structured HTML content. Do not include any introductory phrases like "Here is the improved version:".
+
+Here is the entry content:
+---
+${content}
+---`;
+                break;
+            case 'ASK':
+                prompt = `Based on the content of the following journal entry, please answer the user's question concisely.\n\nJournal Entry:\n---\n${content}\n---\n\nQuestion: "${customPrompt}"`;
+                break;
+        }
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+        });
+
+        return response.text.trim();
+
+    } catch (error) {
+        console.error(`Error processing journal with AI for task ${task}:`, error);
+        return "Sorry, I couldn't process that request right now.";
+    }
 };
