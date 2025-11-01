@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, RefreshCw, MicOff, X, Image as ImageIcon, FileText } from 'lucide-react';
+import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText } from 'lucide-react';
 import { GoogleGenAI, Chat, Part } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
@@ -379,7 +379,7 @@ const AuraAiPage: React.FC = () => {
 
     const NewChatButton = (
         <button onClick={handleNewChat} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-            <RefreshCw size={20} />
+            <SquarePen size={20} />
         </button>
     );
 
