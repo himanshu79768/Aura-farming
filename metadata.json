@@ -1,5 +1,7 @@
 {
   "name": "Aura - Refresh & Focus",
   "description": "A beautiful, minimal iOS-style app to help you feel refreshed and motivated. Features mood selection, a focus timer, and inspirational quotes to reset your day with calm and energy.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }

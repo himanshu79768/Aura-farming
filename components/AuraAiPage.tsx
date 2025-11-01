@@ -1,29 +1,41 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip } from 'lucide-react';
-import { GoogleGenAI, Chat } from "@google/genai";
+import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, RefreshCw, MicOff, X, Image as ImageIcon, FileText } from 'lucide-react';
+import { GoogleGenAI, Chat, Part } from "@google/genai";
+import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { ChatMessage } from '../types';
+import AttachmentTypeModal from './AttachmentTypeModal';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 const GEMINI_API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
 
-// Helper function to extract the direct URL from Google's redirect links.
-const getDirectUrl = (uri: string): string => {
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/pdf',
+  'application/msword', // .doc
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'application/vnd.ms-powerpoint', // .ppt
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+];
+
+const dataURLToUint8Array = (dataURL: string) => {
+    const base64 = dataURL.split(',')[1];
+    if (!base64) return new Uint8Array(0);
     try {
-        const url = new URL(uri);
-        // Check if it's a Google redirect URL
-        if (url.hostname.includes('google.com') && url.pathname === '/url' && url.searchParams.has('q')) {
-            const finalUrl = url.searchParams.get('q');
-            if (finalUrl) {
-                return finalUrl;
-            }
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binary_string.charCodeAt(i);
         }
+        return bytes;
     } catch (e) {
-        // If parsing fails (e.g., not a valid URL), return the original URI
-        console.warn("Could not parse URL, falling back to original:", uri);
+        console.error("Failed to decode base64 string:", e);
+        return new Uint8Array(0);
     }
-    return uri;
 };
 
 const MarkdownRenderer: React.FC<{ text: string }> = ({ text }) => {
@@ -86,7 +98,8 @@ const ActionButtons: React.FC<{ message: ChatMessage }> = ({ message }) => {
     const { showAlertModal } = useAppContext();
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(message.parts[0].text);
+        const textToCopy = message.parts.reduce((acc, part) => 'text' in part ? acc + part.text : acc, '');
+        navigator.clipboard.writeText(textToCopy);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     };
@@ -107,119 +120,38 @@ const ActionButtons: React.FC<{ message: ChatMessage }> = ({ message }) => {
     );
 };
 
-
-const SourcesPill: React.FC<{ message: ChatMessage; onOpen: (sources: ChatMessage['sources']) => void }> = ({ message, onOpen }) => {
-    if (!message.sources || message.sources.length === 0) return null;
-
-    return (
-        <motion.button 
-            onClick={() => onOpen(message.sources)}
-            className="flex items-center gap-2 pl-2 pr-4 py-2 bg-light-glass dark:bg-dark-glass rounded-full border border-white/10"
-            whileTap={{ scale: 0.95 }}
-        >
-            <div className="flex items-center -space-x-2">
-                {message.sources.slice(0, 3).map((source, i) => {
-                    try {
-                        // Use the helper to get the direct URL's domain for the favicon.
-                        const directUrl = getDirectUrl(source.uri);
-                        const domain = new URL(directUrl).hostname;
-                        return (
-                            <img
-                                key={i}
-                                src={`https://www.google.com/s2/favicons?sz=64&domain_url=${domain}`}
-                                alt={domain}
-                                className="w-6 h-6 rounded-full border-2 border-light-bg-secondary dark:border-dark-bg-secondary bg-white object-contain"
-                                style={{ zIndex: 3-i }}
-                            />
-                        );
-                    } catch (e) {
-                        return null;
-                    }
-                })}
-            </div>
-            <span className="text-sm font-medium">Sources</span>
-        </motion.button>
-    );
-}
-
-const SourcesSheet: React.FC<{ sources: ChatMessage['sources']; onClose: () => void }> = ({ sources, onClose }) => {
-    return (
-        <motion.div
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
-            onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-        >
-            <motion.div
-                className="w-full max-w-2xl bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-t-2xl p-4 border-t border-white/10"
-                onClick={(e) => e.stopPropagation()}
-                initial={{ y: "100%" }}
-                animate={{ y: "0%" }}
-                exit={{ y: "100%" }}
-                transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-            >
-                <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
-                <h2 className="text-lg font-semibold mb-4 text-center">Sources</h2>
-                <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-                    {sources?.map((source, index) => {
-                        // Use the helper to get direct URLs for links and favicons.
-                        const directUrl = getDirectUrl(source.uri);
-                        const domain = new URL(directUrl).hostname;
-                        return (
-                         <a 
-                            key={index}
-                            href={directUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="flex items-start gap-3 text-sm hover:bg-black/5 dark:hover:bg-white/5 p-2 rounded-md transition-colors"
-                        >
-                             <img
-                                src={`https://www.google.com/s2/favicons?sz=64&domain_url=${domain}`}
-                                alt={domain}
-                                className="w-5 h-5 mt-0.5 rounded-sm bg-white"
-                            />
-                            <div>
-                                <p className="font-medium text-light-text dark:text-dark-text break-all">{source.title || domain}</p>
-                                <p className="text-xs text-blue-400 break-all">{directUrl}</p>
-                            </div>
-                       </a>
-                    )})}
-                </div>
-            </motion.div>
-        </motion.div>
-    );
+const AttachmentIcon: React.FC<{ type: string }> = ({ type }) => {
+    if (type.startsWith('image/')) return <ImageIcon size={24} className="text-purple-400 shrink-0" />;
+    if (type === 'application/pdf') return <FileText size={24} className="text-red-400 shrink-0" />;
+    if (type.includes('word')) return <FileText size={24} className="text-blue-500 shrink-0" />;
+    if (type.includes('presentation') || type.includes('powerpoint')) return <FileText size={24} className="text-orange-500 shrink-0" />;
+    return <FileText size={24} className="text-gray-400 shrink-0" />;
 };
 
 
 const AuraAiPage: React.FC = () => {
-    const { navigateBack, vibrate, showAlertModal } = useAppContext();
+    const { navigateBack, vibrate, showAlertModal, auraChatHistory, updateAuraChatHistory, clearAuraChatHistory } = useAppContext();
     const [chat, setChat] = useState<Chat | null>(null);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>(auraChatHistory || []);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isSourcesSheetOpen, setIsSourcesSheetOpen] = useState(false);
-    const [activeSources, setActiveSources] = useState<ChatMessage['sources']>([]);
+    const [attachment, setAttachment] = useState<{ data: string; mimeType: string; name: string } | null>(null);
+    const [isListening, setIsListening] = useState(false);
+    const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+    
     const scrollRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const recognitionRef = useRef<any>(null);
+    const wasLoading = useRef(false);
 
-    const openSourcesSheet = (sources: ChatMessage['sources']) => {
-        setActiveSources(sources);
-        setIsSourcesSheetOpen(true);
-    };
 
-    const closeSourcesSheet = () => {
-        setIsSourcesSheetOpen(false);
-    };
-
-    // Initialize Chat
-    useEffect(() => {
+    const initializeChat = useCallback(() => {
         try {
             const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
-                    systemInstruction: "You are Aura, a helpful and friendly AI assistant within a focus and wellness app. Your goal is to provide clear, concise, and supportive answers to user's doubts. When appropriate, use Google Search to find up-to-date and accurate information. Keep your responses encouraging and brief. You MUST use markdown for formatting like bold, italics, and lists.",
-                    tools: [{googleSearch: {}}],
+                    systemInstruction: "You are Aura, a helpful and friendly AI assistant within a focus and wellness app. Your goal is to provide clear, concise, and supportive answers to user's doubts. Keep your responses encouraging and brief. You MUST use markdown for formatting like bold, italics, and lists.",
                 }
             });
             setChat(newChat);
@@ -228,6 +160,58 @@ const AuraAiPage: React.FC = () => {
             showAlertModal({title: "Connection Error", message: "Could not connect to Aura AI. Please check your connection and try again."})
         }
     }, [showAlertModal]);
+
+    // Speech Recognition Setup
+    useEffect(() => {
+        // FIX: Cast `window` to `any` to access the non-standard `SpeechRecognition` and `webkitSpeechRecognition` properties, resolving a TypeScript error.
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = true;
+            recognitionRef.current.interimResults = true;
+
+            recognitionRef.current.onresult = (event: any) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                setInput(input + finalTranscript);
+            };
+
+            recognitionRef.current.onend = () => {
+                setIsListening(false);
+            };
+
+            recognitionRef.current.onerror = (event: any) => {
+                console.error('Speech recognition error', event.error);
+                showAlertModal({ title: "Mic Error", message: `An error occurred: ${event.error}` });
+                setIsListening(false);
+            };
+
+        }
+    }, [input, showAlertModal]);
+
+
+    // Effect to save chat history when a model response is finished.
+    useEffect(() => {
+        if (wasLoading.current && !isLoading) {
+             // Only save if there's a change
+            if (JSON.stringify(messages) !== JSON.stringify(auraChatHistory || [])) {
+                updateAuraChatHistory(messages);
+            }
+        }
+        wasLoading.current = isLoading;
+    }, [isLoading, messages, updateAuraChatHistory, auraChatHistory]);
+
+    // Initialize Chat
+    useEffect(() => {
+        initializeChat();
+    }, [initializeChat]);
 
     // Scroll to bottom
     useEffect(() => {
@@ -238,53 +222,86 @@ const AuraAiPage: React.FC = () => {
 
     const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();
-        if (!input.trim() || isLoading || !chat) return;
+        if (isLoading || !chat) return;
+
+        const userMessagePartsForDisplay: Part[] = [];
+        const userMessagePartsForApi: Part[] = [];
+
+        if (attachment) {
+            userMessagePartsForDisplay.push({
+                inlineData: {
+                    data: attachment.data.split(',')[1],
+                    mimeType: attachment.mimeType,
+                    name: attachment.name,
+                }
+            });
+
+            if (attachment.mimeType.startsWith('image/')) {
+                userMessagePartsForApi.push({
+                    inlineData: {
+                        data: attachment.data.split(',')[1],
+                        mimeType: attachment.mimeType,
+                    }
+                });
+            } else if (attachment.mimeType === 'application/pdf') {
+                const pdfData = dataURLToUint8Array(attachment.data);
+                try {
+                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                    let pdfText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        pdfText += textContent.items.map(item => ('str' in item ? item.str : '')).join(' ');
+                    }
+                    const pdfContentForModel = `The user attached a PDF named "${attachment.name}". Its content is: ${pdfText}`;
+                    userMessagePartsForApi.push({ text: pdfContentForModel });
+                } catch (error) {
+                    console.error("PDF processing error:", error);
+                    showAlertModal({ title: "PDF Error", message: "Could not process the attached PDF." });
+                    return;
+                }
+            } else {
+                // Handle other files like docx, pptx, etc.
+                const otherFileContentForModel = `The user has attached a file named "${attachment.name}" of type ${attachment.mimeType}. You cannot process its contents, but you should acknowledge that it has been attached.`;
+                userMessagePartsForApi.push({ text: otherFileContentForModel });
+            }
+        }
+        
+        if (input.trim()) {
+            const textPart = { text: input.trim() };
+            userMessagePartsForDisplay.push(textPart);
+            userMessagePartsForApi.push(textPart);
+        }
+
+        if (userMessagePartsForApi.length === 0) return;
 
         vibrate();
         const userMessage: ChatMessage = {
             id: crypto.randomUUID(),
             role: 'user',
-            parts: [{ text: input.trim() }]
+            parts: userMessagePartsForDisplay
         };
 
         setMessages(prev => [...prev, userMessage]);
         setInput('');
+        setAttachment(null);
         setIsLoading(true);
 
         try {
-            const result = await chat.sendMessageStream({ message: userMessage.parts[0].text });
+            const result = await chat.sendMessageStream({ message: userMessagePartsForApi });
             
             let modelResponse = '';
             const modelMessageId = crypto.randomUUID();
-            let groundingChunks: any[] = [];
-
-            // Add an empty model message to start streaming into
+            
             setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
 
             for await (const chunk of result) {
                 modelResponse += chunk.text;
-                if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-                    groundingChunks = chunk.candidates[0].groundingMetadata.groundingChunks;
-                }
                 setMessages(prev => prev.map(msg => 
                     msg.id === modelMessageId 
                     ? { ...msg, parts: [{ text: modelResponse }] }
                     : msg
                 ));
-            }
-
-            if (groundingChunks.length > 0) {
-                const sources = groundingChunks
-                    .map((chunk: any) => chunk.web ? { title: chunk.web.title, uri: chunk.web.uri } : null)
-                    .filter(Boolean) as { title: string; uri: string }[];
-                
-                if (sources.length > 0) {
-                    setMessages(prev => prev.map(msg => 
-                        msg.id === modelMessageId 
-                        ? { ...msg, sources }
-                        : msg
-                    ));
-                }
             }
 
         } catch (error) {
@@ -299,13 +316,76 @@ const AuraAiPage: React.FC = () => {
         }
     };
     
-    const handleUnsupported = () => {
-        showAlertModal({ title: "Coming Soon", message: "This feature is not yet implemented."});
+    const handleAttachmentClick = () => {
+        setShowAttachmentModal(true);
     };
+
+    const handleAttachmentTypeSelect = (acceptType: string) => {
+        setShowAttachmentModal(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.accept = acceptType;
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (fileInputRef.current) { fileInputRef.current.value = ""; }
+        if (!file) return;
+
+        if (!ALLOWED_MIME_TYPES.some(type => file.type.startsWith(type) || file.type === type)) {
+            showAlertModal({ title: "Unsupported File", message: "Please select a supported file type (Image, PDF, Word, PowerPoint)." });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            setAttachment({ data: dataUrl, mimeType: file.type, name: file.name });
+        };
+        reader.onerror = () => {
+            showAlertModal({ title: "Error", message: "Failed to read the file." });
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveAttachment = () => {
+        setAttachment(null);
+    };
+
+    const handleMicClick = () => {
+        if (!recognitionRef.current) {
+            showAlertModal({ title: "Not Supported", message: "Speech recognition is not supported in your browser." });
+            return;
+        }
+
+        if (isListening) {
+            recognitionRef.current.stop();
+        } else {
+            vibrate();
+            recognitionRef.current.start();
+            setIsListening(true);
+        }
+    };
+
+    const handleNewChat = () => {
+        vibrate();
+        setMessages([]);
+        setInput('');
+        setAttachment(null);
+        clearAuraChatHistory();
+        initializeChat();
+    };
+
+    const NewChatButton = (
+        <button onClick={handleNewChat} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            <RefreshCw size={20} />
+        </button>
+    );
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
-            <Header title="Aura AI" showBackButton onBack={navigateBack} />
+            <Header title="Aura AI" showBackButton onBack={navigateBack} rightAction={NewChatButton} />
             <div ref={scrollRef} className="flex-grow w-full overflow-y-auto p-4 space-y-6">
                 {messages.map((msg, index) => (
                     <div
@@ -325,15 +405,37 @@ const AuraAiPage: React.FC = () => {
                             )}
                             <div
                                 className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-light-primary dark:bg-dark-primary text-white rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass rounded-bl-lg'}`}
-                                style={ msg.role === 'user' ? { whiteSpace: 'pre-wrap', wordWrap: 'break-word' } : { wordWrap: 'break-word' } }
                             >
                                 {msg.role === 'model' ? 
                                     (
                                         <div className={isLoading && index === messages.length - 1 ? 'typing-cursor' : ''}>
-                                            {msg.parts[0].text ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
+                                            {msg.parts[0] && 'text' in msg.parts[0] ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
                                         </div>
                                     ) : 
-                                    (msg.parts[0].text || <span className="opacity-0">.</span>)
+                                    (
+                                        <div className="flex flex-col gap-2">
+                                            {msg.parts.map((part, i) => {
+                                                if ('inlineData' in part && typeof part.inlineData === 'object') {
+                                                    const { mimeType, data, name } = part.inlineData;
+                                                    const fullDataUrl = `data:${mimeType};base64,${data}`;
+                                                    if (mimeType?.startsWith('image/')) {
+                                                        return <img key={i} src={fullDataUrl} alt={name || "User upload"} className="rounded-lg max-w-full h-auto max-h-64 object-contain" />;
+                                                    } else {
+                                                        return (
+                                                            <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg">
+                                                                <AttachmentIcon type={mimeType || ''} />
+                                                                <span className="truncate text-sm font-medium">{name || 'Attached File'}</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                }
+                                                if ('text' in part && part.text) {
+                                                    return <div key={i} style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{part.text}</div>;
+                                                }
+                                                return null;
+                                            })}
+                                        </div>
+                                    )
                                 }
                             </div>
                             {msg.role === 'user' && (
@@ -343,7 +445,7 @@ const AuraAiPage: React.FC = () => {
                             )}
                         </motion.div>
                         
-                        {msg.role === 'model' && !(isLoading && index === messages.length - 1) && msg.parts[0].text && (
+                        {msg.role === 'model' && !(isLoading && index === messages.length - 1) && msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text && (
                             <motion.div 
                                 className="flex flex-col items-start gap-2 mt-2 ml-11"
                                 initial={{ opacity: 0, y: -10 }}
@@ -351,15 +453,33 @@ const AuraAiPage: React.FC = () => {
                                 transition={{ delay: 0.2 }}
                             >
                                 <ActionButtons message={msg} />
-                                <SourcesPill message={msg} onOpen={openSourcesSheet} />
                             </motion.div>
                         )}
                     </div>
                 ))}
             </div>
             <div className="p-4 border-t border-white/10">
+                 <AnimatePresence>
+                    {attachment && (
+                        <motion.div 
+                            className="mb-2 p-2 bg-light-glass dark:bg-dark-glass rounded-lg flex items-center justify-between"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                        >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <AttachmentIcon type={attachment.mimeType} />
+                                <span className="text-sm truncate">{attachment.name}</span>
+                            </div>
+                            <button onClick={handleRemoveAttachment} className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded-full flex-shrink-0">
+                                <X size={16} />
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <form onSubmit={handleSend} className="flex items-center gap-2">
-                    <button type="button" onClick={handleUnsupported} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
+                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                    <button type="button" onClick={handleAttachmentClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
                         <Paperclip size={20} />
                     </button>
                     <div className="relative flex-grow">
@@ -367,17 +487,17 @@ const AuraAiPage: React.FC = () => {
                             type="text"
                             value={input}
                             onChange={e => setInput(e.target.value)}
-                            placeholder="Ask a doubt..."
+                            placeholder={isListening ? "Listening..." : "Ask a doubt..."}
                             disabled={isLoading}
                             className="w-full pl-4 pr-24 py-3 bg-light-glass dark:bg-dark-glass rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
                         />
                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                             <button type="button" onClick={handleUnsupported} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors">
-                                <Mic size={20} />
+                             <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
                             </button>
                             <button
                                 type="submit"
-                                disabled={!input.trim() || isLoading}
+                                disabled={(!input.trim() && !attachment) || isLoading}
                                 className="w-9 h-9 flex items-center justify-center bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 transition-transform duration-200 flex-shrink-0"
                                 aria-label="Send message"
                             >
@@ -387,11 +507,11 @@ const AuraAiPage: React.FC = () => {
                     </div>
                 </form>
             </div>
-            <AnimatePresence>
-                {isSourcesSheetOpen && (
-                    <SourcesSheet sources={activeSources} onClose={closeSourcesSheet} />
-                )}
-            </AnimatePresence>
+             <AttachmentTypeModal 
+                isOpen={showAttachmentModal} 
+                onClose={() => setShowAttachmentModal(false)} 
+                onSelect={handleAttachmentTypeSelect} 
+            />
              <style>{`
                 @keyframes blink-cursor {
                     50% { opacity: 0; }

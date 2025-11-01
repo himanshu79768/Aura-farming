@@ -79,6 +79,7 @@ export interface Settings {
 export interface UserData extends Settings, UserProfile {
     mood: Mood;
     favoriteQuotes: Record<string, boolean>;
+    auraChatHistory?: ChatMessage[];
 }
 
 
@@ -87,10 +88,24 @@ export interface MoodConfig {
   icon: (props: React.ComponentProps<'svg'>) => React.ReactElement;
 }
 
+export interface TextPart {
+  text: string;
+}
+
+export interface InlineDataPart {
+  inlineData: {
+    mimeType: string;
+    data: string; // Base64 string WITHOUT data URI prefix
+    name?: string; // For local display of filename
+  };
+}
+
+export type Part = TextPart | InlineDataPart;
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
-  parts: { text: string }[];
+  parts: Part[];
   sources?: { title: string; uri: string }[];
 }
 

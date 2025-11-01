@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor } from './types';
+import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor, ChatMessage } from './types';
 import HomePage from './components/HomePage';
 import FocusPage from './components/FocusPage';
 import QuotesPage from './components/QuotesPage';
@@ -85,6 +85,9 @@ interface AppContextType {
   currentView: View;
   modalStack: { view: View; params?: any }[];
   isImmersive: boolean;
+  auraChatHistory: ChatMessage[];
+  updateAuraChatHistory: (history: ChatMessage[]) => void;
+  clearAuraChatHistory: () => void;
   toggleImmersive: () => void;
   toggleSearch: () => void;
 }
@@ -123,6 +126,7 @@ const DEFAULT_USER_DATA: UserData = {
     ...DEFAULT_PROFILE,
     mood: Mood.Calm,
     favoriteQuotes: {},
+    auraChatHistory: [],
 };
 
 export default function App() {
@@ -146,6 +150,7 @@ export default function App() {
   const [focusSearchQuery, setFocusSearchQuery] = useState('');
   const [isImmersive, setIsImmersive] = useLocalStorage('isImmersive', false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [auraChatHistory, setAuraChatHistory] = useState<ChatMessage[]>([]);
   
   // Timer state
   const [timerState, setTimerState] = useState({ duration: 15 * 60, endTime: 0, isActive: false });
@@ -229,6 +234,7 @@ export default function App() {
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
+            setAuraChatHistory(data.auraChatHistory || []);
 
             const journalEntriesArray = data.journalEntries 
                 ? Object.entries(data.journalEntries).map(([id, entry]) => ({ id, ...entry } as JournalEntry)).sort((a,b) => b.createdAt - a.createdAt)
@@ -275,6 +281,22 @@ export default function App() {
     if (!dataPathUid) return;
     update(ref(db, 'users/' + dataPathUid), data);
   }, [currentUser, masterUid]);
+
+  const updateAuraChatHistory = useCallback((history: ChatMessage[]) => {
+    const dataPathUid = masterUid || currentUser?.uid;
+    if (!dataPathUid) return;
+    // Optimistic update
+    setAuraChatHistory(history);
+    update(ref(db, `users/${dataPathUid}`), { auraChatHistory: history });
+    }, [currentUser, masterUid]);
+
+    const clearAuraChatHistory = useCallback(() => {
+        const dataPathUid = masterUid || currentUser?.uid;
+        if (!dataPathUid) return;
+        // Optimistic update
+        setAuraChatHistory([]);
+        update(ref(db, `users/${dataPathUid}`), { auraChatHistory: null });
+    }, [currentUser, masterUid]);
 
   const handleSetMood = useCallback((newMood: Mood) => updateUserData({ mood: newMood }), [updateUserData]);
   
@@ -361,6 +383,7 @@ export default function App() {
         setFavoriteQuotes([]);
         setJournalEntries([]);
         setFocusHistory([]);
+        setAuraChatHistory([]);
         setShowIntro(false);
     }, [vibrate, setMasterUid]);
 
@@ -647,12 +670,14 @@ export default function App() {
     showConfirmationModal, showAlertModal,
     currentUser,
     currentView, modalStack,
+    auraChatHistory, updateAuraChatHistory, clearAuraChatHistory,
     isImmersive, toggleImmersive,
     toggleSearch,
   }), [
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
     focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
+    auraChatHistory, updateAuraChatHistory, clearAuraChatHistory,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, sessionName,
     focusSearchQuery,
