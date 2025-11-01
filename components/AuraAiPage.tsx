@@ -6,6 +6,8 @@ import { useAppContext } from '../App';
 import Header from './Header';
 import { ChatMessage } from '../types';
 
+const GEMINI_API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
+
 // Helper function to extract the direct URL from Google's redirect links.
 const getDirectUrl = (uri: string): string => {
     try {
@@ -212,7 +214,7 @@ const AuraAiPage: React.FC = () => {
     // Initialize Chat
     useEffect(() => {
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {

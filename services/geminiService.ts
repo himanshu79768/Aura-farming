@@ -1,9 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Quote, Mood, AuraData } from '../types';
 
+const GEMINI_API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
+
 export const fetchQuotes = async (): Promise<Quote[]> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: "Generate a list of 50 short, powerful, and uplifting quotes or affirmations for focus, calm, and motivation. Please include a diverse range of authors, with a significant portion from Indian philosophers, leaders, and texts (like Vivekananda, Gandhi, the Upanishads, etc.). Authors can be famous figures or 'Anonymous'. Return as a JSON array.",
@@ -43,7 +45,7 @@ export const fetchQuotes = async (): Promise<Quote[]> => {
 
 export const fetchJournalPrompt = async (): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Generate a short, insightful, and open-ended journal prompt to encourage self-reflection. It should be a single question or a short statement to ponder.",
@@ -64,7 +66,7 @@ export const fetchJournalPrompt = async (): Promise<string> => {
 // FIX: Implemented the missing 'fetchAuraCheckin' function to resolve the import error.
 export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'morning' | 'afternoon' | 'evening'): Promise<AuraData> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
     const prompt = `Generate a personalized "aura check-in" for a user named ${name}. The user is feeling ${mood} during the ${timeOfDay}.
       The response should be encouraging, insightful, and slightly mystical.
