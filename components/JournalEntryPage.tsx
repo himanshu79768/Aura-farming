@@ -1,12 +1,14 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Trash2, Loader, Link as LinkIcon, Paperclip, 
     LoaderCircle, FileImage, FileText, FileQuestion, MoreHorizontal, Search, Copy, Repeat, ArrowLeftRight,
-    Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus,
+    Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus, Table,
     Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon, TextSelect,
-    Sparkles, Wand2, BookText, BrainCircuit, MessageSquare, ArrowLeft
+    Sparkles, Wand2, BookText, BrainCircuit, MessageSquare, ArrowLeft, Pilcrow, CaseUpper,
+    ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, Rows3, Columns3, Trash
 } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Attachment, AITask } from '../types';
@@ -161,6 +163,18 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [isAiModalOpen, setIsAiModalOpen] = useState(false);
     const [aiCustomPrompt, setAiCustomPrompt] = useState('');
     const [currentAiTask, setCurrentAiTask] = useState<AITask | null>(null);
+    
+    // Table Editing State
+    const [tablePopup, setTablePopup] = useState<{
+        isOpen: boolean;
+        position: { top: number; left: number };
+        selection: {
+            table: HTMLTableElement;
+            type: 'row' | 'column';
+            index: number;
+        } | null;
+    }>({ isOpen: false, position: { top: 0, left: 0 }, selection: null });
+    const longPressTimerRef = useRef<number | null>(null);
 
 
     const editorRef = useRef<HTMLDivElement>(null);
@@ -172,6 +186,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const contentChangeDebounceRef = useRef<number | null>(null);
     const formattingMenuRef = useRef<HTMLDivElement>(null);
     const paletteRef = useRef<HTMLDivElement>(null);
+    const tablePopupRef = useRef<HTMLDivElement>(null);
     
     const saveDebounceTimeoutRef = useRef<number | null>(null);
     const handleSaveRef = useRef<() => void>();
@@ -459,12 +474,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             if (isSlashMenuOpen) {
                 setIsSlashMenuOpen(false);
             }
+            if (tablePopup.isOpen && tablePopupRef.current && !tablePopupRef.current.contains(event.target as Node)) {
+                setTablePopup(p => ({ ...p, isOpen: false }));
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, isSlashMenuOpen]);
+    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, isSlashMenuOpen, tablePopup.isOpen]);
     
     // --- End of Search & Formatting Functionality ---
 
@@ -733,6 +751,33 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             action: () => document.execCommand('insertOrderedList', false),
         },
         {
+            icon: <Table size={18} />, title: 'Table', description: 'Create a simple 2x2 table.',
+            action: () => {
+                const tableHTML = `
+                    <table class="journal-table">
+                      <thead>
+                        <tr>
+                          <th>Header 1</th>
+                          <th>Header 2</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td><br></td>
+                          <td><br></td>
+                        </tr>
+                        <tr>
+                          <td><br></td>
+                          <td><br></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <p><br></p>
+                `;
+                document.execCommand('insertHTML', false, tableHTML);
+            },
+        },
+        {
             icon: <Minus size={18} />, title: 'Divider', description: 'Visually separate sections.',
             action: () => document.execCommand('insertHorizontalRule', false),
         },
@@ -878,6 +923,89 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         setAiCustomPrompt('');
     };
      // --- End AI Logic ---
+
+    // --- Table Editing Logic ---
+    const clearTableHighlights = useCallback(() => {
+        editorRef.current?.querySelectorAll('.table-selection-highlight').forEach(el => {
+            el.classList.remove('table-selection-highlight');
+        });
+    }, []);
+    
+    const highlightTableSelection = useCallback((table: HTMLTableElement, type: 'row' | 'column', index: number) => {
+        clearTableHighlights();
+        if (type === 'row') {
+            if (table.rows[index]) {
+                Array.from(table.rows[index].cells).forEach(cell => cell.classList.add('table-selection-highlight'));
+            }
+        } else {
+            Array.from(table.rows).forEach(row => {
+                if (row.cells[index]) {
+                    row.cells[index].classList.add('table-selection-highlight');
+                }
+            });
+        }
+    }, [clearTableHighlights]);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+    
+        const handlePointerDown = (e: PointerEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName !== 'TH') return;
+            const table = target.closest('table.journal-table');
+            if (!table) return;
+    
+            e.preventDefault();
+            
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+
+            longPressTimerRef.current = window.setTimeout(() => {
+// FIX: Cast target to HTMLTableCellElement to access cellIndex property.
+                const th = target as HTMLTableCellElement;
+                const row = th.parentElement as HTMLTableRowElement;
+                const isHeaderRow = row.parentElement?.tagName === 'THEAD';
+                const type = isHeaderRow ? 'column' : 'row';
+                const index = isHeaderRow ? th.cellIndex : row.rowIndex;
+    
+                highlightTableSelection(table, type, index);
+                const rect = th.getBoundingClientRect();
+
+                setTablePopup({
+                    isOpen: true,
+                    position: { top: rect.bottom + 8, left: rect.left + rect.width / 2 },
+                    selection: { table, type, index }
+                });
+            }, 500);
+        };
+    
+        const handlePointerUp = () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        };
+    
+        editor.addEventListener('pointerdown', handlePointerDown);
+        editor.addEventListener('pointerup', handlePointerUp);
+    
+        return () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+            editor.removeEventListener('pointerdown', handlePointerDown);
+            editor.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [isLocked, highlightTableSelection]);
+
+    const closeTablePopup = () => {
+        clearTableHighlights();
+        setTablePopup(p => ({ ...p, isOpen: false, selection: null }));
+    };
+
+    const handleTableAction = (action: () => void) => {
+        action();
+        handleContentChange();
+        closeTablePopup();
+    };
+
+    // --- End Table Editing ---
+
 
     const fontClasses: Record<typeof fontStyle, string> = { default: 'font-sans', serif: 'font-serif', mono: 'font-mono' };
 
@@ -1190,11 +1318,125 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         </button>
     );
 
+     const TablePopupMenu = () => {
+        const { isOpen, position, selection } = tablePopup;
+        if (!isOpen || !selection) return null;
+
+        const { table, type, index } = selection;
+
+        const tableActions = {
+            insertRow: (before = false) => {
+                const newRow = table.insertRow(before ? index : index + 1);
+                const cellCount = table.rows[index]?.cells.length || 2;
+                for (let i = 0; i < cellCount; i++) {
+// FIX: Cast newRow to HTMLTableRowElement to access insertCell method.
+                    const newCell = (newRow as HTMLTableRowElement).insertCell();
+                    newCell.innerHTML = '<br>';
+                }
+            },
+            deleteRow: () => table.rows.length > 2 && table.deleteRow(index),
+            insertColumn: (before = false) => {
+                const colIndex = before ? index : index + 1;
+                Array.from(table.rows).forEach(row => {
+                    const newCell = (row as HTMLTableRowElement).insertCell(colIndex);
+                    newCell.innerHTML = '<br>';
+                });
+            },
+            deleteColumn: () => {
+                 if (table.rows[0]?.cells.length > 1) {
+// FIX: Cast row to HTMLTableRowElement to access deleteCell method.
+                    Array.from(table.rows).forEach(row => (row as HTMLTableRowElement).deleteCell(index));
+                 }
+            },
+            toggleColumnHeader: () => {
+                const header = table.tHead;
+                if (header) {
+                    const headerRow = header.rows[0];
+                    if (headerRow) {
+// FIX: Cast cell to HTMLTableCellElement to access its properties.
+                        Array.from(headerRow.cells).forEach(cell => {
+                            const td = document.createElement('td');
+                            td.innerHTML = (cell as HTMLTableCellElement).innerHTML;
+                            (cell as HTMLTableCellElement).replaceWith(td);
+                        });
+                        table.tBodies[0]?.prepend(headerRow);
+                    }
+                } else if (table.tBodies[0]?.rows[0]) {
+                    const newHeader = table.createTHead();
+                    const firstRow = table.tBodies[0].rows[0];
+// FIX: Cast cell to HTMLTableCellElement to access its properties.
+                    Array.from(firstRow.cells).forEach(cell => {
+                        const th = document.createElement('th');
+                        th.innerHTML = (cell as HTMLTableCellElement).innerHTML;
+                        (cell as HTMLTableCellElement).replaceWith(th);
+                    });
+                    newHeader.appendChild(firstRow);
+                }
+            },
+            toggleRowHeader: () => {
+                const hasRowHeaders = table.classList.toggle('row-headers');
+// FIX: Cast row to HTMLTableRowElement to access its cells property.
+                Array.from(table.tBodies[0]?.rows || []).forEach(row => {
+                    const tableRow = row as HTMLTableRowElement;
+                    if (tableRow.cells[0]) {
+                        const newCellType = hasRowHeaders ? 'th' : 'td';
+                        const oldCell = tableRow.cells[0];
+                        const newCell = document.createElement(newCellType);
+                        newCell.innerHTML = oldCell.innerHTML;
+                        oldCell.replaceWith(newCell);
+                    }
+                });
+            },
+            deleteTable: () => table.remove(),
+        };
+
+        const hasHeaderRow = !!table.tHead;
+        const hasRowHeaders = table.classList.contains('row-headers');
+
+        return (
+            <motion.div
+                ref={tablePopupRef}
+                className="fixed z-50 w-64 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
+                style={{
+                    top: position.top, left: position.left,
+                    transform: 'translateX(-50%)',
+                }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+                {type === 'row' && (
+                    <>
+                        <MenuItem icon={<ArrowUpFromLine size={16}/>} label="Insert Row Above" onClick={() => handleTableAction(() => tableActions.insertRow(true))} />
+                        <MenuItem icon={<ArrowDownFromLine size={16}/>} label="Insert Row Below" onClick={() => handleTableAction(() => tableActions.insertRow(false))} />
+                        <MenuItem icon={<Trash size={16}/>} label="Delete Row" onClick={() => handleTableAction(tableActions.deleteRow)} />
+                        <MenuDivider/>
+                    </>
+                )}
+                 {type === 'column' && (
+                    <>
+                        <MenuItem icon={<ArrowLeftFromLine size={16}/>} label="Insert Column Left" onClick={() => handleTableAction(() => tableActions.insertColumn(true))} />
+                        <MenuItem icon={<ArrowRightFromLine size={16}/>} label="Insert Column Right" onClick={() => handleTableAction(() => tableActions.insertColumn(false))} />
+                        <MenuItem icon={<Trash size={16}/>} label="Delete Column" onClick={() => handleTableAction(tableActions.deleteColumn)} />
+                        <MenuDivider/>
+                    </>
+                )}
+                <MenuItem icon={<Pilcrow size={16}/>} label={`${hasHeaderRow ? 'Disable' : 'Enable'} Header Row`} onClick={() => handleTableAction(tableActions.toggleColumnHeader)} />
+                <MenuItem icon={<CaseUpper size={16}/>} label={`${hasRowHeaders ? 'Disable' : 'Enable'} Row Headers`} onClick={() => handleTableAction(tableActions.toggleRowHeader)} />
+                <MenuDivider/>
+                <MenuItem icon={<Trash2 size={16}/>} label="Delete Table" danger onClick={() => handleTableAction(tableActions.deleteTable)} />
+            </motion.div>
+        );
+    };
+
+
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <AnimatePresence>
                 {isSlashMenuOpen && <SlashCommandMenu />}
             </AnimatePresence>
+            <TablePopupMenu/>
             <Header title={entry ? 'Edit Entry' : 'New Entry'} showBackButton onBack={navigateBack} rightAction={HeaderActions} />
              <AnimatePresence>
                 {isOptionsMenuOpen && (
@@ -1418,7 +1660,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                 >
                                     <h3 className="text-lg font-semibold text-center mb-3">Aura AI Assistant</h3>
                                     <div className="space-y-2">
-                                        <AiTaskButton icon={<Wand2 size={20}/>} title="Organize & Refine" description="Automatically structure, format, and proofread." task="IMPROVE" />
+                                        <AiTaskButton icon={<Wand2 size={20}/>} title="Organize & Refine" description="Structure, format, proofread, and create tables." task="IMPROVE" />
                                         <AiTaskButton icon={<BookText size={20}/>} title="Continue Writing" description="Generate what comes next" task="CONTINUE" />
                                         <AiTaskButton icon={<BrainCircuit size={20}/>} title="Summarize" description="Get the key points" task="SUMMARIZE" />
                                         <AiTaskButton icon={<Sparkles size={20}/>} title="Generate from Prompt" description="Create a new entry from an idea" task="GENERATE" requiresInput/>
@@ -1442,6 +1684,53 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 .journal-editor-container li { margin-bottom: 0.25rem; }
                 .journal-editor-container hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 1.5rem 0; }
                 html.light .journal-editor-container hr { border-top-color: rgba(0, 0, 0, 0.1); }
+                .journal-editor-container table.journal-table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 1rem 0; 
+                    border-radius: 0.75rem;
+                    overflow: hidden;
+                    border: 1px solid rgba(128, 128, 128, 0.2);
+                }
+                .journal-editor-container table.journal-table th, .journal-editor-container table.journal-table td { 
+                    border: 1px solid rgba(128, 128, 128, 0.2); 
+                    padding: 0.75rem;
+                    text-align: left; 
+                    min-height: 1.5rem;
+                    position: relative;
+                }
+                .journal-editor-container table.journal-table th { 
+                    font-weight: 600; 
+                }
+                .journal-editor-container table.journal-table .table-selection-highlight {
+                    background-color: hsla(var(--accent-dark), 0.2);
+                }
+                html.light .journal-editor-container table.journal-table .table-selection-highlight {
+                     background-color: hsla(var(--accent-light), 0.2);
+                }
+                .journal-editor-container table.journal-table.row-headers th:first-child {
+                    font-weight: 600;
+                }
+                html.dark .journal-editor-container table.journal-table {
+                     border-color: rgba(128, 128, 128, 0.2);
+                }
+                html.dark .journal-editor-container table.journal-table th, html.dark .journal-editor-container table.journal-table td { 
+                    border-color: rgba(128, 128, 128, 0.2); 
+                    color: #e5e7eb;
+                }
+                html.dark .journal-editor-container table.journal-table th { 
+                    background-color: rgba(128, 128, 128, 0.15); 
+                }
+                html.light .journal-editor-container table.journal-table {
+                    border-color: rgba(0, 0, 0, 0.1);
+                }
+                html.light .journal-editor-container table.journal-table th, html.light .journal-editor-container table.journal-table td { 
+                    border-color: rgba(0, 0, 0, 0.1); 
+                    color: #1f2937;
+                }
+                html.light .journal-editor-container table.journal-table th { 
+                    background-color: rgba(0, 0, 0, 0.04); 
+                }
                 .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
                 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
                 mark.search-highlight { background-color: #facc15; color: black; border-radius: 3px; }

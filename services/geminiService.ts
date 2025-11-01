@@ -134,6 +134,7 @@ export const processJournalWithAI = async (
     -   Use clean HTML for formatting (e.g., <p>, <h2>, <strong>, <em>, <ul>, <li>). Ensure proper paragraph breaks with <p> tags.
     -   If the content is a Q&A, wrap the questions in <strong> tags.
     -   Insert <hr> tags where you see a clear thematic shift or separation of ideas.
+    -   **Tables:** If the content compares items, lists pros and cons, or presents data that would benefit from a tabular format, structure it into a simple HTML <table> with a class="journal-table". Use <thead>, <tbody>, <th>, and <td> tags appropriately.
 4.  **Structure:** Organize the content logically.
 5.  **Voice:** Preserve the original author's voice and tone.
 6.  **Output:** Return ONLY the improved and fully structured HTML content. Do not include any introductory phrases like "Here is the improved version:".

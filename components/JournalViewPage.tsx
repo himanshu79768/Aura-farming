@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreVertical, Edit, Share2, Trash2, FileText, Copy, FileImage, FileQuestion, Link as LinkIcon } from 'lucide-react';
@@ -395,6 +394,42 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 .journal-view-content li { margin-bottom: 0.25rem; }
                 .journal-view-content hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 1.5rem 0; }
                 html.light .journal-view-content hr { border-top-color: rgba(0, 0, 0, 0.1); }
+                .journal-view-content table.journal-table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 1rem 0; 
+                    border-radius: 0.75rem;
+                    overflow: hidden;
+                    border: 1px solid rgba(128, 128, 128, 0.2);
+                }
+                .journal-view-content table.journal-table th, .journal-view-content table.journal-table td { 
+                    border: 1px solid rgba(128, 128, 128, 0.2); 
+                    padding: 0.75rem;
+                    text-align: left;
+                }
+                .journal-view-content table.journal-table th { 
+                    font-weight: 600; 
+                }
+                html.dark .journal-view-content table.journal-table {
+                    border-color: rgba(128, 128, 128, 0.2);
+                }
+                html.dark .journal-view-content table.journal-table th, html.dark .journal-view-content table.journal-table td {
+                    border-color: rgba(128, 128, 128, 0.2); 
+                    color: #e5e7eb;
+                }
+                html.dark .journal-view-content table.journal-table th {
+                    background-color: rgba(128, 128, 128, 0.15); 
+                }
+                html.light .journal-view-content table.journal-table {
+                    border-color: rgba(0, 0, 0, 0.1);
+                }
+                html.light .journal-view-content table.journal-table th, html.light .journal-view-content table.journal-table td { 
+                    border-color: rgba(0, 0, 0, 0.1); 
+                    color: #1f2937;
+                }
+                html.light .journal-view-content table.journal-table th { 
+                    background-color: rgba(0, 0, 0, 0.04); 
+                }
                 .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
                 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
                 .journal-view-content .custom-highlight, .journal-view-content [data-highlight="true"] {
