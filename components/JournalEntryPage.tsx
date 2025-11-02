@@ -73,7 +73,8 @@ const compressImage = (file: File, options: { quality?: number; maxWidth?: numbe
                 canvas.toBlob(
                     (blob) => {
                         if (blob) {
-                            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                            const fileName = file.name || `image-${Date.now()}.jpg`;
+                            const newFile = new File([blob], fileName.replace(/\.[^/.]+$/, ".jpg"), {
                                 type: 'image/jpeg',
                                 lastModified: Date.now(),
                             });
@@ -848,6 +849,48 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [isDesktop, currentEntry, handleDuplicate, handleDelete, handleLinkSession]);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+
+        const handlePaste = async (event: ClipboardEvent) => {
+            const items = event.clipboardData?.items;
+            if (!items) return;
+
+            let imageFile: File | null = null;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.startsWith('image/')) {
+                    imageFile = items[i].getAsFile();
+                    break;
+                }
+            }
+            
+            if (imageFile) {
+                event.preventDefault();
+                setIsUploading(true);
+                try {
+                    const compressedFile = await compressImage(imageFile, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+                    const dataUrl = await fileToDataURL(compressedFile);
+
+                    const imageTag = `<figure class="generated-image"><img src="${dataUrl}" alt="Pasted image" /><figcaption><em>Pasted image</em></figcaption></figure><p><br></p>`;
+                    document.execCommand('insertHTML', false, imageTag);
+                    handleContentChange();
+                } catch (error) {
+                    console.error("Error processing pasted image:", error);
+                    showAlertModal({ title: "Processing Failed", message: "Could not process the pasted image." });
+                } finally {
+                    setIsUploading(false);
+                }
+            }
+        };
+
+        editor.addEventListener('paste', handlePaste);
+
+        return () => {
+            editor.removeEventListener('paste', handlePaste);
+        };
+    }, [isLocked, showAlertModal, handleContentChange]);
     
     const saveSelection = useCallback(() => {
         const selection = window.getSelection();
