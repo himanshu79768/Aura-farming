@@ -7,10 +7,11 @@ import { useAppContext } from '../App';
 import Header from './Header';
 import { ChatMessage } from '../types';
 import AttachmentTypeModal from './AttachmentTypeModal';
+import OverscrollContainer from './OverscrollContainer';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-const GEMINI_API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
+// FIX: Removed hardcoded API key. API key should be sourced from environment variables as per guidelines.
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -244,7 +245,8 @@ const AuraAiPage: React.FC = () => {
             const fetchAndQueue = async (sentence: string) => {
                 if (!sentence.trim()) return;
                 
-                const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+                // FIX: Use process.env.API_KEY for the API key as per guidelines.
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 const response = await ai.models.generateContent({
                     model: "gemini-2.5-flash-preview-tts",
                     contents: [{ parts: [{ text: sentence }] }],
@@ -280,7 +282,8 @@ const AuraAiPage: React.FC = () => {
 
     const initializeChat = useCallback(() => {
         try {
-            const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+            // FIX: Use process.env.API_KEY for the API key as per guidelines.
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
@@ -531,78 +534,80 @@ const AuraAiPage: React.FC = () => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Aura AI" showBackButton onBack={navigateBack} rightAction={NewChatButton} />
-            <div ref={scrollRef} className="flex-grow w-full overflow-y-auto p-4 space-y-6">
-                {messages.map((msg, index) => (
-                    <div
-                        key={msg.id}
-                        className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-                    >
-                        <motion.div
-                            className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, delay: 0.1 }}
+            <OverscrollContainer ref={scrollRef} className="flex-grow w-full overflow-y-auto">
+                <div className="p-4 space-y-6">
+                    {messages.map((msg, index) => (
+                        <div
+                            key={msg.id}
+                            className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                         >
-                             {msg.role === 'model' && (
-                                <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-purple-500/10 text-purple-400">
-                                    <Sparkles size={18} />
-                                </div>
-                            )}
-                            <div
-                                className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-light-primary dark:bg-dark-primary text-white rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass rounded-bl-lg'}`}
-                            >
-                                {msg.role === 'model' ? 
-                                    (
-                                        <div className={isLoading && index === messages.length - 1 ? 'typing-cursor' : ''}>
-                                            {msg.parts[0] && 'text' in msg.parts[0] ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
-                                        </div>
-                                    ) : 
-                                    (
-                                        <div className="flex flex-col gap-2">
-                                            {msg.parts.map((part, i) => {
-                                                if ('inlineData' in part && typeof part.inlineData === 'object') {
-                                                    const { mimeType, data, name } = part.inlineData;
-                                                    const fullDataUrl = `data:${mimeType};base64,${data}`;
-                                                    if (mimeType?.startsWith('image/')) {
-                                                        return <img key={i} src={fullDataUrl} alt={name || "User upload"} className="rounded-lg max-w-full h-auto max-h-64 object-contain" />;
-                                                    } else {
-                                                        return (
-                                                            <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg">
-                                                                <AttachmentIcon type={mimeType || ''} />
-                                                                <span className="truncate text-sm font-medium">{name || 'Attached File'}</span>
-                                                            </div>
-                                                        );
-                                                    }
-                                                }
-                                                if ('text' in part && part.text) {
-                                                    return <div key={i} style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{part.text}</div>;
-                                                }
-                                                return null;
-                                            })}
-                                        </div>
-                                    )
-                                }
-                            </div>
-                            {msg.role === 'user' && (
-                                <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400">
-                                    <UserIcon size={18} />
-                                </div>
-                            )}
-                        </motion.div>
-                        
-                        {msg.role === 'model' && !(isLoading && index === messages.length - 1) && msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text && (
-                            <motion.div 
-                                className="flex flex-col items-start gap-2 mt-2 ml-11"
-                                initial={{ opacity: 0, y: -10 }}
+                            <motion.div
+                                className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.2 }}
+                                transition={{ duration: 0.3, delay: 0.1 }}
                             >
-                                <ActionButtons message={msg} />
+                                {msg.role === 'model' && (
+                                    <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-purple-500/10 text-purple-400">
+                                        <Sparkles size={18} />
+                                    </div>
+                                )}
+                                <div
+                                    className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-light-primary dark:bg-dark-primary text-white rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass rounded-bl-lg'}`}
+                                >
+                                    {msg.role === 'model' ? 
+                                        (
+                                            <div className={isLoading && index === messages.length - 1 ? 'typing-cursor' : ''}>
+                                                {msg.parts[0] && 'text' in msg.parts[0] ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
+                                            </div>
+                                        ) : 
+                                        (
+                                            <div className="flex flex-col gap-2">
+                                                {msg.parts.map((part, i) => {
+                                                    if ('inlineData' in part && typeof part.inlineData === 'object') {
+                                                        const { mimeType, data, name } = part.inlineData;
+                                                        const fullDataUrl = `data:${mimeType};base64,${data}`;
+                                                        if (mimeType?.startsWith('image/')) {
+                                                            return <img key={i} src={fullDataUrl} alt={name || "User upload"} className="rounded-lg max-w-full h-auto max-h-64 object-contain" />;
+                                                        } else {
+                                                            return (
+                                                                <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg">
+                                                                    <AttachmentIcon type={mimeType || ''} />
+                                                                    <span className="truncate text-sm font-medium">{name || 'Attached File'}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                    }
+                                                    if ('text' in part && part.text) {
+                                                        return <div key={i} style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{part.text}</div>;
+                                                    }
+                                                    return null;
+                                                })}
+                                            </div>
+                                        )
+                                    }
+                                </div>
+                                {msg.role === 'user' && (
+                                    <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400">
+                                        <UserIcon size={18} />
+                                    </div>
+                                )}
                             </motion.div>
-                        )}
-                    </div>
-                ))}
-            </div>
+                            
+                            {msg.role === 'model' && !(isLoading && index === messages.length - 1) && msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text && (
+                                <motion.div 
+                                    className="flex flex-col items-start gap-2 mt-2 ml-11"
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 }}
+                                >
+                                    <ActionButtons message={msg} />
+                                </motion.div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </OverscrollContainer>
             <div className="p-4 border-t border-white/10">
                  <AnimatePresence>
                     {attachment && (

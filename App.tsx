@@ -32,6 +32,8 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import GlobalSearch from './components/GlobalSearch';
 import AuraCheckinPage from './components/AuraCheckinPage';
 import AuraAiPage from './components/AuraAiPage';
+import { playUISound, setSoundEnabled, SoundType } from './services/soundService';
+
 
 const { 
     auth, db, signInAnonymously, signOut, onAuthStateChanged, ref, onValue, 
@@ -218,7 +220,7 @@ interface AppContextType {
   quotes: Quote[];
   setQuotes: (quotes: Quote[]) => void;
   favoriteQuotes: string[];
-  toggleFavorite: (id: string) => void;
+  toggleFavorite: (id: string, isFavoriting: boolean) => void;
   userProfile: UserProfile;
   updateUserName: (newName: string) => Promise<{ success: boolean; message?: string }>;
   journalEntries: JournalEntry[];
@@ -229,7 +231,8 @@ interface AppContextType {
   duplicateJournalEntry: (id: string) => Promise<boolean>;
   focusHistory: FocusSession[];
   addFocusSession: (durationInSeconds: number, name?: string) => void;
-  playSound: (sound: string) => void;
+  playFocusSound: (sound: string) => void;
+  playUISound: (sound: SoundType) => void;
   vibrate: (style?: 'light' | 'medium' | 'heavy') => void;
   navigateTo: (view: View, params?: any) => void;
   navigateBack: () => void;
@@ -294,6 +297,7 @@ const DEFAULT_SETTINGS: Settings = {
     gradientIntensity: 75,
     accentColor: 'blue',
     speakAuraAI: false,
+    buttonSounds: true,
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -408,6 +412,7 @@ export default function App() {
                 gradientIntensity: data.gradientIntensity ?? 75,
                 accentColor: data.accentColor || 'blue',
                 speakAuraAI: data.speakAuraAI ?? false,
+                buttonSounds: data.buttonSounds ?? true,
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
@@ -442,14 +447,20 @@ export default function App() {
         navigator.vibrate(intensity);
     }
   }, [settings.hapticIntensity]);
+
+  useEffect(() => {
+    setSoundEnabled(settings.buttonSounds ?? true);
+  }, [settings.buttonSounds]);
   
   const toggleImmersive = useCallback(() => {
       vibrate();
+      playUISound('tap');
       setIsImmersive(prev => !prev);
   }, [vibrate, setIsImmersive]);
 
   const toggleSearch = useCallback(() => {
     vibrate();
+    playUISound('tap');
     setIsSearchOpen(p => !p);
   }, [vibrate]);
 
@@ -510,6 +521,7 @@ export default function App() {
     
     try {
       await update(ref(db), updates);
+      playUISound('success');
       return { success: true };
     } catch (error) {
       console.error("Error updating username:", error);
@@ -541,6 +553,7 @@ export default function App() {
                 
                 setShowIntro(true);
             }
+            playUISound('success');
         } catch (error) {
             console.error("Error during login by name:", error);
             showAlertModal({ title: "Login Failed", message: "An error occurred during login. Please try again." });
@@ -550,7 +563,8 @@ export default function App() {
     }, [currentUser, setMasterUid, showAlertModal]);
 
     const logoutUser = useCallback(async () => {
-        vibrate();
+        vibrate('medium');
+        playUISound('delete');
         await signOut(auth);
         setCurrentUser(null);
         setMasterUid(null);
@@ -578,10 +592,10 @@ export default function App() {
     root.style.setProperty('--accent-dark', color.dark);
   }, [settings.accentColor]);
 
-  const playSound = useCallback((sound: string) => settings.sound && console.log(`Playing sound: ${sound}`), [settings.sound]);
+  const playFocusSound = useCallback((sound: string) => settings.sound && console.log(`Playing sound: ${sound}`), [settings.sound]);
 
   const addFocusSession = useCallback((durationInSeconds: number, name?: string) => {
-    playSound(settings.focusSound);
+    playFocusSound(settings.focusSound);
     vibrate('heavy');
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return;
@@ -591,7 +605,7 @@ export default function App() {
       date: new Date().toISOString(), duration: durationInSeconds, name: name || '', createdAt: serverTimestamp()
     });
     updateUserData({ completedSessions: (userProfile.completedSessions || 0) + 1 });
-  }, [currentUser, masterUid, playSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
+  }, [currentUser, masterUid, playFocusSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
 
   useEffect(() => {
     if (!timerState.isActive || timerState.endTime <= 0) {
@@ -654,23 +668,28 @@ export default function App() {
 
   const navigateBack = useCallback(() => {
     if (modalStack.length > 0) {
+        vibrate();
+        playUISound('tap');
         const lastModal = modalStack[modalStack.length - 1];
         setForwardStack(stack => [lastModal, ...stack]); // Add to forward history
         setModalStack(stack => stack.slice(0, -1));
     }
-  }, [modalStack]);
+  }, [modalStack, vibrate]);
 
   const navigateForward = useCallback(() => {
     if (forwardStack.length > 0) {
+        vibrate();
+        playUISound('tap');
         const [nextView, ...restOfStack] = forwardStack;
         setForwardStack(restOfStack);
         setModalStack(stack => [...stack, nextView]);
     }
-  }, [forwardStack]);
+  }, [forwardStack, vibrate]);
   
   const navigateToStackIndex = useCallback((index: number) => {
     if (index < modalStack.length - 1) { // Only navigate if not clicking the last item
         vibrate();
+        playUISound('tap');
         const itemsToMove = modalStack.slice(index + 1);
         setForwardStack(stack => [...itemsToMove.reverse(), ...stack]);
         
@@ -682,10 +701,11 @@ export default function App() {
     }
   }, [modalStack, vibrate]);
 
-  const toggleFavorite = useCallback((id: string) => {
+  const toggleFavorite = useCallback((id: string, isFavoriting: boolean) => {
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return;
     vibrate();
+    playUISound(isFavoriting ? 'success' : 'delete');
     const favRef = ref(db, `users/${dataPathUid}/favoriteQuotes/${id}`);
     if (favoriteQuotes.includes(id)) {
         remove(favRef);
@@ -701,6 +721,7 @@ export default function App() {
         const journalRef = ref(db, `users/${dataPathUid}/journalEntries`);
         const newEntryRef = push(journalRef);
         await set(newEntryRef, { ...entry, createdAt: serverTimestamp() });
+        playUISound('success');
         return newEntryRef.key;
     } catch (error) {
         console.error("Error adding journal entry:", error);
@@ -736,6 +757,7 @@ export default function App() {
     try {
         const entryRef = ref(db, `users/${dataPathUid}/journalEntries/${id}`);
         await remove(entryRef);
+        playUISound('delete');
         return true;
     } catch (error) {
         console.error("Error deleting journal entry:", error);
@@ -754,6 +776,7 @@ export default function App() {
                 updates[`/users/${dataPathUid}/journalEntries/${id}`] = null;
             });
             await update(ref(db), updates);
+            playUISound('delete');
             return true;
         } catch (error) {
             console.error("Error deleting multiple journal entries:", error);
@@ -789,6 +812,7 @@ export default function App() {
 
   const selectTimerDuration = useCallback((minutes: number) => {
       vibrate();
+      playUISound('tap');
       const newDuration = minutes * 60;
       setTimerState({ duration: newDuration, endTime: 0, isActive: false });
       setTimeLeft(newDuration);
@@ -797,6 +821,7 @@ export default function App() {
 
   const toggleTimer = useCallback(() => {
     if (isTimerFinished) { resetTimer(false); return; }
+    playUISound('tap');
     if (timerState.isActive) {
       setTimerState(s => ({ ...s, isActive: false }));
     } else if (timeLeft > 0) {
@@ -805,7 +830,10 @@ export default function App() {
   }, [isTimerFinished, timerState.isActive, timeLeft]);
 
   const resetTimer = useCallback((vibrateFeedback = true) => {
-    if (vibrateFeedback) vibrate();
+    if (vibrateFeedback) {
+        vibrate();
+        playUISound('delete');
+    }
     setTimerState(s => ({ ...s, endTime: 0, isActive: false }));
     setTimeLeft(timerState.duration);
     setIsTimerFinished(false);
@@ -839,7 +867,7 @@ export default function App() {
   const appContextValue = useMemo(() => ({
     mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
+    focusHistory, addFocusSession, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
     timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
     focusSearchQuery, setFocusSearchQuery,
@@ -854,7 +882,7 @@ export default function App() {
   }), [
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, playSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
+    focusHistory, addFocusSession, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
     auraChatHistory, updateAuraChatHistory, clearAuraChatHistory,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, sessionName,

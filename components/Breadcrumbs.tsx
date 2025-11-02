@@ -82,6 +82,7 @@ const Breadcrumbs: React.FC = () => {
                             disabled={isLast}
                             className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${isLast ? 'text-light-text dark:text-dark-text' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}
                             whileTap={isLast ? {} : { scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                         >
                             {icon}
                             <span>{title}</span>

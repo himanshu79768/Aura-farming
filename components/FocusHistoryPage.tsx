@@ -5,6 +5,7 @@ import { useAppContext } from '../App';
 import Header from './Header';
 import SearchBar from './SearchBar';
 import { FocusSession } from '../types';
+import OverscrollContainer from './OverscrollContainer';
 
 interface SummaryCardProps {
     icon: React.ReactNode;
@@ -162,7 +163,7 @@ const FocusHistoryPage: React.FC = () => {
                     setSearchQuery={setFocusSearchQuery}
                 />
             </div>
-            <div className="flex-grow w-full overflow-y-auto">
+            <OverscrollContainer className="flex-grow w-full overflow-y-auto">
                 <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4">
                     {focusHistory.length === 0 ? (
                         <motion.div
@@ -228,7 +229,7 @@ const FocusHistoryPage: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
+            </OverscrollContainer>
         </div>
     );
 };

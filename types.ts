@@ -75,6 +75,7 @@ export interface Settings {
   gradientIntensity: number;
   accentColor?: AccentColor;
   speakAuraAI?: boolean;
+  buttonSounds?: boolean;
 }
 
 export interface UserData extends Settings, UserProfile {

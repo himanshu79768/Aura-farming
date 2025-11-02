@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Home, Timer, MessageSquare, User, BookOpen } from 'lucide-react';
 import { View } from '../types';
+import { useAppContext } from '../App';
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -11,22 +12,32 @@ interface NavItemProps {
 }
 
 const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => {
+  const { vibrate, playUISound } = useAppContext();
+  
+  const handleClick = () => {
+    vibrate();
+    playUISound('tap');
+    onClick();
+  }
+
   return (
-    <button
-      onClick={onClick}
-      className={`relative flex items-center justify-center w-16 h-16 rounded-full transition-colors duration-300 tappable ${isActive ? 'text-light-accent dark:text-dark-accent' : 'text-light-text-secondary dark:text-dark-text-secondary hover:text-light-accent dark:hover:text-dark-accent'}`}
+    <motion.button
+      onClick={handleClick}
+      className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-full transition-colors duration-300 tappable ${isActive ? 'text-light-accent dark:text-dark-accent' : 'text-light-text-secondary dark:text-dark-text-secondary hover:text-light-accent dark:hover:text-dark-accent'}`}
       aria-label={`Go to ${label}`}
+      whileTap={{ scale: 0.9 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
     >
       {icon}
       {isActive && (
         <motion.div
           layoutId="active-nav-indicator"
-          className="absolute bottom-0 h-1 w-8 bg-light-accent dark:bg-dark-accent rounded-full"
+          className="absolute bottom-1.5 h-1 w-6 bg-light-accent dark:bg-dark-accent rounded-full"
           initial={false}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         />
       )}
-    </button>
+    </motion.button>
   );
 };
 

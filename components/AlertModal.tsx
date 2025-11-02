@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TriangleAlert, CheckCircle } from 'lucide-react';
+import { useAppContext } from '../App';
 
 interface AlertModalProps {
   isOpen: boolean;
@@ -19,6 +20,13 @@ const AlertModal: React.FC<AlertModalProps> = ({
   closeText = 'OK',
   type = 'alert',
 }) => {
+  const { vibrate, playUISound } = useAppContext();
+
+  const handleClose = () => {
+    vibrate();
+    playUISound(type === 'success' ? 'success' : 'tap');
+    onClose();
+  };
 
   const iconConfig = {
     alert: {
@@ -38,7 +46,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={onClose}
+          onClick={handleClose}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -63,12 +71,14 @@ const AlertModal: React.FC<AlertModalProps> = ({
               {message}
             </p>
             <div className="flex flex-col gap-3">
-              <button
-                onClick={onClose}
-                className="w-full py-3 text-lg font-semibold bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full shadow-md transition-transform hover:scale-105 active:scale-95"
+              <motion.button
+                onClick={handleClose}
+                className="w-full py-3 text-lg font-semibold bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full shadow-md"
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 {closeText}
-              </button>
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>

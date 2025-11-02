@@ -13,8 +13,16 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ icon, label, value, onClick }) => {
+  const { vibrate, playUISound } = useAppContext();
   const commonClasses = "flex items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl w-full text-left";
-  const buttonClasses = "transition-transform duration-200 ease-in-out";
+  
+  const handlePress = () => {
+    if(onClick) {
+        vibrate();
+        playUISound('tap');
+        onClick();
+    }
+  };
 
   const content = (
     <>
@@ -31,10 +39,11 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, onClick }) => {
 
   return onClick ? (
     <motion.button
-      onClick={onClick}
-      className={`${commonClasses} ${buttonClasses}`}
+      onClick={handlePress}
+      className={commonClasses}
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
       {content}
     </motion.button>
@@ -45,7 +54,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, onClick }) => {
 
 
 const ProfilePage: React.FC = () => {
-    const { userProfile, updateUserName, favoriteQuotes, navigateTo, focusHistory, logoutUser, showAlertModal } = useAppContext();
+    const { userProfile, updateUserName, favoriteQuotes, navigateTo, focusHistory, logoutUser, showAlertModal, vibrate, playUISound } = useAppContext();
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(userProfile.name);
 
@@ -70,6 +79,18 @@ const ProfilePage: React.FC = () => {
         } else {
             setName(userProfile.name);
         }
+    };
+    
+    const handleNavigate = (view: View) => {
+        vibrate();
+        playUISound('tap');
+        navigateTo(view);
+    };
+    
+    const handleEditClick = () => {
+        vibrate();
+        playUISound('tap');
+        setIsEditing(true);
     };
 
     return (
@@ -96,9 +117,10 @@ const ProfilePage: React.FC = () => {
                          <div className="flex items-center gap-2">
                             <h1 className="text-3xl font-bold">{userProfile.name || 'User'}</h1>
                             <motion.button 
-                                onClick={() => setIsEditing(true)} 
+                                onClick={handleEditClick} 
                                 className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10"
                                 whileTap={{ scale: 0.9 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 17 }}
                                 aria-label="Edit name"
                             >
                                 <Edit className="w-5 h-5" />
@@ -109,33 +131,37 @@ const ProfilePage: React.FC = () => {
                 </div>
                 
                 <div className="my-8 grid grid-cols-2 gap-4">
-                    <StatCard icon={<Timer className="w-5 h-5"/>} label="Sessions" value={userProfile.completedSessions} onClick={() => navigateTo('focusHistory')} />
-                    <StatCard icon={<Heart className="w-5 h-5"/>} label="Favorites" value={favoriteQuotes.length} onClick={() => navigateTo('favorites')} />
+                    <StatCard icon={<Timer className="w-5 h-5"/>} label="Sessions" value={userProfile.completedSessions} onClick={() => handleNavigate('focusHistory')} />
+                    <StatCard icon={<Heart className="w-5 h-5"/>} label="Favorites" value={favoriteQuotes.length} onClick={() => handleNavigate('favorites')} />
                     <div className="col-span-2">
-                      <StatCard icon={<Clock className="w-5 h-5"/>} label="Total Focus Time" value={`${totalFocusMinutes} min`} onClick={() => navigateTo('focusHistory')} />
+                      <StatCard icon={<Clock className="w-5 h-5"/>} label="Total Focus Time" value={`${totalFocusMinutes} min`} onClick={() => handleNavigate('focusHistory')} />
                     </div>
                 </div>
 
                 <div className="space-y-4">
-                    <button 
-                        onClick={() => navigateTo('settings')}
+                    <motion.button 
+                        onClick={() => handleNavigate('settings')}
                         className="flex justify-between items-center w-full p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 text-left"
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
                     >
                         <div className="flex items-center gap-3">
                             <SettingsIcon className="w-5 h-5" />
                             <span className="font-medium">Settings</span>
                         </div>
                         <ChevronRight className="w-5 h-5 text-light-text-secondary dark:text-dark-text-secondary" />
-                    </button>
-                    <button 
+                    </motion.button>
+                    <motion.button 
                         onClick={logoutUser}
                         className="flex justify-between items-center w-full p-4 bg-red-500/10 dark:bg-red-500/10 backdrop-blur-md rounded-2xl border border-red-500/20 text-red-400"
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
                     >
                         <div className="flex items-center gap-3">
                             <LogOut className="w-5 h-5" />
                             <span className="font-medium">Logout</span>
                         </div>
-                    </button>
+                    </motion.button>
                 </div>
             </div>
         </div>

@@ -4,6 +4,7 @@ import { BarChart2, TrendingUp } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { ACCENT_COLORS } from '../constants';
+import OverscrollContainer from './OverscrollContainer';
 
 // Helper function to format date for grouping (YYYY-MM-DD)
 const getDayKey = (date: Date) => date.toISOString().split('T')[0];
@@ -87,7 +88,7 @@ const FocusAnalyticsPage: React.FC = () => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Focus Analytics" showBackButton onBack={navigateBack} />
-            <div className="flex-grow w-full overflow-y-auto">
+            <OverscrollContainer className="flex-grow w-full overflow-y-auto">
                 <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 pt-4 pb-24">
                     {focusSearchQuery && (
                         <p className="text-center text-sm text-light-text-secondary dark:text-dark-text-secondary mb-4">
@@ -172,7 +173,7 @@ const FocusAnalyticsPage: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
+            </OverscrollContainer>
         </div>
     );
 };

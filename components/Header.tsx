@@ -30,10 +30,11 @@ const moodIcons: Record<Mood, React.ReactNode> = {
 const moodCycle: Mood[] = [Mood.Calm, Mood.Focus, Mood.Energize];
 
 const MoodSelector: React.FC = () => {
-    const { mood, setMood, vibrate } = useAppContext();
+    const { mood, setMood, vibrate, playUISound } = useAppContext();
 
     const changeMood = () => {
         vibrate();
+        playUISound('tap');
         const currentIndex = moodCycle.indexOf(mood);
         const nextIndex = (currentIndex + 1) % moodCycle.length;
         setMood(moodCycle[nextIndex]);
@@ -44,6 +45,7 @@ const MoodSelector: React.FC = () => {
             onClick={changeMood}
             className="flex items-center gap-2 px-3 py-1.5 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-full border border-white/20 dark:border-white/10"
             whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
             aria-label={`Change mood, current is ${mood}`}
         >
             <AnimatePresence mode="wait" initial={false}>
@@ -64,7 +66,7 @@ const MoodSelector: React.FC = () => {
 }
 
 const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, leftAction, rightAction, showCenteredMoodSelector = false, titleClassName }) => {
-    const { navigateBack, navigateForward, canGoBack, canGoForward, isImmersive, toggleImmersive, toggleSearch } = useAppContext();
+    const { navigateBack, navigateForward, canGoBack, canGoForward, isImmersive, toggleImmersive, toggleSearch, vibrate, playUISound } = useAppContext();
     const measureRef = useRef<HTMLHeadingElement>(null);
     const [effectiveTitleClass, setEffectiveTitleClass] = useState(titleClassName || 'text-lg');
 
@@ -88,12 +90,21 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
         return () => window.removeEventListener('resize', checkWrap);
     }, [title, titleClassName]);
 
+    const handleBackPress = () => {
+        if (onBack) {
+            vibrate();
+            playUISound('tap');
+            onBack();
+        }
+    }
+
     const ImmersiveButton = (
         <motion.button
           onClick={toggleImmersive}
           className="p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5"
           aria-label={isImmersive ? "Exit immersive mode" : "Enter immersive mode"}
           whileTap={{ scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 400, damping: 17 }}
           key="immersive-button"
         >
             <AnimatePresence mode="wait" initial={false}>
@@ -116,6 +127,7 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
           className="p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5"
           aria-label="Search"
           whileTap={{ scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 400, damping: 17 }}
           key="search-button"
         >
             <SearchIcon size={20} />
@@ -130,11 +142,13 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-0">
                     {leftAction ? leftAction : (showBackButton && (
                         <motion.button 
-                            onClick={onBack} 
+                            onClick={handleBackPress} 
                             className="flex items-center gap-1 text-light-primary dark:text-dark-primary"
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -10 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
                         >
                             <ChevronLeft className="w-6 h-6" />
                             <span className="text-lg">Back</span>
@@ -176,6 +190,8 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                                     disabled={!canGoBack}
                                     className="flex items-center p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
                                     aria-label="Back"
+                                    whileTap={{ scale: 0.9 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
                                 >
                                     <ChevronLeft className="w-5 h-5" />
                                 </motion.button>
@@ -184,6 +200,8 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                                     disabled={!canGoForward}
                                     className="flex items-center p-2 rounded-full text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
                                     aria-label="Forward"
+                                    whileTap={{ scale: 0.9 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
                                 >
                                     <ChevronRight className="w-5 h-5" />
                                 </motion.button>

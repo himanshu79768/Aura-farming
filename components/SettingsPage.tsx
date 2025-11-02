@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette, Mic } from 'lucide-react';
+import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette, Mic, Volume2 } from 'lucide-react';
 import { Theme, Mood, FocusSound, AppIcon, HapticIntensity, AccentColor } from '../types';
 import { useAppContext } from '../App';
 import Header from './Header';
@@ -14,12 +14,18 @@ interface SegmentedControlProps<T extends string> {
 }
 
 const SegmentedControl = <T extends string>({ options, selectedValue, onChange, layoutId }: SegmentedControlProps<T>) => {
+  const { vibrate, playUISound } = useAppContext();
+  const handleChange = (value: T) => {
+    vibrate();
+    playUISound('tap');
+    onChange(value);
+  };
   return (
     <div className="flex justify-around items-center bg-black/5 dark:bg-white/5 p-1 rounded-full w-full">
       {options.map(({ value, label }) => (
         <button 
             key={value} 
-            onClick={() => onChange(value)} 
+            onClick={() => handleChange(value)} 
             className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${selectedValue !== value ? 'hover:bg-black/5 dark:hover:bg-white/5' : ''}`}
         >
           <span className="flex items-center justify-center gap-1.5">{label}</span>
@@ -34,16 +40,29 @@ const MemoizedSegmentedControl = React.memo(SegmentedControl) as typeof Segmente
 
 
 const SettingsPage: React.FC = () => {
-    const { settings, setSettings, mood, setMood, navigateBack } = useAppContext();
+    const { settings, setSettings, mood, setMood, navigateBack, vibrate, playUISound } = useAppContext();
     
     const handleThemeChange = useCallback((value: Theme) => setSettings(s => ({ ...s, theme: value })), [setSettings]);
-    const handleAccentChange = useCallback((value: AccentColor) => setSettings(s => ({ ...s, accentColor: value })), [setSettings]);
+    const handleAccentChange = useCallback((value: AccentColor) => {
+        vibrate();
+        playUISound('tap');
+        setSettings(s => ({ ...s, accentColor: value }));
+    }, [setSettings, vibrate, playUISound]);
     const handleAppIconChange = useCallback((value: AppIcon) => setSettings(s => ({ ...s, appIcon: value })), [setSettings]);
     const handleGradientChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSettings(s => ({ ...s, gradientIntensity: Number(e.target.value) })), [setSettings]);
     const handleFocusSoundChange = useCallback((value: FocusSound) => setSettings(s => ({ ...s, focusSound: value })), [setSettings]);
     const handleHapticChange = useCallback((value: HapticIntensity) => setSettings(s => ({ ...s, hapticIntensity: value })), [setSettings]);
     const handleMoodChange = useCallback((value: Mood) => setMood(value), [setMood]);
-    const handleSpeakAuraAIChange = useCallback(() => setSettings(s => ({ ...s, speakAuraAI: !s.speakAuraAI })), [setSettings]);
+    const handleSpeakAuraAIChange = useCallback(() => {
+        vibrate();
+        playUISound(settings.speakAuraAI ? 'toggle_off' : 'toggle_on');
+        setSettings(s => ({ ...s, speakAuraAI: !s.speakAuraAI }));
+    }, [setSettings, vibrate, playUISound, settings.speakAuraAI]);
+    const handleButtonSoundsChange = useCallback(() => {
+        vibrate();
+        playUISound(settings.buttonSounds ? 'toggle_off' : 'toggle_on');
+        setSettings(s => ({ ...s, buttonSounds: !s.buttonSounds }));
+    }, [setSettings, vibrate, playUISound, settings.buttonSounds]);
 
 
     return (
@@ -80,6 +99,7 @@ const SettingsPage: React.FC = () => {
                                                 className="w-full aspect-square rounded-full flex items-center justify-center transition-all border-2 border-transparent hover:border-white/50"
                                                 style={{ backgroundColor: `hsl(${color.light})` }}
                                                 aria-label={color.name}
+                                                whileTap={{ scale: 0.9 }}
                                                 animate={(settings.accentColor || 'blue') === key ? { scale: 1.1 } : { scale: 1 }}
                                             >
                                                 {(settings.accentColor || 'blue') === key && (
@@ -136,6 +156,17 @@ const SettingsPage: React.FC = () => {
                         <div className="space-y-4">
                             <h2 className="font-semibold px-4">Sounds & Haptics</h2>
                             <div className="p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <Volume2 size={16} />
+                                        <h3 className="font-medium">Button Sounds</h3>
+                                    </div>
+                                    <label htmlFor="button-sounds-toggle" className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="button-sounds-toggle" className="sr-only peer" checked={settings.buttonSounds} onChange={handleButtonSoundsChange} />
+                                        <div className="w-11 h-6 bg-black/10 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-primary dark:peer-checked:bg-dark-primary"></div>
+                                    </label>
+                                </div>
+                                <div className="h-px bg-black/10 dark:bg-white/10" />
                                 <div>
                                     <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">Focus Sound</h3>
                                     <MemoizedSegmentedControl<FocusSound>

@@ -15,6 +15,7 @@ import Header from './Header';
 import AttachmentTypeModal from './AttachmentTypeModal';
 import PdfViewer from './PdfViewer';
 import { processJournalWithAI, generateImageForJournal } from '../services/geminiService';
+import OverscrollContainer from './OverscrollContainer';
 
 const FONT_COLORS = [
   { name: 'Default', value: 'inherit', isDefault: true },
@@ -1982,68 +1983,70 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         autoFocus={!entry} readOnly={isLocked}
                     />
                 </div>
-                <div className="relative flex-grow w-full journal-editor-container overflow-y-auto pb-24">
-                    <AnimatePresence>
-                        {isDraggingOver && (
-                            <motion.div
-                                className="absolute inset-0 z-10 bg-light-primary/10 dark:bg-dark-primary/10 border-2 border-dashed border-light-primary dark:border-dark-primary rounded-lg pointer-events-none flex flex-col items-center justify-center"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                            >
-                                <UploadCloud size={48} className="text-light-primary dark:text-dark-primary" />
-                                <p className="mt-2 font-semibold text-light-primary dark:text-dark-primary">Drop image here</p>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    {selectedImageContainer && !isLocked && (
-                        <ImageResizer targetElement={selectedImageContainer} onResizeEnd={handleContentChange} editorRef={editorRef} isLocked={isLocked}/>
-                    )}
-                    <div
-                        ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
-                        onKeyUp={handleEditorKeyUp} onKeyDown={handleEditorKeyDown}
-                        onContextMenu={(e) => e.preventDefault()}
-                        data-placeholder="Start writing..."
-                        className={`w-full min-h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
-                        autoFocus={!entry}
-                    />
-                     <div className="mt-8 pt-6 border-t border-white/10">
+                <OverscrollContainer className="relative flex-grow w-full journal-editor-container overflow-y-auto">
+                    <div className="pb-24">
                         <AnimatePresence>
-                            {attachments.length > 0 && (
-                                <div className="space-y-3">
-                                <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
-                                {attachments.map((att, index) => (
-                                    <motion.div
-                                        key={att.id}
-                                        layout
-                                        className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden"
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.1 }}
-                                    >
-                                        <div className="flex items-center justify-between p-3 border-b border-white/10">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <AttachmentIcon type={att.type} />
-                                                <span className="font-semibold truncate pr-2">{att.name}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <button onClick={() => handleRemoveAttachment(att)} className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10" aria-label="Remove attachment"><Trash2 size={16} /></button>
-                                                <button onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm">View</button>
-                                            </div>
-                                        </div>
-                                        <div onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer">
-                                            {att.type.startsWith('image/') ? <img src={att.data} alt={att.name} className="max-w-full max-h-full object-contain" /> : att.type === 'application/pdf' ? <PdfViewer dataUrl={att.data} isThumbnail={true} /> : <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary"><AttachmentIcon type={att.type} /><span>Click to View</span></div>}
-                                        </div>
-                                    </motion.div>
-                                ))}
-                                </div>
+                            {isDraggingOver && (
+                                <motion.div
+                                    className="absolute inset-0 z-10 bg-light-primary/10 dark:bg-dark-primary/10 border-2 border-dashed border-light-primary dark:border-dark-primary rounded-lg pointer-events-none flex flex-col items-center justify-center"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <UploadCloud size={48} className="text-light-primary dark:text-dark-primary" />
+                                    <p className="mt-2 font-semibold text-light-primary dark:text-dark-primary">Drop image here</p>
+                                </motion.div>
                             )}
                         </AnimatePresence>
-                        <AnimatePresence>
-                            {isUploading && <motion.div className="flex items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><LoaderCircle size={16} className="animate-spin" /><span>Compressing & preparing...</span></motion.div>}
-                        </AnimatePresence>
+                        {selectedImageContainer && !isLocked && (
+                            <ImageResizer targetElement={selectedImageContainer} onResizeEnd={handleContentChange} editorRef={editorRef} isLocked={isLocked}/>
+                        )}
+                        <div
+                            ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
+                            onKeyUp={handleEditorKeyUp} onKeyDown={handleEditorKeyDown}
+                            onContextMenu={(e) => e.preventDefault()}
+                            data-placeholder="Start writing..."
+                            className={`w-full min-h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
+                            autoFocus={!entry}
+                        />
+                        <div className="mt-8 pt-6 border-t border-white/10">
+                            <AnimatePresence>
+                                {attachments.length > 0 && (
+                                    <div className="space-y-3">
+                                    <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
+                                    {attachments.map((att, index) => (
+                                        <motion.div
+                                            key={att.id}
+                                            layout
+                                            className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden"
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.1 }}
+                                        >
+                                            <div className="flex items-center justify-between p-3 border-b border-white/10">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <AttachmentIcon type={att.type} />
+                                                    <span className="font-semibold truncate pr-2">{att.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <button onClick={() => handleRemoveAttachment(att)} className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10" aria-label="Remove attachment"><Trash2 size={16} /></button>
+                                                    <button onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm">View</button>
+                                                </div>
+                                            </div>
+                                            <div onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer">
+                                                {att.type.startsWith('image/') ? <img src={att.data} alt={att.name} className="max-w-full max-h-full object-contain" /> : att.type === 'application/pdf' ? <PdfViewer dataUrl={att.data} isThumbnail={true} /> : <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary"><AttachmentIcon type={att.type} /><span>Click to View</span></div>}
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                    </div>
+                                )}
+                            </AnimatePresence>
+                            <AnimatePresence>
+                                {isUploading && <motion.div className="flex items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><LoaderCircle size={16} className="animate-spin" /><span>Compressing & preparing...</span></motion.div>}
+                            </AnimatePresence>
+                        </div>
                     </div>
-                </div>
+                </OverscrollContainer>
                 <AnimatePresence>
                     {!isLocked && (
                         <>

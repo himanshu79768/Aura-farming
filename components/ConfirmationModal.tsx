@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TriangleAlert } from 'lucide-react';
+import { useAppContext } from '../App';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -21,12 +22,26 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
 }) => {
+  const { vibrate, playUISound } = useAppContext();
+  
+  const handleConfirm = () => {
+    vibrate('medium');
+    playUISound('delete');
+    onConfirm();
+  };
+  
+  const handleCancel = () => {
+    vibrate();
+    playUISound('tap');
+    onCancel();
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={onCancel}
+          onClick={handleCancel}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -51,18 +66,22 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               {message}
             </p>
             <div className="flex flex-col gap-3">
-              <button
-                onClick={onConfirm}
-                className="w-full py-3 text-lg font-semibold bg-red-500 text-white rounded-full shadow-md transition-transform hover:scale-105 active:scale-95"
+              <motion.button
+                onClick={handleConfirm}
+                className="w-full py-3 text-lg font-semibold bg-red-500 text-white rounded-full shadow-md"
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 {confirmText}
-              </button>
-              <button
-                onClick={onCancel}
-                className="w-full py-3 text-lg font-semibold bg-light-glass dark:bg-dark-glass rounded-full shadow-md transition-transform hover:scale-105 active:scale-95"
+              </motion.button>
+              <motion.button
+                onClick={handleCancel}
+                className="w-full py-3 text-lg font-semibold bg-light-glass dark:bg-dark-glass rounded-full shadow-md"
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 {cancelText}
-              </button>
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>

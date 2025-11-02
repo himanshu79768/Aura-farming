@@ -5,6 +5,7 @@ import { useAppContext } from '../App';
 import { JournalEntry } from '../types';
 import Header from './Header';
 import SearchBar from './SearchBar';
+import OverscrollContainer from './OverscrollContainer';
 
 interface JournalListItemProps {
     entry: JournalEntry;
@@ -64,7 +65,7 @@ const JournalListItem: React.FC<JournalListItemProps> = React.memo(({ entry, isS
 
 
 const JournalPage: React.FC = () => {
-    const { journalEntries, navigateTo, focusHistory, deleteMultipleJournalEntries, showConfirmationModal } = useAppContext();
+    const { journalEntries, navigateTo, focusHistory, deleteMultipleJournalEntries, showConfirmationModal, vibrate, playUISound } = useAppContext();
     const [searchQuery, setSearchQuery] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
@@ -214,6 +215,18 @@ const JournalPage: React.FC = () => {
         clearTimeout(longPressTimerRef.current);
     }, []);
 
+    const handleToggleCalendar = () => {
+        vibrate();
+        playUISound('tap');
+        setShowCalendar(s => !s);
+    };
+
+    const handleNewEntry = () => {
+        vibrate();
+        playUISound('tap');
+        navigateTo('journalEntry');
+    };
+
     const headerProps = isSelectionMode ? {
         leftAction: (
             <motion.button onClick={exitSelectionMode} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
@@ -230,7 +243,7 @@ const JournalPage: React.FC = () => {
         title: "Journal",
         rightAction: (
             <motion.button 
-                onClick={() => setShowCalendar(s => !s)}
+                onClick={handleToggleCalendar}
                 className={`p-2 rounded-full transition-colors ${showCalendar ? 'bg-light-primary/20 dark:bg-dark-primary/20 text-light-primary dark:text-dark-primary' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                 whileTap={{ scale: 0.9 }}
             >
@@ -317,7 +330,7 @@ const JournalPage: React.FC = () => {
                     </div>
                 )}
             </div>
-            <div className="flex-grow w-full overflow-y-auto">
+            <OverscrollContainer className="flex-grow w-full overflow-y-auto">
                 <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto">
                     <AnimatePresence>
                         {journalEntries.length === 0 ? (
@@ -366,11 +379,11 @@ const JournalPage: React.FC = () => {
                         )}
                     </AnimatePresence>
                 </div>
-            </div>
+            </OverscrollContainer>
              <AnimatePresence>
              {!isSelectionMode && (
                 <motion.button
-                    onClick={() => navigateTo('journalEntry')}
+                    onClick={handleNewEntry}
                     className="absolute bottom-28 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}

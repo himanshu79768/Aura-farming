@@ -8,6 +8,7 @@ import { useAppContext } from '../App';
 import { JournalEntry, Attachment } from '../types';
 import Header from './Header';
 import PdfViewer from './PdfViewer';
+import OverscrollContainer from './OverscrollContainer';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
 
@@ -478,7 +479,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 onExport={() => handleSavePdf({ includeAttachments: pdfExportOptions.include, attachmentIds: pdfExportOptions.selectedIds })}
                 isExporting={isExporting}
             />
-            <div className="flex-grow w-full overflow-y-auto">
+            <OverscrollContainer className="flex-grow w-full overflow-y-auto">
                 <div className={`w-full ${useFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} transition-all duration-300`}>
                     <div className="pb-24">
                         <h1 className="text-3xl font-bold mt-4 mb-2 break-words">
@@ -538,28 +539,33 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                         )}
                         {linkedSessions.length > 0 && (
                             <div className="mt-8 pt-6 border-t border-white/10">
-                                <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Connections</h2>
+                                <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Linked Sessions</h2>
                                 <div className="space-y-3">
                                     {linkedSessions.map(session => (
-                                        <div key={session.id} className="flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl">
+                                        <motion.button
+                                            key={session.id}
+                                            onClick={() => navigateTo('linkedJournals', { session })}
+                                            className="w-full flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl text-left"
+                                            whileTap={{ scale: 0.98 }}
+                                        >
                                             <div>
                                                 <p className="font-medium">{session.name || 'Focus Session'}</p>
                                                 <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
                                                     {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                                 </p>
                                             </div>
-                                            <div className="font-medium text-right">
+                                            <div className="font-medium">
                                                 {Math.round(session.duration / 60)} min
                                             </div>
-                                        </div>
+                                        </motion.button>
                                     ))}
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
-            </div>
-             <style>{`
+            </OverscrollContainer>
+            <style>{`
                 .journal-view-content h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.25rem; }
                 .journal-view-content ul, .journal-view-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
                 .journal-view-content ul { list-style-type: disc; }
@@ -567,62 +573,13 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 .journal-view-content li { margin-bottom: 0.25rem; }
                 .journal-view-content hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 1.5rem 0; }
                 html.light .journal-view-content hr { border-top-color: rgba(0, 0, 0, 0.1); }
-                .journal-view-content table.journal-table { 
-                    width: 100%; 
-                    border-collapse: collapse; 
-                    margin: 1rem 0; 
-                    border-radius: 0.75rem;
-                    overflow: hidden;
-                    border: 1px solid rgba(128, 128, 128, 0.2);
-                }
-                .journal-view-content table.journal-table th, .journal-view-content table.journal-table td { 
-                    border: 1px solid rgba(128, 128, 128, 0.2); 
-                    padding: 0.75rem;
-                    text-align: left;
-                }
-                .journal-view-content table.journal-table th { 
-                    font-weight: 600; 
-                }
-                html.dark .journal-view-content table.journal-table {
-                    border-color: rgba(128, 128, 128, 0.2);
-                }
-                html.dark .journal-view-content table.journal-table th, html.dark .journal-view-content table.journal-table td {
-                    border-color: rgba(128, 128, 128, 0.2); 
-                    color: #e5e7eb;
-                }
-                html.dark .journal-view-content table.journal-table th {
-                    background-color: rgba(128, 128, 128, 0.15); 
-                }
-                html.light .journal-view-content table.journal-table {
-                    border-color: rgba(0, 0, 0, 0.1);
-                }
-                html.light .journal-view-content table.journal-table th, html.light .journal-view-content table.journal-table td { 
-                    border-color: rgba(0, 0, 0, 0.1); 
-                    color: #1f2937;
-                }
-                html.light .journal-view-content table.journal-table th { 
-                    background-color: rgba(0, 0, 0, 0.05); 
-                }
+                .journal-view-content figure.generated-image { margin: 1.5rem auto; text-align: center; }
+                .journal-view-content figure.generated-image img { max-width: 100%; height: auto; border-radius: 0.75rem; border: 1px solid rgba(128, 128, 128, 0.2); }
+                .journal-view-content figure.generated-image figcaption { font-size: 0.875rem; color: #a0a0a0; margin-top: 0.5rem; }
                 .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
                 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-                .journal-view-content .custom-highlight, .journal-view-content [data-highlight="true"] {
-                    color: inherit;
-                    background-image: none !important;
-                }
-                html.dark .journal-view-content .custom-highlight, html.dark .journal-view-content [data-highlight="true"] {
-                    color: #1a1a1a !important;
-                }
-                @media screen and (max-width: 640px) {
-                    .journal-view-content table.journal-table {
-                        display: block;
-                        overflow-x: auto;
-                        white-space: nowrap;
-                    }
-                    .journal-view-content table.journal-table th,
-                    .journal-view-content table.journal-table td {
-                        white-space: normal;
-                    }
-                }
+                .journal-view-content .custom-highlight, .journal-view-content [data-highlight="true"] { color: inherit; }
+                html.dark .journal-view-content .custom-highlight, html.dark .journal-view-content [data-highlight="true"] { color: #1a1a1a !important; }
             `}</style>
         </div>
     );
