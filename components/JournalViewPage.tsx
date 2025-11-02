@@ -2,11 +2,15 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MoreVertical, Edit, Share2, Trash2, FileText, Copy, FileImage, FileQuestion, Link as LinkIcon } from 'lucide-react';
+import { MoreVertical, Edit, Share2, Trash2, FileText, Copy, FileImage, FileQuestion, Link as LinkIcon, Check, Loader } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
-import { JournalEntry, Mood, Theme, Attachment } from '../types';
+import { JournalEntry, Attachment } from '../types';
 import Header from './Header';
 import PdfViewer from './PdfViewer';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+
 
 // Simplified HTML to Plain Text converter for copy-paste
 const htmlToPlainText = (html: string): string => {
@@ -17,6 +21,24 @@ const htmlToPlainText = (html: string): string => {
         .replace(/<\/li>/gi, '');
     tempDiv.innerHTML = formattedHtml;
     return tempDiv.textContent || tempDiv.innerText || '';
+};
+
+// Helper to convert data URL to Uint8Array for pdf.js
+const dataURLToUint8Array = (dataURL: string) => {
+    const base64 = dataURL.split(',')[1];
+    if (!base64) return new Uint8Array(0);
+    try {
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes;
+    } catch (e) {
+        console.error("Failed to decode base64 string:", e);
+        return new Uint8Array(0);
+    }
 };
 
 interface JournalViewPageProps {
@@ -35,6 +57,103 @@ const fontClasses: Record<'default' | 'serif' | 'mono', string> = {
     mono: 'font-mono'
 };
 
+const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
+    const spring = { type: "spring" as const, stiffness: 700, damping: 30 };
+    return (
+         <div 
+            className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ${checked ? 'bg-light-primary dark:bg-dark-primary justify-end' : 'bg-gray-200 dark:bg-gray-700 justify-start'}`}
+            onClick={onToggle}
+        >
+            <motion.div
+                className="w-4 h-4 bg-white rounded-full shadow-sm"
+                layout
+                transition={spring}
+            />
+        </div>
+    );
+};
+
+interface PdfExportModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    attachments: Attachment[];
+    options: { include: boolean; selectedIds: string[] };
+    setOptions: React.Dispatch<React.SetStateAction<{ include: boolean; selectedIds: string[] }>>;
+    onExport: () => void;
+    isExporting: boolean;
+}
+
+const PdfExportModal: React.FC<PdfExportModalProps> = ({ isOpen, onClose, attachments, options, setOptions, onExport, isExporting }) => {
+    const handleToggleInclude = () => {
+        setOptions(prev => ({ ...prev, include: !prev.include }));
+    };
+
+    const handleToggleAttachment = (id: string) => {
+        setOptions(prev => ({
+            ...prev,
+            selectedIds: prev.selectedIds.includes(id)
+                ? prev.selectedIds.filter(attId => attId !== id)
+                : [...prev.selectedIds, id]
+        }));
+    };
+    
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={onClose}
+                >
+                    <motion.div
+                        className="relative w-full max-w-md p-6 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 rounded-2xl border border-white/10 shadow-3xl flex flex-col"
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.9, opacity: 0 }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h2 className="text-xl font-bold mb-4">PDF Export Options</h2>
+                        <div className="flex justify-between items-center py-2">
+                            <span className="font-medium">Include Attachments</span>
+                            <ToggleSwitch checked={options.include} onToggle={handleToggleInclude} />
+                        </div>
+                        <AnimatePresence>
+                            {options.include && (
+                                <motion.div
+                                    className="mt-4 border-t border-white/10 pt-4 space-y-2 max-h-60 overflow-y-auto"
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                >
+                                    {attachments.map(att => (
+                                        <div key={att.id} onClick={() => handleToggleAttachment(att.id)} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/5">
+                                            <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md border-2 transition-all ${options.selectedIds.includes(att.id) ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-400'}`}>
+                                                {options.selectedIds.includes(att.id) && <Check size={16} className="text-white"/>}
+                                            </div>
+                                            <AttachmentIcon type={att.type} />
+                                            <span className="truncate">{att.name}</span>
+                                        </div>
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                        <div className="flex gap-3 mt-6">
+                            <button onClick={onClose} className="w-full py-3 font-semibold bg-light-glass dark:bg-dark-glass rounded-full">Cancel</button>
+                            <button onClick={onExport} disabled={isExporting} className="w-full py-3 font-semibold bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isExporting && <Loader size={16} className="animate-spin" />}
+                                Export PDF
+                            </button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+};
+
+
 const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }) => {
     const { 
         navigateBack, 
@@ -42,12 +161,10 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
         deleteJournalEntry, 
         showConfirmationModal, 
         vibrate, 
-        settings, 
         focusHistory,
         journalEntries
     } = useAppContext();
 
-    // Find the most up-to-date version of the entry from the global state to prevent stale data.
     const entry = useMemo(() => 
         journalEntries.find(e => e.id === initialEntry.id) || initialEntry,
         [journalEntries, initialEntry]
@@ -56,6 +173,12 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
+    const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+    const [pdfExportOptions, setPdfExportOptions] = useState({
+        include: true,
+        selectedIds: entry.attachments?.map(a => a.id) || []
+    });
+    const [isExporting, setIsExporting] = useState(false);
 
     const menuRef = useRef<HTMLDivElement>(null);
     const shareMenuRef = useRef<HTMLDivElement>(null);
@@ -83,7 +206,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
     const toggleMenu = () => {
         vibrate();
         setIsMenuOpen(prev => !prev);
-        setIsShareMenuOpen(false); // Close share menu if main menu is toggled
+        setIsShareMenuOpen(false);
     };
 
     const handleEdit = () => {
@@ -93,16 +216,68 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
 
     const handleShare = () => {
         setIsMenuOpen(false);
-        // Use timeout to allow the main menu to close before the share menu opens, preventing the click-outside handler from misfiring.
         setTimeout(() => setIsShareMenuOpen(true), 10);
     };
     
-    const handleSavePdf = () => {
+    const handlePdfOptionClick = () => {
         setIsShareMenuOpen(false);
+        if (entry.attachments && entry.attachments.length > 0) {
+            setPdfExportOptions({
+                include: true,
+                selectedIds: entry.attachments.map(a => a.id),
+            });
+            setIsPdfModalOpen(true);
+        } else {
+            handleSavePdf({ includeAttachments: false, attachmentIds: [] });
+        }
+    };
+
+    const handleSavePdf = async (options: { includeAttachments: boolean; attachmentIds: string[] }) => {
+        setIsPdfModalOpen(false);
+        setIsExporting(true);
+    
         const date = new Date(entry.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         const time = new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-        
         const title = entry.title || 'Untitled Entry';
+        
+        let attachmentsHtml = '';
+        if (options.includeAttachments && entry.attachments && options.attachmentIds.length > 0) {
+            const selectedAttachments = entry.attachments.filter(att => options.attachmentIds.includes(att.id));
+    
+            let innerAttachmentsHtml = '';
+    
+            for (const att of selectedAttachments) {
+                if (att.type.startsWith('image/')) {
+                    innerAttachmentsHtml += `<div style="page-break-before: always;"></div><img src="${att.data}" style="border: 1px solid #eee; border-radius: 4px;" />`;
+                } else if (att.type === 'application/pdf') {
+                    try {
+                        const pdfData = dataURLToUint8Array(att.data);
+                        const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                        
+                        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                            innerAttachmentsHtml += `<div style="page-break-before: always;"></div>`;
+                            const page = await pdfDoc.getPage(pageNum);
+                            const viewport = page.getViewport({ scale: 1.5 });
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d')!;
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+                            await page.render({ canvasContext: context, viewport }).promise;
+                            const imgData = canvas.toDataURL('image/jpeg');
+                            innerAttachmentsHtml += `<img src="${imgData}" style="display: block;" />`;
+                        }
+                    } catch (e) {
+                        console.error("Error rendering PDF attachment", e);
+                        innerAttachmentsHtml += `<div style="page-break-before: always;"></div><p><em>Could not render preview for this PDF file.</em></p>`;
+                    }
+                } else {
+                    innerAttachmentsHtml += `<div style="page-break-before: always;"></div><p><em>Preview for this file type (${att.type}) is not available.</em></p>`;
+                }
+            }
+            if (innerAttachmentsHtml) {
+                attachmentsHtml = `<div class="attachments">${innerAttachmentsHtml}</div>`;
+            }
+        }
     
         const printWindow = window.open('', '_blank');
         if (printWindow) {
@@ -114,44 +289,29 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
                         <style>
-                            @page {
-                                size: A4;
-                                margin: 0.5in;
-                            }
-                            html, body {
-                                margin: 0;
-                                padding: 0;
-                            }
-                            body {
-                                font-family: 'Inter', sans-serif;
-                                line-height: 1.6;
-                                font-size: 11pt;
-                                color: #1a1a1a;
-                                background-color: #ffffff;
-                            }
-                            .header {
-                                text-align: left;
-                                border-bottom: 1px solid #ddd;
-                                padding-bottom: 1rem;
-                                margin-bottom: 1rem;
-                            }
-                            .header h1 {
-                                font-size: 22pt;
-                                font-weight: 700;
-                                margin: 0;
-                                color: #000;
-                            }
-                            .header .meta-info {
-                                font-size: 10pt;
-                                color: #555;
-                                margin-top: 0.5rem;
-                            }
+                            @page { size: A4; margin: 0.3in; }
+                            html, body { margin: 0; padding: 0; }
+                            body { font-family: 'Inter', sans-serif; line-height: 1.3; font-size: 11pt; color: #1a1a1a; background-color: #ffffff; }
+                            .header { text-align: left; border-bottom: 1px solid #ddd; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+                            .header h1 { font-size: 22pt; font-weight: 700; margin: 0; color: #000; }
+                            .header .meta-info { font-size: 10pt; color: #555; margin-top: 0.5rem; }
                             .content h2 { font-size: 15pt; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid #eee; padding-bottom: 0.25rem; }
-                            .content p { margin-bottom: 1rem; }
-                            .content ul, .content ol { padding-left: 1.5rem; margin-bottom: 1rem; }
-                            .content li { margin-bottom: 0.25rem; }
+                            .content p { margin-bottom: 0.2rem; }
+                            .content ul, .content ol { padding-left: 1.5rem; margin-bottom: 0.5rem; }
+                            .content li { margin-bottom: 0.2rem; }
                             .content hr { border: none; border-top: 1px solid #ccc; margin: 2rem 0; }
                             .custom-highlight, [data-highlight="true"] { background-color: #fef9c3 !important; -webkit-print-color-adjust: exact; color-adjust: exact; padding: 0.1em 0; }
+                            .content table.journal-table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.5rem 0; border: 1px solid #ddd; border-radius: 0.75rem; overflow: hidden; page-break-inside: auto; }
+                            .content table.journal-table thead { display: table-header-group; }
+                            .content table.journal-table th, .content table.journal-table td { padding: 0.75rem; text-align: left; border-top: 1px solid #ddd; border-left: 1px solid #ddd; }
+                            .content table.journal-table tr:first-child th, .content table.journal-table tr:first-child td { border-top: none; }
+                            .content table.journal-table th:first-child, .content table.journal-table td:first-child { border-left: none; }
+                            .content table.journal-table th { font-weight: 600; background-color: #f9f9f9; -webkit-print-color-adjust: exact; color-adjust: exact; }
+                            .content figure.generated-image { margin: 1.5rem 0; text-align: center; page-break-inside: avoid; }
+                            .content figure.generated-image img { max-width: 100%; height: auto; border-radius: 4px; border: 1px solid #eee; }
+                            .content figure.generated-image figcaption { font-size: 9pt; color: #555; margin-top: 0.5rem; font-style: italic; }
+                            h2 { page-break-after: avoid; page-break-inside: avoid; }
+                            .attachments img { max-width: 100%; max-height: 90vh; height: auto; object-fit: contain; }
                         </style>
                     </head>
                     <body>
@@ -161,6 +321,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                                 <p class="meta-info">${date} &bull; ${time}</p>
                             </div>
                             <div class="content">${entry.content}</div>
+                            ${attachmentsHtml}
                         </div>
                     </body>
                 </html>
@@ -169,7 +330,9 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
             printWindow.focus();
             setTimeout(() => { printWindow.print(); }, 500);
         }
+        setIsExporting(false);
     };
+
 
     const handleCopyText = () => {
         const plainText = htmlToPlainText(entry.content);
@@ -278,7 +441,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                             transition={{ duration: 0.2, ease: 'easeOut' }}
                         >
                             <div className="p-2">
-                                 <button onClick={handleSavePdf} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                 <button onClick={handlePdfOptionClick} className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                                     <FileText size={16} />
                                     <span>Save as PDF</span>
                                 </button>
@@ -305,6 +468,15 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 showBackButton 
                 onBack={navigateBack}
                 rightAction={HeaderActions}
+            />
+            <PdfExportModal 
+                isOpen={isPdfModalOpen}
+                onClose={() => setIsPdfModalOpen(false)}
+                attachments={entry.attachments || []}
+                options={pdfExportOptions}
+                setOptions={setPdfExportOptions}
+                onExport={() => handleSavePdf({ includeAttachments: pdfExportOptions.include, attachmentIds: pdfExportOptions.selectedIds })}
+                isExporting={isExporting}
             />
             <div className="flex-grow w-full overflow-y-auto">
                 <div className={`w-full ${useFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} transition-all duration-300`}>

@@ -107,6 +107,109 @@ const AttachmentIcon = ({ type }: { type: string }) => {
     return <FileQuestion size={24} className="text-gray-400 shrink-0" />;
 };
 
+const ImageResizer = ({ targetElement, onResizeEnd, editorRef, isLocked }: { targetElement: HTMLImageElement, onResizeEnd: () => void, editorRef: React.RefObject<HTMLDivElement>, isLocked: boolean }) => {
+    const resizeDataRef = useRef<{ startX: number, startWidth: number } | null>(null);
+    const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
+
+    useEffect(() => {
+        const scroller = editorRef.current?.parentElement;
+        const positioningContainer = scroller?.parentElement;
+
+        const updatePosition = () => {
+            if (!targetElement || !scroller || !positioningContainer) return;
+
+            const rect = targetElement.getBoundingClientRect();
+            const containerRect = positioningContainer.getBoundingClientRect();
+
+            setPosition({
+                top: rect.top - containerRect.top + scroller.scrollTop,
+                left: rect.left - containerRect.left,
+                width: rect.width,
+                height: rect.height,
+            });
+        };
+
+        const observer = new ResizeObserver(updatePosition);
+        observer.observe(targetElement);
+        
+        updatePosition();
+        scroller?.addEventListener('scroll', updatePosition);
+        window.addEventListener('resize', updatePosition);
+
+        return () => {
+            observer.disconnect();
+            scroller?.removeEventListener('scroll', updatePosition);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [targetElement, editorRef]);
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        const scroller = editorRef.current?.parentElement;
+        if (scroller) {
+            scroller.style.overflowY = 'hidden';
+        }
+        if (editorRef.current) {
+            editorRef.current.contentEditable = 'false';
+        }
+
+        const rect = targetElement.getBoundingClientRect();
+        resizeDataRef.current = {
+            startX: e.clientX,
+            startWidth: rect.width,
+        };
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+        if (!resizeDataRef.current) return;
+        
+        const { startX, startWidth } = resizeDataRef.current;
+        const dx = e.clientX - startX;
+        
+        let newWidth = startWidth + dx;
+
+        const maxWidth = editorRef.current?.clientWidth || startWidth;
+        newWidth = Math.max(80, Math.min(newWidth, maxWidth)); // min 80px, max parent width
+
+        targetElement.style.width = `${newWidth}px`;
+        targetElement.style.height = 'auto';
+    };
+
+    const handlePointerUp = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        resizeDataRef.current = null;
+        
+        const scroller = editorRef.current?.parentElement;
+        if (scroller) {
+            scroller.style.overflowY = 'auto';
+        }
+
+        if (editorRef.current && !isLocked) {
+            editorRef.current.contentEditable = 'true';
+        }
+
+        onResizeEnd();
+    };
+
+    return (
+        <div 
+            className="absolute border-2 border-dashed border-light-primary dark:border-dark-primary pointer-events-none"
+            style={{ ...position, transform: 'translateZ(0)' }}
+        >
+            <div
+                className="image-resizer-handle cursor-nwse-resize"
+                style={{ bottom: '-6px', right: '-6px' }}
+                onPointerDown={handlePointerDown}
+            />
+        </div>
+    );
+};
+
 
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
@@ -177,6 +280,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         } | null;
     }>({ isOpen: false, position: { top: 0, left: 0 }, selection: null });
     const longPressTimerRef = useRef<number | null>(null);
+
+    const [selectedImageContainer, setSelectedImageContainer] = useState<HTMLImageElement | null>(null);
 
 
     const editorRef = useRef<HTMLDivElement>(null);
@@ -1086,7 +1191,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
 
             longPressTimerRef.current = window.setTimeout(() => {
-// FIX: Cast target to HTMLTableCellElement to access cellIndex property.
                 const th = target as HTMLTableCellElement;
                 const row = th.parentElement as HTMLTableRowElement;
                 const isHeaderRow = row.parentElement?.tagName === 'THEAD';
@@ -1130,6 +1234,35 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     };
 
     // --- End Table Editing ---
+    
+    // --- Image Selection Logic ---
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            
+            if (target.classList.contains('image-resizer-handle')) {
+                return;
+            }
+
+            const img = target.closest('figure.generated-image img');
+
+            if (img) {
+                setSelectedImageContainer(img as HTMLImageElement);
+            } else if (selectedImageContainer) {
+                setSelectedImageContainer(null);
+            }
+        };
+        
+        editor.addEventListener('click', handleClick);
+        
+        return () => {
+            editor.removeEventListener('click', handleClick);
+        };
+    }, [isLocked, selectedImageContainer]);
+    // --- End Image Selection ---
 
 
     const fontClasses: Record<typeof fontStyle, string> = { default: 'font-sans', serif: 'font-serif', mono: 'font-mono' };
@@ -1482,7 +1615,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 const newRow = table.insertRow(before ? index : index + 1);
                 const cellCount = table.rows[index]?.cells.length || 2;
                 for (let i = 0; i < cellCount; i++) {
-// FIX: Cast newRow to HTMLTableRowElement to access insertCell method.
                     const newCell = (newRow as HTMLTableRowElement).insertCell();
                     newCell.innerHTML = '<br>';
                 }
@@ -1497,7 +1629,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             },
             deleteColumn: () => {
                  if (table.rows[0]?.cells.length > 1) {
-// FIX: Cast row to HTMLTableRowElement to access deleteCell method.
                     Array.from(table.rows).forEach(row => (row as HTMLTableRowElement).deleteCell(index));
                  }
             },
@@ -1506,7 +1637,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 if (header) {
                     const headerRow = header.rows[0];
                     if (headerRow) {
-// FIX: Cast cell to HTMLTableCellElement to access its properties.
                         Array.from(headerRow.cells).forEach(cell => {
                             const td = document.createElement('td');
                             td.innerHTML = (cell as HTMLTableCellElement).innerHTML;
@@ -1517,7 +1647,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 } else if (table.tBodies[0]?.rows[0]) {
                     const newHeader = table.createTHead();
                     const firstRow = table.tBodies[0].rows[0];
-// FIX: Cast cell to HTMLTableCellElement to access its properties.
                     Array.from(firstRow.cells).forEach(cell => {
                         const th = document.createElement('th');
                         th.innerHTML = (cell as HTMLTableCellElement).innerHTML;
@@ -1528,7 +1657,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             },
             toggleRowHeader: () => {
                 const hasRowHeaders = table.classList.toggle('row-headers');
-// FIX: Cast row to HTMLTableRowElement to access its cells property.
                 Array.from(table.tBodies[0]?.rows || []).forEach(row => {
                     const tableRow = row as HTMLTableRowElement;
                     if (tableRow.cells[0]) {
@@ -1670,7 +1798,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             </AnimatePresence>
             <div 
                 ref={positioningContainerRef}
-                className={`relative flex-grow w-full ${isFullWidth ? 'px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300 overflow-hidden`}>
+                className={`relative flex-grow w-full ${isFullWidth ? 'is-full-width px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300 overflow-hidden`}>
                 <FormattingMenu />
                 <div className={`${fontClasses[fontStyle]}`}>
                     <input
@@ -1681,6 +1809,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     />
                 </div>
                 <div className="relative flex-grow w-full journal-editor-container overflow-y-auto pb-24">
+                    {selectedImageContainer && !isLocked && (
+                        <ImageResizer targetElement={selectedImageContainer} onResizeEnd={handleContentChange} editorRef={editorRef} isLocked={isLocked}/>
+                    )}
                     <div
                         ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
                         onKeyUp={handleEditorKeyUp} onKeyDown={handleEditorKeyDown}
@@ -1897,12 +2028,16 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 .journal-editor-container figure.generated-image {
                     margin: 1rem 0;
                     text-align: center;
+                    display: block;
+                    position: relative;
+                    max-width: 100%;
                 }
                 .journal-editor-container figure.generated-image img {
                     max-width: 100%;
                     height: auto;
                     border-radius: 0.5rem;
                     border: 1px solid rgba(128, 128, 128, 0.2);
+                    display: inline-block;
                 }
                 .journal-editor-container figure.generated-image figcaption {
                     font-size: 0.875rem;
@@ -1921,6 +2056,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 html.dark .journal-editor-container [style*="rgb(167, 243, 208)"],
                 html.dark .journal-editor-container [style*="rgb(233, 213, 255)"] {
                     color: #1a1a1a !important;
+                }
+                .image-resizer-handle {
+                    position: absolute;
+                    width: 12px;
+                    height: 12px;
+                    background-color: white;
+                    border: 2px solid hsl(var(--accent-dark));
+                    border-radius: 50%;
+                    pointer-events: auto;
+                    z-index: 10;
+                }
+                html.light .image-resizer-handle {
+                    border-color: hsl(var(--accent-light));
                 }
                 @media screen and (max-width: 640px) {
                     .journal-editor-container table.journal-table {
