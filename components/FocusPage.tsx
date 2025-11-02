@@ -63,8 +63,34 @@ const TimerRing: React.FC<{ progress: number; mood: Mood; isShining: boolean }> 
 
 type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak';
 
+const swipeConfidenceThreshold = 10000;
+const swipePower = (offset: number, velocity: number) => {
+  return Math.abs(offset) * velocity;
+};
+
+const variants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    zIndex: 0,
+    x: direction < 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+};
+
 const FocusPage: React.FC = () => {
-  const [mode, setMode] = useState<'timer' | 'pomodoro'>('timer');
+  const modes = ['timer', 'pomodoro'] as const;
+  const [modeIndex, setModeIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
+  const mode = modes[modeIndex];
+
   const [pomodoroState, setPomodoroState] = useState<{ round: number; phase: PomodoroPhase }>({ round: 1, phase: 'focus' });
   const [isCustomInput, setIsCustomInput] = useState(false);
   const [customMinutes, setCustomMinutes] = useState('');
@@ -77,6 +103,25 @@ const FocusPage: React.FC = () => {
       selectTimerDuration, toggleTimer, resetTimer: resetTimerContext,
       sessionName, setSessionName, navigateTo, addFocusSession
   } = useAppContext();
+
+  const resetPomodoro = () => {
+      setPomodoroState({ round: 1, phase: 'focus' });
+      selectTimerDuration(POMODORO_DURATIONS.focus / 60);
+      resetTimerContext(false); // No vibrate on auto-reset
+      setSessionName('');
+  };
+
+  const handleModeChange = (index: number) => {
+    if (modeIndex === index) return;
+    vibrate();
+    setDirection(index > modeIndex ? 1 : -1);
+    setModeIndex(index);
+    if (modes[index] === 'pomodoro') {
+        resetPomodoro();
+    } else {
+        resetTimerContext();
+    }
+  };
   
   // Pomodoro Logic
   useEffect(() => {
@@ -139,13 +184,6 @@ const FocusPage: React.FC = () => {
     manageAudioPlayback();
   }, [isTimerActive, settings.focusMusic, settings.sound]);
   
-  const resetPomodoro = () => {
-      setPomodoroState({ round: 1, phase: 'focus' });
-      selectTimerDuration(POMODORO_DURATIONS.focus / 60);
-      resetTimerContext();
-      setSessionName('');
-  };
-  
   const handleReset = () => {
     vibrate();
     if (mode === 'pomodoro') {
@@ -189,20 +227,16 @@ const FocusPage: React.FC = () => {
   
   const ModeSelector = () => (
     <div className="flex justify-center items-center bg-black/5 dark:bg-white/5 p-1 rounded-full w-full max-w-xs mb-4">
-      {(['timer', 'pomodoro'] as const).map(m => (
-        <button 
-            key={m} 
-            onClick={() => {
-              setMode(m);
-              if (m === 'pomodoro') { resetPomodoro(); } 
-              else { resetTimerContext(); }
-            }} 
-            className="relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors"
-        >
-          <span>{m}</span>
-          {mode === m && <motion.div layoutId="focus-mode-selector" className="absolute inset-0 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-md z-[-1]" />}
-        </button>
-      ))}
+        {modes.map((m, index) => (
+            <button 
+                key={m} 
+                onClick={() => handleModeChange(index)} 
+                className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-light-text dark:text-dark-text' : 'text-light-text-secondary dark:text-dark-text-secondary'}`}
+            >
+            <span>{m}</span>
+            {modeIndex === index && <motion.div layoutId="focus-mode-selector" className="absolute inset-0 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-md z-[-1]" />}
+            </button>
+        ))}
     </div>
   );
 
@@ -218,7 +252,7 @@ const FocusPage: React.FC = () => {
             </button>
           </motion.div>
         ) : (
-          <motion.div key="timer-active" initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-col items-center justify-center w-full">
+          <motion.div key="timer-active" className="flex flex-col items-center justify-center w-full">
               <div className="relative flex items-center justify-center">
                   <TimerRing progress={progress} mood={mood} isShining={showShine} />
                   <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
@@ -277,7 +311,7 @@ const FocusPage: React.FC = () => {
   };
 
   const renderPomodoroContent = () => (
-    <motion.div key="pomodoro-active" initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-col items-center justify-center w-full">
+    <div className="flex flex-col items-center justify-center w-full">
         <PomodoroStatus />
         <div className="relative flex items-center justify-center">
             <TimerRing progress={progress} mood={mood} isShining={showShine} />
@@ -292,18 +326,47 @@ const FocusPage: React.FC = () => {
             <button onClick={handleToggleTimer} className="w-20 h-20 bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full flex items-center justify-center shadow-lg">{isTimerActive ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}</button>
             <button onClick={() => navigateTo('soundOptions')} className="p-4 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg">{settings.sound ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}</button>
         </div>
-    </motion.div>
+    </div>
   );
 
   return (
     <div className="w-full h-full flex flex-col">
        <audio ref={audioRef} loop />
        <Header title="Focus"/>
-       <div className="flex-grow p-4 overflow-y-auto flex flex-col items-center justify-center">
+       <div className="flex-grow p-4 overflow-hidden flex flex-col items-center justify-center">
         <ModeSelector />
-        <div className="flex flex-col items-center justify-center flex-grow w-full">
-          {mode === 'timer' ? renderTimerContent() : renderPomodoroContent()}
-        </div>
+        <motion.div
+          className="relative flex flex-col items-center justify-center flex-grow w-full"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={(e, { offset, velocity }) => {
+            const swipe = swipePower(offset.x, velocity.x);
+            if (swipe < -swipeConfidenceThreshold) { // swipe left
+              if (modeIndex === 0) handleModeChange(1);
+            } else if (swipe > swipeConfidenceThreshold) { // swipe right
+              if (modeIndex === 1) handleModeChange(0);
+            }
+          }}
+        >
+          <AnimatePresence initial={false} custom={direction}>
+            <motion.div
+              key={modeIndex}
+              className="absolute w-full h-full flex flex-col items-center justify-center"
+              custom={direction}
+              variants={variants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                  x: { type: "spring", stiffness: 300, damping: 30 },
+                  opacity: { duration: 0.2 }
+              }}
+            >
+              {mode === 'timer' ? renderTimerContent() : renderPomodoroContent()}
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
        </div>
     </div>
   );
