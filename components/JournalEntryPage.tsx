@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -1729,7 +1730,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     color: #1f2937;
                 }
                 html.light .journal-editor-container table.journal-table th { 
-                    background-color: rgba(0, 0, 0, 0.04); 
+                    background-color: rgba(0, 0, 0, 0.05); 
                 }
                 .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
                 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
@@ -1743,6 +1744,17 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 html.dark .journal-editor-container [style*="rgb(167, 243, 208)"],
                 html.dark .journal-editor-container [style*="rgb(233, 213, 255)"] {
                     color: #1a1a1a !important;
+                }
+                @media screen and (max-width: 640px) {
+                    .journal-editor-container table.journal-table {
+                        display: block;
+                        overflow-x: auto;
+                        white-space: nowrap;
+                    }
+                    .journal-editor-container table.journal-table th,
+                    .journal-editor-container table.journal-table td {
+                        white-space: normal;
+                    }
                 }
             `}</style>
         </div>

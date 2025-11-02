@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreVertical, Edit, Share2, Trash2, FileText, Copy, FileImage, FileQuestion, Link as LinkIcon } from 'lucide-react';
@@ -428,7 +429,7 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                     color: #1f2937;
                 }
                 html.light .journal-view-content table.journal-table th { 
-                    background-color: rgba(0, 0, 0, 0.04); 
+                    background-color: rgba(0, 0, 0, 0.05); 
                 }
                 .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
                 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
@@ -438,6 +439,17 @@ const JournalViewPage: React.FC<JournalViewPageProps> = ({ entry: initialEntry }
                 }
                 html.dark .journal-view-content .custom-highlight, html.dark .journal-view-content [data-highlight="true"] {
                     color: #1a1a1a !important;
+                }
+                @media screen and (max-width: 640px) {
+                    .journal-view-content table.journal-table {
+                        display: block;
+                        overflow-x: auto;
+                        white-space: nowrap;
+                    }
+                    .journal-view-content table.journal-table th,
+                    .journal-view-content table.journal-table td {
+                        white-space: normal;
+                    }
                 }
             `}</style>
         </div>
