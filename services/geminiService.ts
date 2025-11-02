@@ -105,7 +105,7 @@ export const processJournalWithAI = async (task: AITask, content: string, custom
                 prompt = `Summarize this journal entry into a few bullet points:\n\n${content}`;
                 break;
             case 'IMPROVE':
-                 prompt = `Analyze the following journal entry for key themes, emotions, or subjects. Rewrite and improve it by structuring it with paragraphs, lists, and potentially headings. Where a visual could enhance a specific part of the text, insert a tag like <generate-image-prompt>a serene landscape with a river</generate-image-prompt>. Use this tag 1-2 times for the most impactful moments. Here is the entry:\n\n${content}`;
+                 prompt = `Analyze the following journal entry for key themes, emotions, or subjects. Rewrite and improve it by structuring it with paragraphs, lists, and potentially headings. Format the output using simple HTML tags (e.g., \`<h2>\`, \`<strong>\`, \`<em>\`, \`<ul>\`, \`<li>\`). Do not use markdown syntax like \`**\` or \`-\`. Where a visual could enhance a specific part of the text, insert a tag like <generate-image-prompt>a serene landscape with a river</generate-image-prompt>. Use this tag 1-2 times for the most impactful moments. Here is the entry:\n\n${content}`;
                 break;
             case 'ASK':
                 prompt = `Given the following journal entry, answer this question: "${customPrompt}"\n\nJournal Entry:\n${content}`;
@@ -132,7 +132,7 @@ export const generateImageForJournal = async (prompt: string): Promise<string | 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
           contents: {
-            parts: [{ text: `Generate an artistic, abstract, or metaphorical image representing the concept: ${prompt}. The style should be painterly and evocative, suitable for a journal.` }],
+            parts: [{ text: `Generate an image for a personal journal representing the concept: ${prompt}. The desired style is artistic and evocative, reminiscent of old-style, professional photography. Aim for a soft, creamy texture, warm and slightly desaturated tones, and a gentle, soft-focus aesthetic like an analog film photo. Avoid bright, cartoonish, or digitally sharp styles.` }],
           },
           config: {
               responseModalities: [Modality.IMAGE],

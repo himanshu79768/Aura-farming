@@ -12,7 +12,6 @@ import {
 import { useAppContext } from '../App';
 import { JournalEntry, Attachment, AITask } from '../types';
 import Header from './Header';
-import AttachmentTypeModal from './AttachmentTypeModal';
 import PdfViewer from './PdfViewer';
 import { processJournalWithAI, generateImageForJournal } from '../services/geminiService';
 import OverscrollContainer from './OverscrollContainer';
@@ -212,6 +211,44 @@ const ImageResizer = ({ targetElement, onResizeEnd, editorRef, isLocked }: { tar
     );
 };
 
+const JournalAttachmentMenu = ({ onSelect, menuRef, position }: {
+  onSelect: (acceptType: string) => void;
+  menuRef: React.RefObject<HTMLDivElement>;
+  position: { top: number, right: number };
+}) => {
+  const attachmentOptions = [
+    { label: 'Photo', icon: ImageIcon, accept: 'image/jpeg, image/png' },
+    { label: 'Files', icon: FileText, accept: 'application/pdf, .ppt, .pptx, application/vnd.ms-powerpoint, application/vnd.openxmlformats-officedocument.presentationml.presentation, .doc, .docx, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
+  ];
+
+  return (
+    <motion.div
+        ref={menuRef}
+        style={{ top: position.top, right: position.right }}
+        className="absolute z-40 w-48 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-sm rounded-xl border border-white/10 shadow-3xl p-2 origin-bottom"
+        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+    >
+        {attachmentOptions.map((option, index) => (
+            <React.Fragment key={option.label}>
+                <button
+                    onClick={() => onSelect(option.accept)}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                >
+                    <option.icon size={20} />
+                    <span className="font-medium">{option.label}</span>
+                </button>
+                {index < attachmentOptions.length - 1 && (
+                    <div className="h-px bg-black/10 dark:bg-white/10 mx-2"></div>
+                )}
+            </React.Fragment>
+        ))}
+    </motion.div>
+  );
+};
+
 
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
@@ -225,7 +262,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [linkedSessionIds, setLinkedSessionIds] = useState<string[]>([]);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isUploading, setIsUploading] = useState(false);
-    const [showAttachmentModal, setShowAttachmentModal] = useState(false);
     
     const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
     const [fontStyle, setFontStyle] = useState<'default' | 'serif' | 'mono'>(entry?.fontStyle || 'default');
@@ -245,14 +281,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchMatches, setSearchMatches] = useState<HTMLElement[]>([]);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
-
-    const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
-    const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
-    const [slashMenuFilter, setSlashMenuFilter] = useState('');
-    const [activeCommandIndex, setActiveCommandIndex] = useState(0);
     
     const [isImageSourceMenuOpen, setIsImageSourceMenuOpen] = useState(false);
     const [imageSourceMenuPosition, setImageSourceMenuPosition] = useState({ top: 0, left: 0 });
+
+    const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
+    const [attachmentMenuPosition, setAttachmentMenuPosition] = useState({ top: 0, right: 0 });
 
     const [isFormattingMenuOpen, setIsFormattingMenuOpen] = useState(false);
     const [formattingMenuPosition, setFormattingMenuPosition] = useState({ top: 0, left: 0 });
@@ -286,14 +320,18 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [selectedImageContainer, setSelectedImageContainer] = useState<HTMLImageElement | null>(null);
     const [isDraggingOver, setIsDraggingOver] = useState(false);
 
+    // Toolbar state
+    const [isToolbarVisible, setIsToolbarVisible] = useState(false);
+
 
     const editorRef = useRef<HTMLDivElement>(null);
     const positioningContainerRef = useRef<HTMLDivElement>(null);
-    const slashCommandRef = useRef<HTMLElement | null>(null);
     const hasSetInitialContent = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const inlineImageInputRef = useRef<HTMLInputElement>(null);
     const imageSourceMenuRef = useRef<HTMLDivElement>(null);
+    const attachmentButtonRef = useRef<HTMLButtonElement>(null);
+    const attachmentMenuRef = useRef<HTMLDivElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const contentChangeDebounceRef = useRef<number | null>(null);
     const formattingMenuRef = useRef<HTMLDivElement>(null);
@@ -584,11 +622,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     setSearchQuery('');
                 }
             }
-            if (isSlashMenuOpen) {
-                setIsSlashMenuOpen(false);
-            }
             if (isImageSourceMenuOpen && imageSourceMenuRef.current && !imageSourceMenuRef.current.contains(event.target as Node)) {
                 setIsImageSourceMenuOpen(false);
+            }
+            if (isAttachmentMenuOpen && attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+                setIsAttachmentMenuOpen(false);
             }
             if (tablePopup.isOpen && tablePopupRef.current && !tablePopupRef.current.contains(event.target as Node)) {
                 setTablePopup(p => ({ ...p, isOpen: false }));
@@ -598,7 +636,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, isSlashMenuOpen, tablePopup.isOpen, isImageSourceMenuOpen]);
+    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, tablePopup.isOpen, isImageSourceMenuOpen, isAttachmentMenuOpen]);
     
     // --- End of Search & Formatting Functionality ---
 
@@ -715,14 +753,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         });
     };
 
-    const handleAttachmentTypeSelect = (acceptType: string) => {
-        setShowAttachmentModal(false);
-        if (fileInputRef.current) {
-            fileInputRef.current.accept = acceptType;
-            fileInputRef.current.click();
-        }
-    };
-
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (fileInputRef.current) { fileInputRef.current.value = ""; }
@@ -753,6 +783,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         markAsChanged();
     };
     
+
     const handleContentChange = () => {
         markAsChanged();
 
@@ -1038,161 +1069,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             selection?.addRange(savedRangeRef.current);
         }
     }, []);
-
-     // --- Slash Command Logic ---
-    const COMMANDS = [
-        {
-            icon: <Heading2 size={18} />, title: 'Heading', description: 'Large section heading.',
-            action: () => document.execCommand('formatBlock', false, '<h2>'),
-        },
-        {
-            icon: <List size={18} />, title: 'Bulleted List', description: 'Create a simple bulleted list.',
-            action: () => document.execCommand('insertUnorderedList', false),
-        },
-        {
-            icon: <ListOrdered size={18} />, title: 'Numbered List', description: 'Create a list with numbering.',
-            action: () => document.execCommand('insertOrderedList', false),
-        },
-        {
-            icon: <Table size={18} />, title: 'Table', description: 'Create a simple 2x2 table.',
-            action: () => {
-                const tableHTML = `
-                    <table class="journal-table">
-                      <thead>
-                        <tr>
-                          <th>Header 1</th>
-                          <th>Header 2</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td><br></td>
-                          <td><br></td>
-                        </tr>
-                        <tr>
-                          <td><br></td>
-                          <td><br></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <p><br></p>
-                `;
-                document.execCommand('insertHTML', false, tableHTML);
-            },
-        },
-        {
-            icon: <Minus size={18} />, title: 'Divider', description: 'Visually separate sections.',
-            action: () => document.execCommand('insertHorizontalRule', false),
-        },
-        {
-            icon: <ImageIcon size={18} />, title: 'Image', description: 'Upload or generate an image.',
-            action: () => {
-                saveSelection();
-                const rect = slashCommandRef.current?.getBoundingClientRect();
-                if (rect) {
-                    const editorContainer = positioningContainerRef.current?.querySelector('.journal-editor-container');
-                    const scrollTop = editorContainer?.scrollTop || 0;
-                    const containerRect = positioningContainerRef.current?.getBoundingClientRect();
-                    setImageSourceMenuPosition({ 
-                        top: rect.bottom - (containerRect?.top || 0) + scrollTop, 
-                        left: rect.left - (containerRect?.left || 0)
-                    });
-                }
-                setIsImageSourceMenuOpen(true);
-            },
-        },
-    ];
-
-    const filteredCommands = COMMANDS.filter(cmd => cmd.title.toLowerCase().startsWith(slashMenuFilter.toLowerCase()));
-
-    const handleCommandSelect = useCallback((command: typeof COMMANDS[0]) => {
-        const block = slashCommandRef.current;
-        if (!block) return;
-
-        block.innerHTML = '';
-        
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(block);
-        range.collapse(false);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-        
-        command.action();
-
-        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-
-        setIsSlashMenuOpen(false);
-        slashCommandRef.current = null;
-    }, []);
-
-    const checkSlashCommand = useCallback(() => {
-        const selection = window.getSelection();
-        if (!selection || !selection.rangeCount) return;
-
-        const range = selection.getRangeAt(0);
-        let node = range.startContainer;
-        
-        let parentBlock = node;
-        while (parentBlock && parentBlock.nodeType !== Node.ELEMENT_NODE) {
-            parentBlock = parentBlock.parentNode!;
-        }
-        while (parentBlock && !['P', 'DIV'].includes((parentBlock as HTMLElement).tagName)) {
-             if ((parentBlock as HTMLElement) === editorRef.current) break;
-            parentBlock = parentBlock.parentNode!;
-        }
-
-        const text = (parentBlock as HTMLElement)?.innerText;
-
-        if (text?.startsWith('/')) {
-            const rect = range.getBoundingClientRect();
-            const containerRect = positioningContainerRef.current?.getBoundingClientRect();
-            const editorContainer = positioningContainerRef.current?.querySelector('.journal-editor-container');
-            const scrollTop = editorContainer?.scrollTop || 0;
-
-            if (containerRect) {
-                setSlashMenuPosition({ 
-                    top: rect.bottom - containerRect.top + scrollTop + 5, 
-                    left: rect.left - containerRect.left 
-                });
-            }
-            
-            setSlashMenuFilter(text.substring(1));
-            slashCommandRef.current = parentBlock as HTMLElement;
-            if (!isSlashMenuOpen) {
-                setActiveCommandIndex(0);
-                setIsSlashMenuOpen(true);
-            }
-        } else {
-            if (isSlashMenuOpen) {
-                setIsSlashMenuOpen(false);
-                slashCommandRef.current = null;
-            }
-        }
-    }, [isSlashMenuOpen]);
-    
-    const handleEditorKeyUp = () => {
-        setTimeout(checkSlashCommand, 0);
-    };
-
-    const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (!isSlashMenuOpen) return;
-        
-        if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setActiveCommandIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
-        } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setActiveCommandIndex(prev => (prev + 1) % filteredCommands.length);
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            handleCommandSelect(filteredCommands[activeCommandIndex]);
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            setIsSlashMenuOpen(false);
-        }
-    };
-     // --- End Slash Command Logic ---
 
      // --- AI Logic ---
     const handleAiAction = async (task: AITask, promptOverride?: string) => {
@@ -1528,45 +1404,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             </motion.button>
         </div>
     );
-
-     const SlashCommandMenu = () => (
-        <motion.div
-            style={{ top: slashMenuPosition.top, left: slashMenuPosition.left }}
-            className="absolute z-50 w-64 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ type: 'spring', stiffness: 600, damping: 35 }}
-            onClick={(e) => e.stopPropagation()}
-        >
-            <p className="px-2 pt-1 pb-2 text-xs font-semibold uppercase text-light-text-secondary dark:text-dark-text-secondary">Blocks</p>
-            {filteredCommands.length > 0 ? filteredCommands.map((cmd, index) => (
-                <button
-                    key={cmd.title}
-                    onClick={() => handleCommandSelect(cmd)}
-                    className={`w-full flex items-start gap-3 p-2 rounded-md text-left transition-colors ${index === activeCommandIndex ? 'bg-black/5 dark:bg-white/5' : ''}`}
-                >
-                    <div className="p-1 bg-light-glass dark:bg-dark-glass rounded text-light-text dark:text-dark-text">{cmd.icon}</div>
-                    <div>
-                        <p className="font-semibold">{cmd.title}</p>
-                        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{cmd.description}</p>
-                    </div>
-                </button>
-            )) : <p className="p-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">No matching commands.</p>}
-        </motion.div>
-    );
     
     const ImageSourceMenu = () => (
         <motion.div
             ref={imageSourceMenuRef}
-            style={{ top: imageSourceMenuPosition.top, left: imageSourceMenuPosition.left }}
-            className="absolute z-50 w-56 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            style={{ top: imageSourceMenuPosition.top, left: imageSourceMenuPosition.left, transform: 'translateX(-50%)' }}
+            className="absolute z-50 w-56 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2 origin-top"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 600, damping: 35 }}
         >
             <button
+                onMouseDown={e => e.preventDefault()}
                 onClick={handleInlineImageUpload}
                 className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             >
@@ -1574,6 +1424,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 <span>Upload Image</span>
             </button>
             <button
+                onMouseDown={e => e.preventDefault()}
                 onClick={handleImageGenerateOption}
                 className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             >
@@ -1582,6 +1433,31 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             </button>
         </motion.div>
     );
+
+    const handleAttachmentButtonClick = () => {
+        vibrate();
+        const button = attachmentButtonRef.current;
+        const container = positioningContainerRef.current;
+        if (button && container) {
+            const buttonRect = button.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const MENU_HEIGHT = 88; // Approximate height of the menu
+
+            setAttachmentMenuPosition({
+                top: buttonRect.top - containerRect.top - MENU_HEIGHT, // Position above the button, reduced gap
+                right: containerRect.right - buttonRect.right, // Align right edge
+            });
+            setIsAttachmentMenuOpen(true);
+        }
+    };
+
+    const handleAttachmentMenuSelect = (acceptType: string) => {
+        setIsAttachmentMenuOpen(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.accept = acceptType;
+            fileInputRef.current.click();
+        }
+    };
 
     
     const handleRemoveHighlight = useCallback(() => {
@@ -1886,12 +1762,85 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         );
     };
 
+    const FormattingToolbar = () => {
+        const handleCommand = (command: string, value?: string) => {
+            document.execCommand(command, false, value);
+            handleContentChange();
+        };
+    
+        const handleImageButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+            saveSelection();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const containerRect = positioningContainerRef.current?.getBoundingClientRect();
+            if (rect && containerRect) {
+                setImageSourceMenuPosition({ 
+                    top: rect.bottom - containerRect.top + 10,
+                    left: rect.left - containerRect.left + rect.width / 2
+                });
+            }
+            setIsImageSourceMenuOpen(true);
+        };
+    
+        const COMMANDS = [
+            { icon: <Heading2 size={20} />, title: 'Heading', action: () => handleCommand('formatBlock', '<h2>') },
+            { icon: <List size={20} />, title: 'Bulleted List', action: () => handleCommand('insertUnorderedList') },
+            { icon: <ListOrdered size={20} />, title: 'Numbered List', action: () => handleCommand('insertOrderedList') },
+            { icon: <Table size={20} />, title: 'Table', action: () => {
+                const tableHTML = `<table class="journal-table"><thead><tr><th>Header 1</th><th>Header 2</th></tr></thead><tbody><tr><td><br></td><td><br></td></tr></tbody></table><p><br></p>`;
+                handleCommand('insertHTML', tableHTML);
+            }},
+            { icon: <Minus size={20} />, title: 'Divider', action: () => handleCommand('insertHorizontalRule') },
+        ];
+        
+        return (
+            <motion.div
+                className="sticky top-0 z-30"
+                initial={{ y: "-100%" }}
+                animate={{ y: "0%" }}
+                exit={{ y: "-100%" }}
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+            >
+                <div className="flex justify-center p-2 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md border-b border-white/10 shadow-lg">
+                    <div className="flex items-center gap-1">
+                        {COMMANDS.map(cmd => (
+                            <button
+                                key={cmd.title}
+                                onMouseDown={e => e.preventDefault()}
+                                onClick={() => cmd.action()}
+                                title={cmd.title}
+                                className="p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                            >
+                                {cmd.icon}
+                            </button>
+                        ))}
+                        <div className="w-px h-6 bg-black/10 dark:bg-white/10 mx-1"></div>
+                        <button
+                            key="Image"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={handleImageButtonClick}
+                            title="Image"
+                            className="p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                        >
+                            <ImageIcon size={20} />
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
+
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <AnimatePresence>
-                {isSlashMenuOpen && <SlashCommandMenu />}
                 {isImageSourceMenuOpen && <ImageSourceMenu />}
+                {isAttachmentMenuOpen && (
+                    <JournalAttachmentMenu
+                        menuRef={attachmentMenuRef}
+                        position={attachmentMenuPosition}
+                        onSelect={handleAttachmentMenuSelect}
+                    />
+                )}
             </AnimatePresence>
             <TablePopupMenu/>
             <Header title={entry ? 'Edit Entry' : 'New Entry'} showBackButton onBack={navigateBack} rightAction={HeaderActions} />
@@ -1984,6 +1933,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     />
                 </div>
                 <OverscrollContainer className="relative flex-grow w-full journal-editor-container overflow-y-auto">
+                    <AnimatePresence>
+                        {isToolbarVisible && !isLocked && <FormattingToolbar />}
+                    </AnimatePresence>
                     <div className="pb-24">
                         <AnimatePresence>
                             {isDraggingOver && (
@@ -2003,8 +1955,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         )}
                         <div
                             ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
-                            onKeyUp={handleEditorKeyUp} onKeyDown={handleEditorKeyDown}
                             onContextMenu={(e) => e.preventDefault()}
+                            onFocus={() => setIsToolbarVisible(true)}
+                            onBlur={() => setIsToolbarVisible(false)}
                             data-placeholder="Start writing..."
                             className={`w-full min-h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
                             autoFocus={!entry}
@@ -2063,7 +2016,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                            <Sparkles size={24} />
                         </motion.button>
                         <motion.button
-                            onClick={() => setShowAttachmentModal(true)}
+                            ref={attachmentButtonRef}
+                            onClick={handleAttachmentButtonClick}
                             disabled={isUploading}
                             className="absolute bottom-6 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20 disabled:opacity-50"
                             whileHover={{ scale: 1.1 }}
@@ -2086,7 +2040,6 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
                 <input type="file" ref={inlineImageInputRef} onChange={handleInlineImageFileSelect} style={{ display: 'none' }} accept="image/jpeg, image/png" />
             </div>
-            <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
             <AnimatePresence>
                 {isAiModalOpen && (
                     <motion.div
