@@ -283,6 +283,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const longPressTimerRef = useRef<number | null>(null);
 
     const [selectedImageContainer, setSelectedImageContainer] = useState<HTMLImageElement | null>(null);
+    const [isDraggingOver, setIsDraggingOver] = useState(false);
 
 
     const editorRef = useRef<HTMLDivElement>(null);
@@ -855,18 +856,20 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         if (!editor || isLocked) return;
 
         const handlePaste = async (event: ClipboardEvent) => {
-            const items = event.clipboardData?.items;
-            if (!items) return;
-
-            let imageFile: File | null = null;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.startsWith('image/')) {
-                    imageFile = items[i].getAsFile();
-                    break;
-                }
+            // Prioritize checking clipboard files, which works well for both screenshots
+            // and images copied from websites in modern browsers.
+            const files = event.clipboardData?.files;
+            
+            if (!files || files.length === 0) {
+                // Let the browser handle non-file pastes (e.g., plain text).
+                return;
             }
+
+            // Find the first image file in the pasted content.
+            const imageFile = Array.from(files).find(file => file.type.startsWith('image/'));
             
             if (imageFile) {
+                // We found an image, so prevent the default browser paste behavior.
                 event.preventDefault();
                 setIsUploading(true);
                 try {
@@ -874,6 +877,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     const dataUrl = await fileToDataURL(compressedFile);
 
                     const imageTag = `<figure class="generated-image"><img src="${dataUrl}" alt="Pasted image" /><figcaption><em>Pasted image</em></figcaption></figure><p><br></p>`;
+                    // Insert the image as a data URL.
                     document.execCommand('insertHTML', false, imageTag);
                     handleContentChange();
                 } catch (error) {
@@ -883,12 +887,98 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     setIsUploading(false);
                 }
             }
+            // If no image file is found among the files, do nothing and let the browser
+            // handle it (e.g., pasting a text file's content).
         };
 
         editor.addEventListener('paste', handlePaste);
 
         return () => {
             editor.removeEventListener('paste', handlePaste);
+        };
+    }, [isLocked, showAlertModal, handleContentChange]);
+    
+    // Drag and Drop Logic
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+
+        let dragCounter = 0;
+
+        const handleDragEnter = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter++;
+            if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+                setIsDraggingOver(true);
+            }
+        };
+
+        const handleDragOver = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        const handleDragLeave = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter--;
+            if (dragCounter === 0) {
+               setIsDraggingOver(false);
+            }
+        };
+
+        const handleDrop = async (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDraggingOver(false);
+            dragCounter = 0;
+
+            const files = e.dataTransfer?.files;
+            if (!files || files.length === 0) return;
+
+            const imageFile = Array.from(files).find(file => file.type.startsWith('image/'));
+
+            if (imageFile) {
+                setIsUploading(true);
+                try {
+                    const compressedFile = await compressImage(imageFile, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+                    const dataUrl = await fileToDataURL(compressedFile);
+                    const imageTag = `<figure class="generated-image"><img src="${dataUrl}" alt="Dropped image" /><figcaption><em>Dropped image</em></figcaption></figure><p><br></p>`;
+
+                    // Position the cursor at the drop location if possible
+                    // @ts-ignore - caretRangeFromPoint is non-standard but widely supported
+                    if (document.caretRangeFromPoint) {
+                         // @ts-ignore
+                        const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                        const selection = window.getSelection();
+                        if (selection && editor.contains(range.startContainer)) {
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
+                    }
+                    
+                    document.execCommand('insertHTML', false, imageTag);
+                    handleContentChange();
+                } catch (error) {
+                    console.error("Error processing dropped image:", error);
+                    showAlertModal({ title: "Processing Failed", message: "Could not process the dropped image." });
+                } finally {
+                    setIsUploading(false);
+                }
+            }
+        };
+
+        editor.addEventListener('dragenter', handleDragEnter);
+        editor.addEventListener('dragover', handleDragOver);
+        editor.addEventListener('dragleave', handleDragLeave);
+        editor.addEventListener('drop', handleDrop);
+
+        return () => {
+            editor.removeEventListener('dragenter', handleDragEnter);
+            editor.removeEventListener('dragover', handleDragOver);
+            editor.removeEventListener('dragleave', handleDragLeave);
+            editor.removeEventListener('drop', handleDrop);
         };
     }, [isLocked, showAlertModal, handleContentChange]);
     
@@ -1852,6 +1942,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     />
                 </div>
                 <div className="relative flex-grow w-full journal-editor-container overflow-y-auto pb-24">
+                    <AnimatePresence>
+                        {isDraggingOver && (
+                            <motion.div
+                                className="absolute inset-0 z-10 bg-light-primary/10 dark:bg-dark-primary/10 border-2 border-dashed border-light-primary dark:border-dark-primary rounded-lg pointer-events-none flex flex-col items-center justify-center"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                            >
+                                <UploadCloud size={48} className="text-light-primary dark:text-dark-primary" />
+                                <p className="mt-2 font-semibold text-light-primary dark:text-dark-primary">Drop image here</p>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     {selectedImageContainer && !isLocked && (
                         <ImageResizer targetElement={selectedImageContainer} onResizeEnd={handleContentChange} editorRef={editorRef} isLocked={isLocked}/>
                     )}
