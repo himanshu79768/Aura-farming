@@ -894,8 +894,7 @@ export default function App() {
     isImmersive, toggleImmersive,
     toggleSearch,
   ]);
-
-
+  
   if (isLoading) {
     return <div className="w-screen h-screen bg-light-bg dark:bg-dark-bg" />;
   }

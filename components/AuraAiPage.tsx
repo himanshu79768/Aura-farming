@@ -11,7 +11,7 @@ import OverscrollContainer from './OverscrollContainer';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-// FIX: Removed hardcoded API key. API key should be sourced from environment variables as per guidelines.
+const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -245,8 +245,7 @@ const AuraAiPage: React.FC = () => {
             const fetchAndQueue = async (sentence: string) => {
                 if (!sentence.trim()) return;
                 
-                // FIX: Use process.env.API_KEY for the API key as per guidelines.
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const ai = new GoogleGenAI({ apiKey: API_KEY });
                 const response = await ai.models.generateContent({
                     model: "gemini-2.5-flash-preview-tts",
                     contents: [{ parts: [{ text: sentence }] }],
@@ -282,8 +281,7 @@ const AuraAiPage: React.FC = () => {
 
     const initializeChat = useCallback(() => {
         try {
-            // FIX: Use process.env.API_KEY for the API key as per guidelines.
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
