@@ -982,6 +982,47 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         };
     }, [isLocked, showAlertModal, handleContentChange]);
     
+    // --- Inline Image Click Handler ---
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const img = target.closest('figure.generated-image img') as HTMLImageElement;
+
+            // Don't trigger viewer if an image is selected for resizing
+            if (img && selectedImageContainer !== img) {
+                e.preventDefault();
+
+                const allImages = Array.from(editor.querySelectorAll('figure.generated-image img')) as HTMLImageElement[];
+                
+                const tempAttachments: Attachment[] = allImages.map(imageEl => {
+                    const src = imageEl.src;
+                    const mimeTypeMatch = src.match(/^data:(image\/[^;]+);/);
+                    const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+                    return {
+                        id: crypto.randomUUID(),
+                        name: imageEl.alt || 'Inline Image',
+                        type: mimeType,
+                        data: src
+                    };
+                });
+                
+                const startIndex = allImages.findIndex(imageEl => imageEl === img);
+
+                if (startIndex !== -1) {
+                    navigateTo('attachmentViewer', { attachments: tempAttachments, startIndex });
+                }
+            }
+        };
+
+        editor.addEventListener('click', handleClick);
+        return () => {
+            editor.removeEventListener('click', handleClick);
+        };
+    }, [navigateTo, selectedImageContainer]);
+
     const saveSelection = useCallback(() => {
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
@@ -2181,9 +2222,10 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 .journal-editor-container figure.generated-image img {
                     max-width: 100%;
                     height: auto;
-                    border-radius: 0.5rem;
+                    border-radius: 0.75rem;
                     border: 1px solid rgba(128, 128, 128, 0.2);
                     display: inline-block;
+                    cursor: pointer;
                 }
                 .journal-editor-container figure.generated-image figcaption {
                     font-size: 0.875rem;
