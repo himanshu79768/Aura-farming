@@ -74,6 +74,7 @@ export interface Settings {
   focusMusic: FocusMusic;
   gradientIntensity: number;
   accentColor?: AccentColor;
+  speakAuraAI?: boolean;
 }
 
 export interface UserData extends Settings, UserProfile {

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette } from 'lucide-react';
+import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette, Mic } from 'lucide-react';
 import { Theme, Mood, FocusSound, AppIcon, HapticIntensity, AccentColor } from '../types';
 import { useAppContext } from '../App';
 import Header from './Header';
@@ -43,6 +43,8 @@ const SettingsPage: React.FC = () => {
     const handleFocusSoundChange = useCallback((value: FocusSound) => setSettings(s => ({ ...s, focusSound: value })), [setSettings]);
     const handleHapticChange = useCallback((value: HapticIntensity) => setSettings(s => ({ ...s, hapticIntensity: value })), [setSettings]);
     const handleMoodChange = useCallback((value: Mood) => setMood(value), [setMood]);
+    const handleSpeakAuraAIChange = useCallback(() => setSettings(s => ({ ...s, speakAuraAI: !s.speakAuraAI })), [setSettings]);
+
 
     return (
         <div className="w-full h-full flex flex-col">
@@ -162,6 +164,24 @@ const SettingsPage: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Aura AI Section */}
+                        <div className="space-y-4">
+                            <h2 className="font-semibold px-4">Aura AI</h2>
+                            <div className="p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <Mic size={16} />
+                                        <h3 className="font-medium">Speak Responses</h3>
+                                    </div>
+                                    <label htmlFor="speak-aura-ai-toggle" className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="speak-aura-ai-toggle" className="sr-only peer" checked={settings.speakAuraAI} onChange={handleSpeakAuraAIChange} />
+                                        <div className="w-11 h-6 bg-black/10 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-primary dark:peer-checked:bg-dark-primary"></div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>

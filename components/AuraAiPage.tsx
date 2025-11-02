@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText } from 'lucide-react';
-import { GoogleGenAI, Chat, Part } from "@google/genai";
+import { GoogleGenAI, Chat, Part, Modality } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
 import Header from './Header';
@@ -128,9 +128,39 @@ const AttachmentIcon: React.FC<{ type: string }> = ({ type }) => {
     return <FileText size={24} className="text-gray-400 shrink-0" />;
 };
 
+// --- Audio Helper Functions ---
+function decode(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
 
 const AuraAiPage: React.FC = () => {
-    const { navigateBack, vibrate, showAlertModal, auraChatHistory, updateAuraChatHistory, clearAuraChatHistory } = useAppContext();
+    const { navigateBack, vibrate, showAlertModal, auraChatHistory, updateAuraChatHistory, clearAuraChatHistory, settings } = useAppContext();
     const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>(auraChatHistory || []);
     const [input, setInput] = useState('');
@@ -144,6 +174,109 @@ const AuraAiPage: React.FC = () => {
     const recognitionRef = useRef<any>(null);
     const wasLoading = useRef(false);
 
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const audioQueueRef = useRef<AudioBuffer[]>([]);
+    const isPlayingRef = useRef<boolean>(false);
+    const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+    const nextStartTimeRef = useRef<number>(0);
+
+    const processAudioQueue = useCallback(() => {
+        const audioContext = audioContextRef.current;
+        if (isPlayingRef.current || audioQueueRef.current.length === 0 || !audioContext || audioContext.state === 'closed') {
+            isPlayingRef.current = false;
+            return;
+        }
+        isPlayingRef.current = true;
+        
+        const audioBuffer = audioQueueRef.current.shift();
+        if (!audioBuffer) {
+            isPlayingRef.current = false;
+            return;
+        }
+
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+
+        audioSourceNodesRef.current.add(source);
+        source.onended = () => {
+            audioSourceNodesRef.current.delete(source);
+            isPlayingRef.current = false;
+            processAudioQueue(); // Process next in queue
+        };
+
+        nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContext.currentTime);
+        source.start(nextStartTimeRef.current);
+        nextStartTimeRef.current += audioBuffer.duration;
+    }, []);
+
+    const cancelSpeech = useCallback(() => {
+        audioQueueRef.current = [];
+        isPlayingRef.current = false;
+        audioSourceNodesRef.current.forEach(source => {
+            try { source.stop(); } catch (e) {}
+        });
+        audioSourceNodesRef.current.clear();
+    }, []);
+
+    const speakText = useCallback(async (text: string) => {
+        if (!text.trim() || !('AudioContext' in window || 'webkitAudioContext' in window)) {
+            return;
+        }
+
+        cancelSpeech();
+
+        try {
+            if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            }
+            const audioContext = audioContextRef.current;
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+            nextStartTimeRef.current = audioContext.currentTime;
+
+            const cleanedText = text.replace(/[*#]/g, '').replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+            if (!cleanedText.trim()) return;
+
+            const sentences = cleanedText.match(/[^.!?]+[.!?]*(\s|$)/g) || [cleanedText];
+
+            const fetchAndQueue = async (sentence: string) => {
+                if (!sentence.trim()) return;
+                
+                const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+                const response = await ai.models.generateContent({
+                    model: "gemini-2.5-flash-preview-tts",
+                    contents: [{ parts: [{ text: sentence }] }],
+                    config: {
+                        responseModalities: [Modality.AUDIO],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: 'Kore' },
+                            },
+                        },
+                    },
+                });
+                
+                const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                if (base64Audio && audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                    const audioData = decode(base64Audio);
+                    const audioBuffer = await decodeAudioData(audioData, audioContext, 24000, 1);
+                    audioQueueRef.current.push(audioBuffer);
+                    
+                    if (!isPlayingRef.current) {
+                        processAudioQueue();
+                    }
+                }
+            };
+            
+            sentences.forEach(fetchAndQueue);
+
+        } catch (error) {
+            console.error("Error with Gemini TTS:", error);
+            showAlertModal({title: "Speech Error", message: "Sorry, I couldn't generate the audio for that response."});
+        }
+    }, [cancelSpeech, showAlertModal, processAudioQueue]);
 
     const initializeChat = useCallback(() => {
         try {
@@ -161,9 +294,8 @@ const AuraAiPage: React.FC = () => {
         }
     }, [showAlertModal]);
 
-    // Speech Recognition Setup
+    // Speech Recognition & TTS cleanup
     useEffect(() => {
-        // FIX: Cast `window` to `any` to access the non-standard `SpeechRecognition` and `webkitSpeechRecognition` properties, resolving a TypeScript error.
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognitionRef.current = new SpeechRecognition();
@@ -192,21 +324,33 @@ const AuraAiPage: React.FC = () => {
                 showAlertModal({ title: "Mic Error", message: `An error occurred: ${event.error}` });
                 setIsListening(false);
             };
-
         }
-    }, [input, showAlertModal]);
 
+        return () => {
+            cancelSpeech();
+            if (audioContextRef.current) {
+                audioContextRef.current.close().catch(console.error);
+                audioContextRef.current = null;
+            }
+             if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
+        };
+    }, [input, showAlertModal, cancelSpeech]);
 
-    // Effect to save chat history when a model response is finished.
     useEffect(() => {
         if (wasLoading.current && !isLoading) {
-             // Only save if there's a change
             if (JSON.stringify(messages) !== JSON.stringify(auraChatHistory || [])) {
                 updateAuraChatHistory(messages);
             }
+            const lastMessage = messages[messages.length - 1];
+            if (settings.speakAuraAI && lastMessage?.role === 'model' && lastMessage.parts[0] && 'text' in lastMessage.parts[0]) {
+                speakText(lastMessage.parts[0].text);
+            }
         }
         wasLoading.current = isLoading;
-    }, [isLoading, messages, updateAuraChatHistory, auraChatHistory]);
+    }, [isLoading, messages, updateAuraChatHistory, auraChatHistory, settings.speakAuraAI, speakText]);
+
 
     // Initialize Chat
     useEffect(() => {
@@ -261,7 +405,6 @@ const AuraAiPage: React.FC = () => {
                     return;
                 }
             } else {
-                // Handle other files like docx, pptx, etc.
                 const otherFileContentForModel = `The user has attached a file named "${attachment.name}" of type ${attachment.mimeType}. You cannot process its contents, but you should acknowledge that it has been attached.`;
                 userMessagePartsForApi.push({ text: otherFileContentForModel });
             }
@@ -286,20 +429,20 @@ const AuraAiPage: React.FC = () => {
         setInput('');
         setAttachment(null);
         setIsLoading(true);
+        let modelResponseText = '';
 
         try {
             const result = await chat.sendMessageStream({ message: userMessagePartsForApi });
             
-            let modelResponse = '';
             const modelMessageId = crypto.randomUUID();
             
             setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
 
             for await (const chunk of result) {
-                modelResponse += chunk.text;
+                modelResponseText += chunk.text;
                 setMessages(prev => prev.map(msg => 
                     msg.id === modelMessageId 
-                    ? { ...msg, parts: [{ text: modelResponse }] }
+                    ? { ...msg, parts: [{ text: modelResponseText }] }
                     : msg
                 ));
             }
@@ -362,6 +505,7 @@ const AuraAiPage: React.FC = () => {
         if (isListening) {
             recognitionRef.current.stop();
         } else {
+            cancelSpeech();
             vibrate();
             recognitionRef.current.start();
             setIsListening(true);
@@ -369,6 +513,7 @@ const AuraAiPage: React.FC = () => {
     };
 
     const handleNewChat = () => {
+        cancelSpeech();
         vibrate();
         setMessages([]);
         setInput('');

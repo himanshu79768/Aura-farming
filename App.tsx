@@ -293,6 +293,7 @@ const DEFAULT_SETTINGS: Settings = {
     focusSound: 'chime', appIcon: 'default', hapticIntensity: 'medium', focusMusic: 'Rain Drops',
     gradientIntensity: 75,
     accentColor: 'blue',
+    speakAuraAI: false,
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -406,6 +407,7 @@ export default function App() {
                 hapticIntensity: data.hapticIntensity || 'medium', focusMusic: data.focusMusic || 'Rain Drops',
                 gradientIntensity: data.gradientIntensity ?? 75,
                 accentColor: data.accentColor || 'blue',
+                speakAuraAI: data.speakAuraAI ?? false,
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
