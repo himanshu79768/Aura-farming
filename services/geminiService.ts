@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Quote, Mood, AuraData, AITask } from '../types';
 
 const GEMINI_API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
@@ -106,6 +106,31 @@ export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'mor
   }
 };
 
+export const generateImageForJournal = async (prompt: string): Promise<string | null> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: `A diagram or aesthetic, high-quality illustration for a journal entry about: ${prompt}` }],
+      },
+      config: {
+          responseModalities: [Modality.IMAGE],
+      },
+    });
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return part.inlineData.data;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Error generating image from Gemini:", error);
+    return null;
+  }
+};
+
+
 export const processJournalWithAI = async (
   task: AITask,
   content: string,
@@ -135,9 +160,10 @@ export const processJournalWithAI = async (
     -   If the content is a Q&A, wrap the questions in <strong> tags.
     -   Insert <hr> tags where you see a clear thematic shift or separation of ideas.
     -   **Tables:** If the content compares items, lists pros and cons, or presents data that would benefit from a tabular format, structure it into a simple HTML <table> with a class="journal-table". Use <thead>, <tbody>, <th>, and <td> tags appropriately.
-4.  **Structure:** Organize the content logically.
-5.  **Voice:** Preserve the original author's voice and tone.
-6.  **Output:** Return ONLY the improved and fully structured HTML content. Do not include any introductory phrases like "Here is the improved version:".
+4.  **Image Generation:** If you identify a place where a diagram, model, or illustration would significantly clarify the content, insert a special tag in the HTML: \`<generate-image-prompt>A detailed, descriptive prompt for an AI image generator to create the visual.</generate-image-prompt>\`. Use this sparingly and only when it adds real value.
+5.  **Structure:** Organize the content logically.
+6.  **Voice:** Preserve the original author's voice and tone.
+7.  **Output:** Return ONLY the improved and fully structured HTML content, including any image generation tags. Do not include any introductory phrases like "Here is the improved version:".
 
 Here is the entry content:
 ---
@@ -148,6 +174,8 @@ ${content}
                 prompt = `Based on the content of the following journal entry, please answer the user's question concisely.\n\nJournal Entry:\n---\n${content}\n---\n\nQuestion: "${customPrompt}"`;
                 break;
         }
+
+        if (!prompt) return "Invalid AI task.";
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",

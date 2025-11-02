@@ -115,4 +115,4 @@ export interface AuraData {
     suggestion: string;
 }
 
-export type AITask = 'GENERATE' | 'CONTINUE' | 'SUMMARIZE' | 'IMPROVE' | 'ASK';
+export type AITask = 'GENERATE' | 'CONTINUE' | 'SUMMARIZE' | 'IMPROVE' | 'ASK' | 'GENERATE_IMAGE';

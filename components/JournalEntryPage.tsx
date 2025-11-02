@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -9,14 +6,15 @@ import {
     Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus, Table,
     Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon, TextSelect,
     Sparkles, Wand2, BookText, BrainCircuit, MessageSquare, ArrowLeft, Pilcrow, CaseUpper,
-    ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, Rows3, Columns3, Trash
+    ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, Rows3, Columns3, Trash,
+    Image as ImageIcon, UploadCloud
 } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Attachment, AITask } from '../types';
 import Header from './Header';
 import AttachmentTypeModal from './AttachmentTypeModal';
 import PdfViewer from './PdfViewer';
-import { processJournalWithAI } from '../services/geminiService';
+import { processJournalWithAI, generateImageForJournal } from '../services/geminiService';
 
 const FONT_COLORS = [
   { name: 'Default', value: 'inherit', isDefault: true },
@@ -147,6 +145,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
     const [slashMenuFilter, setSlashMenuFilter] = useState('');
     const [activeCommandIndex, setActiveCommandIndex] = useState(0);
+    
+    const [isImageSourceMenuOpen, setIsImageSourceMenuOpen] = useState(false);
+    const [imageSourceMenuPosition, setImageSourceMenuPosition] = useState({ top: 0, left: 0 });
 
     const [isFormattingMenuOpen, setIsFormattingMenuOpen] = useState(false);
     const [formattingMenuPosition, setFormattingMenuPosition] = useState({ top: 0, left: 0 });
@@ -183,11 +184,14 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const slashCommandRef = useRef<HTMLElement | null>(null);
     const hasSetInitialContent = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const inlineImageInputRef = useRef<HTMLInputElement>(null);
+    const imageSourceMenuRef = useRef<HTMLDivElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const contentChangeDebounceRef = useRef<number | null>(null);
     const formattingMenuRef = useRef<HTMLDivElement>(null);
     const paletteRef = useRef<HTMLDivElement>(null);
     const tablePopupRef = useRef<HTMLDivElement>(null);
+    const savedRangeRef = useRef<Range | null>(null);
     
     const saveDebounceTimeoutRef = useRef<number | null>(null);
     const handleSaveRef = useRef<() => void>();
@@ -475,6 +479,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             if (isSlashMenuOpen) {
                 setIsSlashMenuOpen(false);
             }
+            if (isImageSourceMenuOpen && imageSourceMenuRef.current && !imageSourceMenuRef.current.contains(event.target as Node)) {
+                setIsImageSourceMenuOpen(false);
+            }
             if (tablePopup.isOpen && tablePopupRef.current && !tablePopupRef.current.contains(event.target as Node)) {
                 setTablePopup(p => ({ ...p, isOpen: false }));
             }
@@ -483,7 +490,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, isSlashMenuOpen, tablePopup.isOpen]);
+    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, isSlashMenuOpen, tablePopup.isOpen, isImageSourceMenuOpen]);
     
     // --- End of Search & Formatting Functionality ---
 
@@ -736,6 +743,21 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [isDesktop, currentEntry, handleDuplicate, handleDelete, handleLinkSession]);
+    
+    const saveSelection = useCallback(() => {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            savedRangeRef.current = selection.getRangeAt(0);
+        }
+    }, []);
+
+    const restoreSelection = useCallback(() => {
+        if (savedRangeRef.current) {
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(savedRangeRef.current);
+        }
+    }, []);
 
      // --- Slash Command Logic ---
     const COMMANDS = [
@@ -782,6 +804,23 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             icon: <Minus size={18} />, title: 'Divider', description: 'Visually separate sections.',
             action: () => document.execCommand('insertHorizontalRule', false),
         },
+        {
+            icon: <ImageIcon size={18} />, title: 'Image', description: 'Upload or generate an image.',
+            action: () => {
+                saveSelection();
+                const rect = slashCommandRef.current?.getBoundingClientRect();
+                if (rect) {
+                    const editorContainer = positioningContainerRef.current?.querySelector('.journal-editor-container');
+                    const scrollTop = editorContainer?.scrollTop || 0;
+                    const containerRect = positioningContainerRef.current?.getBoundingClientRect();
+                    setImageSourceMenuPosition({ 
+                        top: rect.bottom - (containerRect?.top || 0) + scrollTop, 
+                        left: rect.left - (containerRect?.left || 0)
+                    });
+                }
+                setIsImageSourceMenuOpen(true);
+            },
+        },
     ];
 
     const filteredCommands = COMMANDS.filter(cmd => cmd.title.toLowerCase().startsWith(slashMenuFilter.toLowerCase()));
@@ -827,7 +866,17 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
         if (text?.startsWith('/')) {
             const rect = range.getBoundingClientRect();
-            setSlashMenuPosition({ top: rect.bottom + 5, left: rect.left });
+            const containerRect = positioningContainerRef.current?.getBoundingClientRect();
+            const editorContainer = positioningContainerRef.current?.querySelector('.journal-editor-container');
+            const scrollTop = editorContainer?.scrollTop || 0;
+
+            if (containerRect) {
+                setSlashMenuPosition({ 
+                    top: rect.bottom - containerRect.top + scrollTop + 5, 
+                    left: rect.left - containerRect.left 
+                });
+            }
+            
             setSlashMenuFilter(text.substring(1));
             slashCommandRef.current = parentBlock as HTMLElement;
             if (!isSlashMenuOpen) {
@@ -883,15 +932,55 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             setAiCustomPrompt('');
             return;
         }
+        
+        if (task === 'GENERATE_IMAGE') {
+            const base64Image = await generateImageForJournal(customPrompt);
+            if (base64Image) {
+                restoreSelection();
+                const imageUrl = `data:image/png;base64,${base64Image}`;
+                const imageTag = `<figure class="generated-image"><img src="${imageUrl}" alt="${customPrompt}" /><figcaption><em>Illustration for: ${customPrompt}</em></figcaption></figure><p><br></p>`;
+                document.execCommand('insertHTML', false, imageTag);
+                handleContentChange();
+            } else {
+                showAlertModal({ title: "Image Generation Failed", message: "Sorry, I couldn't create an image for that prompt." });
+            }
+            setIsAiLoading(false);
+            setAiCustomPrompt('');
+            return;
+        }
 
-        const result = await processJournalWithAI(task, currentContent, customPrompt);
+        let result = await processJournalWithAI(task, currentContent, customPrompt);
 
         if (result.includes("couldn't process that request")) {
             showAlertModal({ title: "AI Error", message: result });
         } else if (editorRef.current) {
             switch (task) {
-                case 'GENERATE':
                 case 'IMPROVE':
+                    const imagePromptRegex = /<generate-image-prompt>(.*?)<\/generate-image-prompt>/g;
+                    const prompts = [...result.matchAll(imagePromptRegex)].map(match => match[1]);
+
+                    if (prompts.length > 0) {
+                        const imagePromises = prompts.map(prompt => generateImageForJournal(prompt));
+                        const generatedImages = await Promise.all(imagePromises);
+
+                        let finalHtml = result;
+                        generatedImages.forEach((base64Image, index) => {
+                            const originalTag = `<generate-image-prompt>${prompts[index]}</generate-image-prompt>`;
+                            if (base64Image) {
+                                const prompt = prompts[index];
+                                const imageUrl = `data:image/png;base64,${base64Image}`;
+                                const imageTag = `<figure class="generated-image"><img src="${imageUrl}" alt="${prompt}" /><figcaption><em>Illustration for: ${prompt}</em></figcaption></figure>`;
+                                finalHtml = finalHtml.replace(originalTag, imageTag);
+                            } else {
+                                finalHtml = finalHtml.replace(originalTag, ''); // Remove tag if generation fails
+                            }
+                        });
+                        editorRef.current.innerHTML = finalHtml;
+                    } else {
+                        editorRef.current.innerHTML = result;
+                    }
+                    break;
+                case 'GENERATE':
                     editorRef.current.innerHTML = result;
                     break;
                 case 'CONTINUE':
@@ -924,6 +1013,41 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         setAiCustomPrompt('');
     };
      // --- End AI Logic ---
+     
+    const handleInlineImageUpload = () => {
+        setIsImageSourceMenuOpen(false);
+        inlineImageInputRef.current?.click();
+    };
+
+    const handleImageGenerateOption = () => {
+        setIsImageSourceMenuOpen(false);
+        restoreSelection();
+        setCurrentAiTask('GENERATE_IMAGE');
+        setIsAiModalOpen(true);
+    };
+
+    const handleInlineImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (inlineImageInputRef.current) { inlineImageInputRef.current.value = ""; }
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const compressedFile = await compressImage(file, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+            const dataUrl = await fileToDataURL(compressedFile);
+
+            restoreSelection();
+            const imageTag = `<figure class="generated-image"><img src="${dataUrl}" alt="${compressedFile.name}" /><figcaption><em>${compressedFile.name}</em></figcaption></figure><p><br></p>`;
+            document.execCommand('insertHTML', false, imageTag);
+            handleContentChange();
+        } catch (error) {
+            console.error("Error processing inline image:", error);
+            showAlertModal({ title: "Processing Failed", message: "Could not process the image." });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
 
     // --- Table Editing Logic ---
     const clearTableHighlights = useCallback(() => {
@@ -1123,6 +1247,34 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             )) : <p className="p-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">No matching commands.</p>}
         </motion.div>
     );
+    
+    const ImageSourceMenu = () => (
+        <motion.div
+            ref={imageSourceMenuRef}
+            style={{ top: imageSourceMenuPosition.top, left: imageSourceMenuPosition.left }}
+            className="absolute z-50 w-56 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ type: 'spring', stiffness: 600, damping: 35 }}
+        >
+            <button
+                onClick={handleInlineImageUpload}
+                className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            >
+                <UploadCloud size={18} />
+                <span>Upload Image</span>
+            </button>
+            <button
+                onClick={handleImageGenerateOption}
+                className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            >
+                <Sparkles size={18} />
+                <span>Generate with AI</span>
+            </button>
+        </motion.div>
+    );
+
     
     const handleRemoveHighlight = useCallback(() => {
         const selection = window.getSelection();
@@ -1436,6 +1588,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <AnimatePresence>
                 {isSlashMenuOpen && <SlashCommandMenu />}
+                {isImageSourceMenuOpen && <ImageSourceMenu />}
             </AnimatePresence>
             <TablePopupMenu/>
             <Header title={entry ? 'Edit Entry' : 'New Entry'} showBackButton onBack={navigateBack} rightAction={HeaderActions} />
@@ -1610,6 +1763,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                     )}
                 </AnimatePresence>
                 <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
+                <input type="file" ref={inlineImageInputRef} onChange={handleInlineImageFileSelect} style={{ display: 'none' }} accept="image/jpeg, image/png" />
             </div>
             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
             <AnimatePresence>
@@ -1639,17 +1793,25 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                 >
                                     <div className="flex items-center gap-2 mb-3">
                                         <button onClick={() => setCurrentAiTask(null)} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ArrowLeft size={18}/></button>
-                                        <h3 className="text-lg font-semibold">{currentAiTask === 'GENERATE' ? 'Generate from Prompt' : 'Ask about your entry'}</h3>
+                                        <h3 className="text-lg font-semibold">
+                                            {currentAiTask === 'GENERATE' ? 'Generate from Prompt' 
+                                            : currentAiTask === 'GENERATE_IMAGE' ? 'Generate Image'
+                                            : 'Ask about your entry'}
+                                        </h3>
                                     </div>
                                     <textarea
                                         value={aiCustomPrompt}
                                         onChange={(e) => setAiCustomPrompt(e.target.value)}
-                                        placeholder={currentAiTask === 'GENERATE' ? 'e.g., about my productive day...' : 'e.g., what themes are present?'}
+                                        placeholder={
+                                            currentAiTask === 'GENERATE' ? 'e.g., about my productive day...' 
+                                            : currentAiTask === 'GENERATE_IMAGE' ? 'Describe the image you want...'
+                                            : 'e.g., what themes are present?'
+                                        }
                                         className="w-full h-24 p-2 bg-light-glass dark:bg-dark-glass rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
                                         autoFocus
                                     />
                                     <button onClick={() => handleAiAction(currentAiTask)} className="w-full mt-2 py-3 bg-light-primary dark:bg-dark-primary text-white rounded-full font-semibold">
-                                        {currentAiTask === 'GENERATE' ? 'Generate' : 'Ask'}
+                                        {currentAiTask === 'ASK' ? 'Ask' : 'Generate'}
                                     </button>
                                 </motion.div>
                             ) : (
@@ -1661,7 +1823,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                 >
                                     <h3 className="text-lg font-semibold text-center mb-3">Aura AI Assistant</h3>
                                     <div className="space-y-2">
-                                        <AiTaskButton icon={<Wand2 size={20}/>} title="Organize & Refine" description="Structure, format, proofread, and create tables." task="IMPROVE" />
+                                        <AiTaskButton icon={<Wand2 size={20}/>} title="Organize & Refine" description="Structure, format, and add diagrams." task="IMPROVE" />
                                         <AiTaskButton icon={<BookText size={20}/>} title="Continue Writing" description="Generate what comes next" task="CONTINUE" />
                                         <AiTaskButton icon={<BrainCircuit size={20}/>} title="Summarize" description="Get the key points" task="SUMMARIZE" />
                                         <AiTaskButton icon={<Sparkles size={20}/>} title="Generate from Prompt" description="Create a new entry from an idea" task="GENERATE" requiresInput/>
@@ -1731,6 +1893,21 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 }
                 html.light .journal-editor-container table.journal-table th { 
                     background-color: rgba(0, 0, 0, 0.05); 
+                }
+                .journal-editor-container figure.generated-image {
+                    margin: 1rem 0;
+                    text-align: center;
+                }
+                .journal-editor-container figure.generated-image img {
+                    max-width: 100%;
+                    height: auto;
+                    border-radius: 0.5rem;
+                    border: 1px solid rgba(128, 128, 128, 0.2);
+                }
+                .journal-editor-container figure.generated-image figcaption {
+                    font-size: 0.875rem;
+                    color: #a0a0a0;
+                    margin-top: 0.5rem;
                 }
                 .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
                 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
