@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, Search, BookOpen, ChevronDown } from 'lucide-react';
+import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, BookOpen, ChevronDown } from 'lucide-react';
 import { GoogleGenAI, Chat, Part, Modality } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
@@ -11,6 +10,8 @@ import { ChatMessage, JournalEntry } from '../types';
 import AttachmentTypeModal from './AttachmentTypeModal';
 import OverscrollContainer from './OverscrollContainer';
 import SearchBar from './SearchBar';
+import { generateImageForJournal } from '../services/geminiService';
+
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
@@ -42,7 +43,98 @@ const dataURLToUint8Array = (dataURL: string) => {
     }
 };
 
-const MarkdownRenderer: React.FC<{ text: string }> = ({ text }) => {
+const ImageGenerator: React.FC<{ prompt: string }> = ({ prompt }) => {
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        const generate = async () => {
+            if (!prompt) {
+                setError("Empty prompt.");
+                setIsLoading(false);
+                return;
+            }
+            try {
+                const base64Data = await generateImageForJournal(prompt);
+                if (isMounted) {
+                    if (base64Data) {
+                        setImageUrl(`data:image/png;base64,${base64Data}`);
+                    } else {
+                        setError("Failed to generate image.");
+                    }
+                    setIsLoading(false);
+                }
+            } catch (err) {
+                if (isMounted) {
+                    console.error("Image generation error:", err);
+                    setError("An error occurred during generation.");
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        generate();
+
+        return () => { isMounted = false; };
+    }, [prompt]);
+
+    if (isLoading) {
+        return (
+            <div className="my-2 p-4 rounded-lg bg-black/5 dark:bg-white/5 animate-pulse flex flex-col items-center justify-center h-48 border border-white/10">
+                <ImageIcon size={32} className="text-light-text-secondary dark:text-dark-text-secondary" />
+                <p className="text-sm text-center text-light-text-secondary dark:text-dark-text-secondary mt-2">Generating image for:</p>
+                <p className="text-sm text-center text-light-text-secondary dark:text-dark-text-secondary font-medium italic">"{prompt}"</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return <p className="text-red-500 text-sm my-2">Error generating image: {error}</p>;
+    }
+
+    if (imageUrl) {
+        return (
+            <div className="my-2">
+                <img src={imageUrl} alt={prompt} className="max-w-full rounded-lg border border-white/10" />
+            </div>
+        );
+    }
+
+    return null;
+};
+
+const CodeBlock: React.FC<{ codeWithLang: string }> = ({ codeWithLang }) => {
+    const [isCopied, setIsCopied] = useState(false);
+    const codeRef = useRef<HTMLElement>(null);
+
+    const fullCode = codeWithLang.replace(/^```(\w*\n)?|```$/g, '');
+    const lang = codeWithLang.match(/^```(\w*)/)?.[1] || '';
+
+    const handleCopy = () => {
+        if (codeRef.current) {
+            navigator.clipboard.writeText(codeRef.current.innerText);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        }
+    };
+
+    return (
+        <div className="relative group my-4">
+            <pre><code ref={codeRef} className={`language-${lang}`}>{fullCode}</code></pre>
+            <button
+                onClick={handleCopy}
+                className="absolute top-2 right-2 p-1.5 rounded-md bg-black/20 text-white/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Copy code"
+            >
+                {isCopied ? <Check size={16} /> : <Copy size={16} />}
+            </button>
+        </div>
+    );
+};
+
+const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
     const html = useMemo(() => {
         const lines = text.split('\n');
         const htmlElements: string[] = [];
@@ -55,45 +147,111 @@ const MarkdownRenderer: React.FC<{ text: string }> = ({ text }) => {
             }
         };
 
-        lines.forEach(line => {
-            // Corrected the order of replacements. Bold (**) must be processed before italic (*).
-            let processedLine = line
+        const applyInlineFormatting = (str: string) => {
+            return str
+                .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0;" />')
+                .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                .replace(/__(.*?)__/g, '<u>$1</u>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/~~(.*?)~~/g, '<s>$1</s>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/\^(.*?)\^/g, '<sup>$1</sup>')
+                .replace(/~(.*?)~/g, '<sub>$1</sub>');
+        };
 
-            const ulMatch = processedLine.match(/^(\s*)(\*|-)\s+(.*)/);
+        lines.forEach(line => {
+            if (line.trim() === '') {
+                closeList();
+                htmlElements.push('<br>');
+                return;
+            }
+            
+            if (line.startsWith('#')) {
+                const h3Match = line.match(/^###\s+(.*)/);
+                if (h3Match) {
+                    closeList();
+                    htmlElements.push(`<h3>${applyInlineFormatting(h3Match[1])}</h3>`);
+                    return;
+                }
+                const h2Match = line.match(/^##\s+(.*)/);
+                if (h2Match) {
+                    closeList();
+                    htmlElements.push(`<h2>${applyInlineFormatting(h2Match[1])}</h2>`);
+                    return;
+                }
+                const h1Match = line.match(/^#\s+(.*)/);
+                if (h1Match) {
+                    closeList();
+                    htmlElements.push(`<h1>${applyInlineFormatting(h1Match[1])}</h1>`);
+                    return;
+                }
+            }
+            
+            const ulMatch = line.match(/^(\s*)(\*|-)\s+(.*)/);
             if (ulMatch) {
                 if (inList !== 'ul') {
                     closeList();
                     htmlElements.push('<ul>');
                     inList = 'ul';
                 }
-                htmlElements.push(`<li>${ulMatch[3]}</li>`);
+                let listItemContent = ulMatch[3];
+                const todoUncheckedMatch = listItemContent.match(/^\[ \]\s+(.*)/);
+                if (todoUncheckedMatch) {
+                    listItemContent = `<label style="display: flex; align-items: start; gap: 0.5em; cursor: default;"><input type="checkbox" disabled style="margin-top: 0.25em;" /><span>${applyInlineFormatting(todoUncheckedMatch[1])}</span></label>`;
+                } else {
+                    const todoCheckedMatch = listItemContent.match(/^\[x\]\s+(.*)/i);
+                    if (todoCheckedMatch) {
+                        listItemContent = `<label style="display: flex; align-items: start; gap: 0.5em; cursor: default;"><input type="checkbox" checked disabled style="margin-top: 0.25em;" /><span style="text-decoration: line-through; opacity: 0.7;">${applyInlineFormatting(todoCheckedMatch[1])}</span></label>`;
+                    } else {
+                        listItemContent = applyInlineFormatting(listItemContent);
+                    }
+                }
+                htmlElements.push(`<li>${listItemContent}</li>`);
                 return;
             }
-
-            const olMatch = processedLine.match(/^(\s*)(\d+\.)\s+(.*)/);
+            
+            const olMatch = line.match(/^(\s*)(\d+\.)\s+(.*)/);
             if (olMatch) {
                 if (inList !== 'ol') {
                     closeList();
                     htmlElements.push('<ol>');
                     inList = 'ol';
                 }
-                htmlElements.push(`<li>${olMatch[3]}</li>`);
+                htmlElements.push(`<li>${applyInlineFormatting(olMatch[3])}</li>`);
                 return;
             }
-
+            
             closeList();
-            if (processedLine.trim()) {
-                htmlElements.push(`<p>${processedLine}</p>`);
-            }
+            htmlElements.push(`<p>${applyInlineFormatting(line)}</p>`);
         });
 
         closeList();
         return htmlElements.join('');
     }, [text]);
 
-    return <div className="prose-styles" dangerouslySetInnerHTML={{ __html: html }} />;
+    return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
+
+const MarkdownRenderer: React.FC<{ text: string }> = ({ text }) => {
+    const content = useMemo(() => {
+        const regex = /(```[\s\S]*?```|!\[Image:\s*\{[^}]*\}\])/g;
+        const parts = text.split(regex).filter(Boolean);
+
+        return parts.map((part, index) => {
+            if (part.startsWith('```')) {
+                return <CodeBlock key={index} codeWithLang={part} />;
+            }
+            if (part.startsWith('![Image:')) {
+                const match = part.match(/!\[Image:\s*\{(.*?)\}\]/);
+                const prompt = match ? match[1] : '';
+                return <ImageGenerator key={index} prompt={prompt} />;
+            }
+            return <RegularMarkdown key={index} text={part} />;
+        });
+    }, [text]);
+
+    return <div className="prose-styles">{content}</div>;
 };
 
 
@@ -513,10 +671,17 @@ const AuraAiPage: React.FC = () => {
     const initializeChat = useCallback(() => {
         try {
             const ai = new GoogleGenAI({ apiKey: API_KEY });
+            const currentDate = new Date().toLocaleDateString(undefined, {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+            const currentTime = new Date().toLocaleTimeString();
+
+            const systemInstruction = `You are Aura, a powerful and helpful AI assistant. The current date and time is ${currentDate}, ${currentTime}. Your goal is to provide comprehensive, well-structured, and supportive answers. You can answer questions on any topic. Use markdown extensively for formatting, including headings (## for main titles, ### for subheadings), lists, bold, italics, etc. To request an image generation, use the specific markdown format: \`![Image: {A descriptive prompt for the image to be generated}]\`. Do not use regular markdown image syntax \`![]()\`.`;
+
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
-                    systemInstruction: "You are Aura, a helpful and friendly AI assistant within a focus and wellness app. Your goal is to provide clear, concise, and supportive answers to user's doubts. Keep your responses encouraging and brief. You MUST use markdown for formatting like bold, italics, and lists.",
+                    systemInstruction,
                 }
             });
             setChat(newChat);
@@ -1145,16 +1310,12 @@ const AuraAiPage: React.FC = () => {
                     layoutId="aura-ai-input-form"
                     layout
                     transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                    className="relative rounded-2xl p-[2px]"
+                    className="relative"
                 >
-                    <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
                     <form
                         onSubmit={handleSend}
-                        className="relative flex gap-2 items-center p-1 rounded-[14px] bg-light-bg-secondary dark:bg-dark-bg-secondary"
+                        className="relative flex gap-2 items-center p-1 rounded-2xl bg-light-bg-secondary dark:bg-dark-bg-secondary border border-white/10 focus-within:border-light-primary/50 dark:focus-within:border-dark-primary/50 transition-colors"
                     >
-                        <button type="button" onClick={handleAddContextClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Add journal context">
-                            <BookText size={20} />
-                        </button>
                         <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
                             <Paperclip size={20} />
                         </button>
@@ -1296,11 +1457,11 @@ const AuraAiPage: React.FC = () => {
                 .dark\\:hover\\:border-dark-primary\\/50:hover {
                     border-color: hsla(var(--accent-dark), 0.5);
                 }
-                .focus-within\\:border-light-primary:focus-within {
-                     border-color: hsl(var(--accent-light));
+                .focus-within\\:border-light-primary\\/50:focus-within {
+                     border-color: hsla(var(--accent-light), 0.5);
                 }
-                .dark\\:focus-within\\:border-dark-primary:focus-within {
-                    border-color: hsl(var(--accent-dark));
+                .dark\\:focus-within\\:border-dark-primary\\/50:focus-within {
+                    border-color: hsla(var(--accent-dark), 0.5);
                 }
                 .prose-styles p:not(:last-child) { margin-bottom: 0.75rem; }
                 .prose-styles ul, .prose-styles ol { margin-left: 1.25rem; margin-top: 0.5rem; margin-bottom: 0.75rem; }
@@ -1309,6 +1470,40 @@ const AuraAiPage: React.FC = () => {
                 .prose-styles li:not(:last-child) { margin-bottom: 0.25rem; }
                 .prose-styles strong { font-weight: 600; }
                 .prose-styles em { font-style: italic; }
+                .prose-styles h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; margin-top: 1.5rem; }
+                .prose-styles h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; margin-top: 1.25rem; }
+                .prose-styles h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem; }
+                .prose-styles li > label { margin: 0; padding: 0; }
+                .prose-styles code {
+                    background-color: rgba(128, 128, 128, 0.15);
+                    padding: 0.1em 0.3em;
+                    border-radius: 0.25rem;
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                    font-size: 0.9em;
+                }
+                .prose-styles pre {
+                    background-color: rgba(128, 128, 128, 0.1);
+                    padding: 0.75rem;
+                    border-radius: 0.5rem;
+                    margin: 1rem 0;
+                    overflow-x: auto;
+                    font-size: 0.9em;
+                }
+                .prose-styles pre code {
+                    background-color: transparent;
+                    padding: 0;
+                    border-radius: 0;
+                }
+                .prose-styles u { text-decoration: underline; }
+                .prose-styles s { text-decoration: line-through; }
+                .prose-styles sub { vertical-align: sub; font-size: 0.75em; }
+                .prose-styles sup { vertical-align: super; font-size: 0.75em; }
+                .prose-styles a {
+                    color: hsl(var(--accent-light));
+                    text-decoration: none;
+                }
+                .prose-styles a:hover { text-decoration: underline; }
+                html.dark .prose-styles a { color: hsl(var(--accent-dark)); }
                 .line-clamp-2 {
                     overflow: hidden;
                     display: -webkit-box;
