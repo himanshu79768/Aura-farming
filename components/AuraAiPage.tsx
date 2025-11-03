@@ -884,7 +884,7 @@ const AuraAiPage: React.FC = () => {
                     onSubmit={handleSend}
                     className="group w-full max-w-xl mx-auto"
                 >
-                    <div className={`relative rounded-2xl shadow-xl dark:shadow-3xl transition-all duration-300 ${isTextareaFocused ? 'bg-light-primary dark:bg-dark-primary p-[2px]' : 'bg-transparent p-[2px]'}`}>
+                    <div className={`relative rounded-2xl shadow-xl dark:shadow-3xl transition-all duration-300 border-2 ${isTextareaFocused ? 'border-cyan-400' : 'border-transparent'}`}>
                         <div className="relative flex flex-col bg-light-glass/50 dark:bg-dark-glass/50 rounded-[14px] min-h-[136px] transition-colors duration-300">
                             <div className="p-3">
                                 <motion.button 
@@ -1063,17 +1063,17 @@ const AuraAiPage: React.FC = () => {
                     layout
                     transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                     onSubmit={handleSend}
-                    className="relative flex gap-2 items-center"
+                    className={`relative flex gap-2 items-center p-1 rounded-2xl border-2 transition-colors bg-light-bg-secondary dark:bg-dark-bg-secondary ${isTextareaFocused ? 'border-cyan-400' : 'border-transparent'}`}
                 >
-                    <button type="button" onClick={handleAddContextClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Add journal context">
+                    <button type="button" onClick={handleAddContextClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Add journal context">
                         <BookText size={20} />
                     </button>
-                    <button type="button" onClick={handleAttachmentClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
+                    <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
                         <Paperclip size={20} />
                     </button>
-                    <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
+                    <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
                     <div className="flex items-center gap-1 flex-shrink-0">
-                        <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                        <button type="button" onClick={handleMicClick} className={`p-1 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
                             {isListening ? <MicOff size={20} /> : <Mic size={20} />}
                         </button>
                         <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200">
