@@ -48,7 +48,7 @@ export interface FocusSession {
   createdAt?: any; // For Firestore serverTimestamp
 }
 
-export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'flow' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView' | 'sessionLinking' | 'linkedJournals' | 'attachmentViewer' | 'auraCheckin' | 'auraAI';
+export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'flow' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView' | 'sessionLinking' | 'linkedJournals' | 'attachmentViewer' | 'auraCheckin' | 'auraAI' | 'auraChatHistory';
 
 export interface UserProfile {
   name: string;
@@ -81,7 +81,7 @@ export interface Settings {
 export interface UserData extends Settings, UserProfile {
     mood: Mood;
     favoriteQuotes: Record<string, boolean>;
-    auraChatHistory?: ChatMessage[];
+    auraChatSessions?: ChatMessage[][];
 }
 
 

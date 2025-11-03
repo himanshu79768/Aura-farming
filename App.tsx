@@ -293,9 +293,8 @@ interface AppContextType {
   currentView: View;
   modalStack: { view: View; params?: any }[];
   isImmersive: boolean;
-  auraChatHistory: ChatMessage[];
-  updateAuraChatHistory: (history: ChatMessage[]) => void;
-  clearAuraChatHistory: () => void;
+  auraChatSessions: ChatMessage[][];
+  saveChatSession: (messages: ChatMessage[]) => void;
   toggleImmersive: () => void;
   toggleSearch: () => void;
   isAiLoading: boolean;
@@ -342,7 +341,7 @@ const DEFAULT_USER_DATA: UserData = {
     ...DEFAULT_PROFILE,
     mood: Mood.Calm,
     favoriteQuotes: {},
-    auraChatHistory: [],
+    auraChatSessions: [],
 };
 
 export default function App() {
@@ -366,7 +365,7 @@ export default function App() {
   const [focusSearchQuery, setFocusSearchQuery] = useState('');
   const [isImmersive, setIsImmersive] = useLocalStorage('isImmersive', false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [auraChatHistory, setAuraChatHistory] = useState<ChatMessage[]>([]);
+  const [auraChatSessions, setAuraChatSessions] = useState<ChatMessage[][]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [magicTransition, setMagicTransition] = useState<{ active: boolean; origin: { x: number; y: number } }>({ active: false, origin: { x: 0, y: 0 } });
   
@@ -454,7 +453,7 @@ export default function App() {
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
-            setAuraChatHistory(data.auraChatHistory || []);
+            setAuraChatSessions(data.auraChatSessions || []);
 
             const journalEntriesArray = data.journalEntries 
                 ? Object.entries(data.journalEntries).map(([id, entry]) => ({ id, ...entry } as JournalEntry)).sort((a,b) => b.createdAt - a.createdAt)
@@ -508,20 +507,19 @@ export default function App() {
     update(ref(db, 'users/' + dataPathUid), data);
   }, [currentUser, masterUid]);
 
-  const updateAuraChatHistory = useCallback((history: ChatMessage[]) => {
-    const dataPathUid = masterUid || currentUser?.uid;
-    if (!dataPathUid) return;
-    // Optimistic update
-    setAuraChatHistory(history);
-    update(ref(db, `users/${dataPathUid}`), { auraChatHistory: history });
-    }, [currentUser, masterUid]);
-
-    const clearAuraChatHistory = useCallback(() => {
+  const saveChatSession = useCallback((messagesToSave: ChatMessage[]) => {
+        if (messagesToSave.length === 0) return;
         const dataPathUid = masterUid || currentUser?.uid;
         if (!dataPathUid) return;
-        // Optimistic update
-        setAuraChatHistory([]);
-        update(ref(db, `users/${dataPathUid}`), { auraChatHistory: null });
+
+        setAuraChatSessions(prevSessions => {
+            const isAlreadySaved = prevSessions.some(session => JSON.stringify(session) === JSON.stringify(messagesToSave));
+            if (isAlreadySaved) return prevSessions;
+
+            const newSessions = [messagesToSave, ...prevSessions].slice(0, 3);
+            update(ref(db, `users/${dataPathUid}`), { auraChatSessions: newSessions });
+            return newSessions;
+        });
     }, [currentUser, masterUid]);
 
   const handleSetMood = useCallback((newMood: Mood) => updateUserData({ mood: newMood }), [updateUserData]);
@@ -612,7 +610,7 @@ export default function App() {
         setFavoriteQuotes([]);
         setJournalEntries([]);
         setFocusHistory([]);
-        setAuraChatHistory([]);
+        setAuraChatSessions([]);
         setShowIntro(false);
     }, [vibrate, setMasterUid]);
 
@@ -918,7 +916,7 @@ export default function App() {
     showConfirmationModal, showAlertModal,
     currentUser,
     currentView, modalStack,
-    auraChatHistory, updateAuraChatHistory, clearAuraChatHistory,
+    auraChatSessions, saveChatSession,
     isImmersive, toggleImmersive,
     toggleSearch,
     isAiLoading, setIsAiLoading,
@@ -927,7 +925,7 @@ export default function App() {
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
     focusHistory, addFocusSession, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
-    auraChatHistory, updateAuraChatHistory, clearAuraChatHistory,
+    auraChatSessions, saveChatSession,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, sessionName,
     focusSearchQuery,
