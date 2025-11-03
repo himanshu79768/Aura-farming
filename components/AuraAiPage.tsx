@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, Search, BookOpen } from 'lucide-react';
+import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, Search, BookOpen, ChevronDown } from 'lucide-react';
 import { GoogleGenAI, Chat, Part, Modality } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
@@ -392,6 +393,8 @@ const AuraAiPage: React.FC = () => {
     const [isJournalContextModalOpen, setIsJournalContextModalOpen] = useState(false);
     const [isTextareaFocused, setIsTextareaFocused] = useState(false);
     const [isDesktop, setIsDesktop] = useState(false);
+    const [isResearchMode, setIsResearchMode] = useState(false);
+    const [thinkingLogVisible, setThinkingLogVisible] = useState(false);
     
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -708,19 +711,43 @@ const AuraAiPage: React.FC = () => {
         let modelResponseText = '';
 
         try {
-            const result = await chat.sendMessageStream({ message: userMessagePartsForApi });
+            const streamOptions: { message: Part[]; config?: any } = { message: userMessagePartsForApi };
+            if (isResearchMode) {
+                streamOptions.config = {
+                    thinkingConfig: { thinkingBudget: 24576 } // Max for flash
+                };
+            }
+
+            const result = await chat.sendMessageStream(streamOptions);
             
             const modelMessageId = crypto.randomUUID();
             
-            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
+            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }], thinkingSteps: [] }]);
 
             for await (const chunk of result) {
                 modelResponseText += chunk.text;
-                setMessages(prev => prev.map(msg => 
-                    msg.id === modelMessageId 
-                    ? { ...msg, parts: [{ text: modelResponseText }] }
-                    : msg
-                ));
+                
+                setMessages(prev => prev.map(msg => {
+                    if (msg.id === modelMessageId) {
+                        const newMsg = { ...msg };
+                        
+                        // Append text
+                        newMsg.parts = [{ text: modelResponseText }];
+                        
+                        // Handle thinking state
+                        if (chunk.thinkingState?.lastAction) {
+                            const newThinkingStep = chunk.thinkingState.lastAction;
+                            const existingSteps = newMsg.thinkingSteps || [];
+                            
+                            // Avoid adding duplicate consecutive steps
+                            if (existingSteps[existingSteps.length - 1] !== newThinkingStep) {
+                                newMsg.thinkingSteps = [...existingSteps, newThinkingStep];
+                            }
+                        }
+                        return newMsg;
+                    }
+                    return msg;
+                }));
             }
 
         } catch (error) {
@@ -902,7 +929,7 @@ const AuraAiPage: React.FC = () => {
                     <div className="relative rounded-2xl shadow-xl dark:shadow-3xl p-[2px]">
                         <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
                         <div className="relative flex flex-col bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-[14px] min-h-[136px] transition-colors duration-300">
-                            <div className="p-3">
+                            <div className="p-3 flex gap-2">
                                 <motion.button 
                                     type="button" 
                                     onClick={handleAddContextClick}
@@ -912,6 +939,21 @@ const AuraAiPage: React.FC = () => {
                                 >
                                     <BookText size={16} />
                                     <span className="text-sm">Add context</span>
+                                </motion.button>
+                                <motion.button 
+                                    type="button" 
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => {
+                                        vibrate();
+                                        setIsResearchMode(prev => !prev);
+                                    }} 
+                                    className={`flex items-center gap-2 px-3 h-9 text-sm rounded-full transition-colors ${isResearchMode 
+                                        ? 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary' 
+                                        : 'text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10'
+                                    }`}>
+                                    <BrainCircuit size={16}/>
+                                    <span>Research {isResearchMode ? 'On' : 'Off'}</span>
                                 </motion.button>
                             </div>
                             <textarea
@@ -927,19 +969,10 @@ const AuraAiPage: React.FC = () => {
                                 className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base"
                             />
                             <div className="p-2 flex justify-between items-center">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
                                     <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
                                         <Paperclip size={20} />
                                     </button>
-                                    <motion.button 
-                                        type="button" 
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => showAlertModal({ title: "Coming Soon", message: "Research mode will enable deeper thinking for complex tasks."})} 
-                                        className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
-                                        <BrainCircuit size={16}/>
-                                        Research
-                                    </motion.button>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
@@ -1003,59 +1036,91 @@ const AuraAiPage: React.FC = () => {
                     transition={{ duration: 0.4, delay: 0.15 }}
                 >
                     <div className="p-4 space-y-6">
-                        {messages.map((msg, index) => (
-                            <div key={msg.id} className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                <div className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    {msg.role === 'model' && (
-                                        <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary">
-                                            <Sparkles size={18} />
-                                        </div>
-                                    )}
-                                    <div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-light-primary dark:bg-dark-primary text-white rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass rounded-bl-lg'}`}>
-                                        {msg.role === 'model' ? 
-                                            (<div className={isLoading && index === messages.length - 1 ? 'typing-cursor' : ''}>
-                                                {msg.parts[0] && 'text' in msg.parts[0] ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
-                                            </div>) : 
-                                            (<div className="flex flex-col gap-2">
-                                                {msg.parts.map((part, i) => {
-                                                    if ('inlineData' in part && typeof part.inlineData === 'object') {
-                                                        const { mimeType, data, name } = part.inlineData;
-                                                        const fullDataUrl = `data:${mimeType};base64,${data}`;
-                                                        if (mimeType === 'application/vnd.aura.journal') {
-                                                            return (
-                                                                <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg">
-                                                                    <BookText size={16} />
-                                                                    <span className="truncate text-sm font-medium">{name || 'Journal Context'}</span>
+                        {messages.map((msg, index) => {
+                            const lastThinkingStep = msg.thinkingSteps?.[msg.thinkingSteps.length - 1];
+                            return (
+                                <div key={msg.id} className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                    <div className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        {msg.role === 'model' && (
+                                            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary">
+                                                <Sparkles size={18} />
+                                            </div>
+                                        )}
+                                        <div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-light-primary dark:bg-dark-primary text-white rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass rounded-bl-lg'}`}>
+                                            {msg.role === 'model' ? 
+                                                (<div>
+                                                    {isLoading && index === messages.length - 1 && lastThinkingStep && (
+                                                        <div className="mb-2 border-b border-white/10 pb-2">
+                                                            <button onClick={() => setThinkingLogVisible(prev => !prev)} className="w-full flex items-center justify-between gap-2 text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                                    <BrainCircuit size={14} className="text-light-primary dark:text-dark-primary animate-pulse flex-shrink-0"/>
+                                                                    <span className="truncate text-left">{lastThinkingStep}</span>
                                                                 </div>
-                                                            );
+                                                                <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${thinkingLogVisible ? 'rotate-180' : ''}`} />
+                                                            </button>
+                                                            <AnimatePresence>
+                                                                {thinkingLogVisible && msg.thinkingSteps && msg.thinkingSteps.length > 1 && (
+                                                                    <motion.div
+                                                                        initial={{ height: 0, opacity: 0 }}
+                                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                                        exit={{ height: 0, opacity: 0 }}
+                                                                        className="overflow-hidden"
+                                                                    >
+                                                                        <ul className="mt-2 pl-5 text-xs text-light-text-secondary dark:text-dark-text-secondary list-disc space-y-1">
+                                                                            {msg.thinkingSteps.slice(0, -1).map((step, i) => (
+                                                                                <li key={i} className="opacity-70">{step}</li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </motion.div>
+                                                                )}
+                                                            </AnimatePresence>
+                                                        </div>
+                                                    )}
+                                                    <div className={isLoading && index === messages.length - 1 && !lastThinkingStep ? 'typing-cursor' : ''}>
+                                                        {msg.parts[0] && 'text' in msg.parts[0] ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
+                                                    </div>
+                                                </div>) : 
+                                                (<div className="flex flex-col gap-2">
+                                                    {msg.parts.map((part, i) => {
+                                                        if ('inlineData' in part && typeof part.inlineData === 'object') {
+                                                            const { mimeType, data, name } = part.inlineData;
+                                                            const fullDataUrl = `data:${mimeType};base64,${data}`;
+                                                            if (mimeType === 'application/vnd.aura.journal') {
+                                                                return (
+                                                                    <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg">
+                                                                        <BookText size={16} />
+                                                                        <span className="truncate text-sm font-medium">{name || 'Journal Context'}</span>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            if (mimeType?.startsWith('image/')) {
+                                                                return <img key={i} src={fullDataUrl} alt={name || "User upload"} className="rounded-lg max-w-full h-auto max-h-64 object-contain" />;
+                                                            } else {
+                                                                return (<div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg"><AttachmentIcon type={mimeType || ''} /><span className="truncate text-sm font-medium">{name || 'Attached File'}</span></div>);
+                                                            }
                                                         }
-                                                        if (mimeType?.startsWith('image/')) {
-                                                            return <img key={i} src={fullDataUrl} alt={name || "User upload"} className="rounded-lg max-w-full h-auto max-h-64 object-contain" />;
-                                                        } else {
-                                                            return (<div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg"><AttachmentIcon type={mimeType || ''} /><span className="truncate text-sm font-medium">{name || 'Attached File'}</span></div>);
+                                                        if ('text' in part && part.text) {
+                                                            return <div key={i} style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{part.text}</div>;
                                                         }
-                                                    }
-                                                    if ('text' in part && part.text) {
-                                                        return <div key={i} style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{part.text}</div>;
-                                                    }
-                                                    return null;
-                                                })}
-                                            </div>)
-                                        }
+                                                        return null;
+                                                    })}
+                                                </div>)
+                                            }
+                                        </div>
+                                        {msg.role === 'user' && (
+                                            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400">
+                                                <UserIcon size={18} />
+                                            </div>
+                                        )}
                                     </div>
-                                    {msg.role === 'user' && (
-                                        <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400">
-                                            <UserIcon size={18} />
+                                    {msg.role === 'model' && !(isLoading && index === messages.length - 1) && msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text && (
+                                        <div className="flex flex-col items-start gap-2 mt-2 ml-11">
+                                            <ActionButtons message={msg} />
                                         </div>
                                     )}
                                 </div>
-                                {msg.role === 'model' && !(isLoading && index === messages.length - 1) && msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text && (
-                                    <div className="flex flex-col items-start gap-2 mt-2 ml-11">
-                                        <ActionButtons message={msg} />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </motion.div>
             </OverscrollContainer>

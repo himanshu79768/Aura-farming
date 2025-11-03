@@ -109,6 +109,7 @@ export interface ChatMessage {
   role: 'user' | 'model';
   parts: Part[];
   sources?: { title: string; uri: string }[];
+  thinkingSteps?: string[];
 }
 
 export interface AuraData {
