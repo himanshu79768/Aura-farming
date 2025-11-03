@@ -316,11 +316,11 @@ const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClo
                             </div>
                         </OverscrollContainer>
                         
-                        <div className="flex-shrink-0 p-4 border-t border-white/10">
+                        <div className="flex-shrink-0 p-4 border-t border-white/10 flex justify-center">
                             <motion.button
                                 onClick={handleAddContext}
                                 disabled={selectedIds.length === 0}
-                                className="w-full py-3 font-semibold bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full shadow-lg disabled:opacity-50"
                                 whileTap={{ scale: 0.98 }}
                             >
                                 Add Context ({selectedIds.length})
