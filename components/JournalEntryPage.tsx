@@ -1021,6 +1021,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
         const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
+            
+            if (target.classList.contains('image-resizer-handle')) {
+                return;
+            }
+
             const img = target.closest('figure.generated-image img') as HTMLImageElement;
 
             // Don't trigger viewer if an image is selected for resizing
@@ -1171,15 +1176,26 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
      // --- End AI Logic ---
      
     const handleInlineImageUpload = () => {
-        setIsImageSourceMenuOpen(false);
         inlineImageInputRef.current?.click();
     };
 
     const handleImageGenerateOption = () => {
-        setIsImageSourceMenuOpen(false);
         restoreSelection();
         setCurrentAiTask('GENERATE_IMAGE');
         setIsAiModalOpen(true);
+    };
+    
+    const handleImageSourceSelect = (source: 'upload' | 'generate') => {
+        setIsImageSourceMenuOpen(false);
+        // Use a short timeout to prevent click-through issues
+        // by allowing the bottom sheet to close before the next action is triggered.
+        setTimeout(() => {
+            if (source === 'upload') {
+                handleInlineImageUpload();
+            } else {
+                handleImageGenerateOption();
+            }
+        }, 100);
     };
 
     const handleInlineImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1417,7 +1433,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         >
             <button
                 onMouseDown={e => e.preventDefault()}
-                onClick={handleInlineImageUpload}
+                onClick={() => handleImageSourceSelect('upload')}
                 className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             >
                 <UploadCloud size={18} />
@@ -1425,7 +1441,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             </button>
             <button
                 onMouseDown={e => e.preventDefault()}
-                onClick={handleImageGenerateOption}
+                onClick={() => handleImageSourceSelect('generate')}
                 className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             >
                 <Sparkles size={18} />
@@ -1434,19 +1450,139 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
         </motion.div>
     );
 
+    const ImageSourceBottomSheet: React.FC<{
+        onClose: () => void;
+        onSelect: (source: 'upload' | 'generate') => void;
+    }> = ({ onClose, onSelect }) => {
+        return (
+            <motion.div
+                className="fixed inset-0 z-40 flex items-end p-2 bg-black/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+            >
+                <motion.div
+                    className="relative w-full max-w-md mx-auto bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl p-4 pt-8"
+                    initial={{ y: "100%" }}
+                    animate={{ y: "0%" }}
+                    exit={{ y: "100%" }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                    drag="y"
+                    dragConstraints={{ top: 0 }}
+                    onDragEnd={(event, info) => {
+                        if (info.offset.y > 100) {
+                            onClose();
+                        }
+                    }}
+                    dragElastic={{ top: 0, bottom: 0.5 }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
+                        <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                    </div>
+                    <h3 className="text-lg font-semibold text-center mb-4">Insert Image</h3>
+                    <div className="space-y-2">
+                        <button
+                            onClick={() => onSelect('upload')}
+                            className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        >
+                            <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg"><UploadCloud size={20} /></div>
+                            <div>
+                                <p className="font-semibold">Upload Image</p>
+                                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Choose from your device</p>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => onSelect('generate')}
+                            className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        >
+                            <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg"><Sparkles size={20} /></div>
+                            <div>
+                                <p className="font-semibold">Generate with AI</p>
+                                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Create an image from a prompt</p>
+                            </div>
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        );
+    };
+
+    const AttachmentBottomSheet: React.FC<{
+        onClose: () => void;
+        onSelect: (acceptType: string) => void;
+    }> = ({ onClose, onSelect }) => {
+        const attachmentOptions = [
+            { label: 'Photo', icon: ImageIcon, accept: 'image/jpeg, image/png', description: "Upload a JPG or PNG" },
+            { label: 'Files', icon: FileText, accept: 'application/pdf, .ppt, .pptx, application/vnd.ms-powerpoint, application/vnd.openxmlformats-officedocument.presentationml.presentation, .doc, .docx, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document', description: "PDF, Word, PowerPoint..." }
+        ];
+
+        return (
+            <motion.div
+                className="fixed inset-0 z-40 flex items-end p-2 bg-black/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+            >
+                <motion.div
+                    className="relative w-full max-w-md mx-auto bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl p-4 pt-8"
+                    initial={{ y: "100%" }}
+                    animate={{ y: "0%" }}
+                    exit={{ y: "100%" }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                    drag="y"
+                    dragConstraints={{ top: 0 }}
+                    onDragEnd={(event, info) => {
+                        if (info.offset.y > 100) {
+                            onClose();
+                        }
+                    }}
+                    dragElastic={{ top: 0, bottom: 0.5 }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
+                        <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                    </div>
+                    <h3 className="text-lg font-semibold text-center mb-4">Add Attachment</h3>
+                    <div className="space-y-2">
+                        {attachmentOptions.map(option => (
+                            <button
+                                key={option.label}
+                                onClick={() => onSelect(option.accept)}
+                                className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                            >
+                                <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg"><option.icon size={20} /></div>
+                                <div>
+                                    <p className="font-semibold">{option.label}</p>
+                                    <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{option.description}</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </motion.div>
+            </motion.div>
+        );
+    };
+
     const handleAttachmentButtonClick = () => {
         vibrate();
-        const button = attachmentButtonRef.current;
-        const container = positioningContainerRef.current;
-        if (button && container) {
-            const buttonRect = button.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            const MENU_HEIGHT = 88; // Approximate height of the menu
+        if (isDesktop) {
+            const button = attachmentButtonRef.current;
+            const container = positioningContainerRef.current;
+            if (button && container) {
+                const buttonRect = button.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                const MENU_HEIGHT = 88; // Approximate height of the menu
 
-            setAttachmentMenuPosition({
-                top: buttonRect.top - containerRect.top - MENU_HEIGHT, // Position above the button, reduced gap
-                right: containerRect.right - buttonRect.right, // Align right edge
-            });
+                setAttachmentMenuPosition({
+                    top: buttonRect.top - containerRect.top - MENU_HEIGHT,
+                    right: containerRect.right - buttonRect.right,
+                });
+                setIsAttachmentMenuOpen(true);
+            }
+        } else {
             setIsAttachmentMenuOpen(true);
         }
     };
@@ -1770,13 +1906,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     
         const handleImageButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
             saveSelection();
-            const rect = e.currentTarget.getBoundingClientRect();
-            const containerRect = positioningContainerRef.current?.getBoundingClientRect();
-            if (rect && containerRect) {
-                setImageSourceMenuPosition({ 
-                    top: rect.bottom - containerRect.top + 10,
-                    left: rect.left - containerRect.left + rect.width / 2
-                });
+            if (isDesktop) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const containerRect = positioningContainerRef.current?.getBoundingClientRect();
+                if (rect && containerRect) {
+                    setImageSourceMenuPosition({ 
+                        top: rect.bottom - containerRect.top + 10,
+                        left: rect.left - containerRect.left + rect.width / 2
+                    });
+                }
             }
             setIsImageSourceMenuOpen(true);
         };
@@ -1833,13 +1971,25 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <AnimatePresence>
-                {isImageSourceMenuOpen && <ImageSourceMenu />}
-                {isAttachmentMenuOpen && (
-                    <JournalAttachmentMenu
-                        menuRef={attachmentMenuRef}
-                        position={attachmentMenuPosition}
-                        onSelect={handleAttachmentMenuSelect}
+                {isImageSourceMenuOpen && (
+                    isDesktop 
+                    ? <ImageSourceMenu /> 
+                    : <ImageSourceBottomSheet 
+                        onClose={() => setIsImageSourceMenuOpen(false)} 
+                        onSelect={handleImageSourceSelect} 
                     />
+                )}
+                {isAttachmentMenuOpen && (
+                    isDesktop
+                        ? <JournalAttachmentMenu
+                            menuRef={attachmentMenuRef}
+                            position={attachmentMenuPosition}
+                            onSelect={handleAttachmentMenuSelect}
+                        />
+                        : <AttachmentBottomSheet
+                            onClose={() => setIsAttachmentMenuOpen(false)}
+                            onSelect={handleAttachmentMenuSelect}
+                        />
                 )}
             </AnimatePresence>
             <TablePopupMenu/>
@@ -2005,7 +2155,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                         <>
                         <motion.button
                             onClick={() => {vibrate(); setIsAiModalOpen(true);}}
-                            className="absolute bottom-6 left-6 w-16 h-16 bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full flex items-center justify-center shadow-lg z-20"
+                            className="absolute bottom-6 left-6 group z-20"
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             aria-label="Aura AI Assistant"
@@ -2013,7 +2163,10 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0, y: 50 }}
                         >
-                           <Sparkles size={24} />
+                            <div className="absolute -inset-1 bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-md opacity-75 group-hover:opacity-100 transition duration-500"></div>
+                            <div className="relative w-16 h-16 flex items-center justify-center bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
+                                <Sparkles size={24} className="text-cyan-400"/>
+                            </div>
                         </motion.button>
                         <motion.button
                             ref={attachmentButtonRef}
@@ -2043,20 +2196,27 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
             <AnimatePresence>
                 {isAiModalOpen && (
                     <motion.div
-                        className="fixed inset-0 z-40 flex flex-col justify-end bg-black/50"
+                        className="fixed inset-0 z-40 flex items-end p-2 bg-black/50"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={handleAiModalClose}
                     >
                         <motion.div
-                            className="w-full bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-t-2xl border-t border-white/10 shadow-3xl p-4"
+                            className="relative w-full max-w-md mx-auto bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl p-4 pt-8"
                             initial={{ y: "100%" }}
                             animate={{ y: "0%" }}
                             exit={{ y: "100%" }}
                             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                            drag="y"
+                            dragConstraints={{ top: 0 }}
+                            onDragEnd={(_, info) => { if (info.offset.y > 100) handleAiModalClose(); }}
+                            dragElastic={{ top: 0, bottom: 0.5 }}
                             onClick={(e) => e.stopPropagation()}
                         >
+                           <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
+                               <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                           </div>
                            <AnimatePresence mode="wait">
                             {currentAiTask ? (
                                 <motion.div
@@ -2084,9 +2244,19 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                                         className="w-full h-24 p-2 bg-light-glass dark:bg-dark-glass rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
                                         autoFocus
                                     />
-                                    <button onClick={() => handleAiAction(currentAiTask)} className="w-full mt-2 py-3 bg-light-primary dark:bg-dark-primary text-white rounded-full font-semibold">
-                                        {currentAiTask === 'ASK' ? 'Ask' : 'Generate'}
-                                    </button>
+                                    <div className="flex justify-center mt-4">
+                                        <motion.button
+                                            onClick={() => handleAiAction(currentAiTask)}
+                                            disabled={!aiCustomPrompt.trim()}
+                                            className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 text-white rounded-full font-semibold shadow-lg disabled:opacity-50"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                                        >
+                                            <Sparkles size={18} />
+                                            <span>{currentAiTask === 'ASK' ? 'Ask' : 'Generate'}</span>
+                                        </motion.button>
+                                    </div>
                                 </motion.div>
                             ) : (
                                 <motion.div 

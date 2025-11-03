@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Sparkles, Wind } from 'lucide-react';
 import { useAppContext } from '../App';
@@ -14,9 +14,10 @@ const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
 }
 
 const HomePage: React.FC = () => {
-  const { userProfile, vibrate, navigateTo, playUISound } = useAppContext();
+  const { userProfile, vibrate, navigateTo, playUISound, triggerMagicTransition } = useAppContext();
   const [greeting, setGreeting] = useState('');
   const [thought, setThought] = useState('');
+  const auraAiButtonRef = useRef<HTMLButtonElement>(null);
 
   const greetingContent = useMemo(() => {
     if (!greeting) return '';
@@ -67,6 +68,19 @@ const HomePage: React.FC = () => {
       playUISound('tap');
       navigateTo(view);
   };
+  
+  const handleAuraAiClick = () => {
+    if (auraAiButtonRef.current) {
+        const rect = auraAiButtonRef.current.getBoundingClientRect();
+        const origin = {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+        };
+        vibrate();
+        playUISound('tap');
+        triggerMagicTransition(origin, 'auraAI');
+    }
+  };
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -93,7 +107,8 @@ const HomePage: React.FC = () => {
 
       <div className="flex items-center justify-center gap-4 pb-28">
          <motion.button
-            onClick={() => handleNavigate('auraAI')}
+            ref={auraAiButtonRef}
+            onClick={handleAuraAiClick}
             className="relative inline-flex items-center justify-center rounded-full group"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -101,7 +116,7 @@ const HomePage: React.FC = () => {
           >
             <div className="absolute -inset-px bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-sm opacity-75 group-hover:opacity-100 transition duration-500"></div>
             <div className="relative flex items-center gap-2 px-6 py-3 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
-                <Sparkles className="w-5 h-5 text-purple-400" />
+                <Sparkles className="w-5 h-5 text-cyan-400" />
                 <span>Aura AI</span>
             </div>
         </motion.button>

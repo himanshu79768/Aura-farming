@@ -212,6 +212,39 @@ const GlisterEffect = () => {
     );
 };
 
+const MagicTransitionEffect: React.FC<{ origin: { x: number; y: number }; onComplete: () => void }> = ({ origin, onComplete }) => {
+    return (
+        <motion.div
+            className="fixed inset-0 z-[99] pointer-events-none"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            onAnimationComplete={onComplete}
+        >
+            <motion.div
+                className="absolute rounded-full bg-flow-gradient bg-400% animate-gradient-flow"
+                style={{
+                    left: origin.x,
+                    top: origin.y,
+                    translateX: '-50%',
+                    translateY: '-50%',
+                }}
+                initial={{
+                    width: '6rem', // approx button size with glow
+                    height: '6rem',
+                    opacity: 0.8,
+                }}
+                animate={{
+                    width: '200vmax', // large enough to cover the screen
+                    height: '200vmax',
+                    opacity: 0,
+                }}
+                transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+            />
+        </motion.div>
+    );
+};
+
 interface AppContextType {
   mood: Mood;
   setMood: (mood: Mood) => void;
@@ -267,6 +300,7 @@ interface AppContextType {
   toggleSearch: () => void;
   isAiLoading: boolean;
   setIsAiLoading: (isLoading: boolean) => void;
+  triggerMagicTransition: (origin: { x: number; y: number }, view: View, params?: any) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -282,8 +316,11 @@ export const useAppContext = () => {
 // --- Motion Variants & Transitions ---
 const pageVariants = { initial: { opacity: 0 }, in: { opacity: 1 }, out: { opacity: 0 } };
 const modalVariants = { initial: { x: '100%' }, in: { x: '0%' }, out: { x: '100%' } };
+const magicModalVariants = { initial: { opacity: 0, scale: 0.95 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.95 } };
 const pageTransition = { type: 'tween' as const, ease: 'easeInOut', duration: 0.3 };
 const modalTransition = { type: 'tween' as const, ease: [0.4, 0, 0.2, 1], duration: 0.4 };
+const magicModalTransition = { type: 'tween' as const, ease: [0.4, 0, 0.2, 1], duration: 0.4, delay: 0.1 };
+
 const moodFromColors: Record<Mood, string> = {
   [Mood.Calm]: 'from-blue-400/25',
   [Mood.Focus]: 'from-purple-400/25',
@@ -331,6 +368,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [auraChatHistory, setAuraChatHistory] = useState<ChatMessage[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [magicTransition, setMagicTransition] = useState<{ active: boolean; origin: { x: number; y: number } }>({ active: false, origin: { x: 0, y: 0 } });
   
   // Timer state
   const [timerState, setTimerState] = useState({ duration: 15 * 60, endTime: 0, isActive: false });
@@ -664,6 +702,11 @@ export default function App() {
             }
         }
     }, [currentView, modalStack]);
+    
+    const triggerMagicTransition = useCallback((origin: { x: number; y: number }, view: View, params?: any) => {
+        setMagicTransition({ active: true, origin });
+        navigateTo(view, params);
+    }, [navigateTo]);
 
 
   const navigateBack = useCallback(() => {
@@ -879,6 +922,7 @@ export default function App() {
     isImmersive, toggleImmersive,
     toggleSearch,
     isAiLoading, setIsAiLoading,
+    triggerMagicTransition,
   }), [
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
@@ -893,6 +937,7 @@ export default function App() {
     currentView, isAiLoading,
     isImmersive, toggleImmersive,
     toggleSearch,
+    triggerMagicTransition,
   ]);
   
   if (isLoading) {
@@ -908,7 +953,7 @@ export default function App() {
         <AnimatePresence>
             {isAiLoading && (
                 <motion.div
-                    className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/30 backdrop-blur-[3px]"
+                    className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/30 backdrop-blur-[8px]"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -918,6 +963,14 @@ export default function App() {
                     <SparkleIcon />
                     <FadingSubtitles />
                 </motion.div>
+            )}
+        </AnimatePresence>
+        <AnimatePresence>
+            {magicTransition.active && (
+                <MagicTransitionEffect
+                    origin={magicTransition.origin}
+                    onComplete={() => setMagicTransition(mt => ({ ...mt, active: false }))}
+                />
             )}
         </AnimatePresence>
         <AnimatePresence mode="wait">
@@ -947,6 +1000,10 @@ export default function App() {
                         <AnimatePresence>
                             {modalStack.map((modal, index) => {
                                 let modalContent = null;
+                                const isMagicView = modal.view === 'auraAI';
+                                const variantsToUse = isMagicView ? magicModalVariants : modalVariants;
+                                const transitionToUse = isMagicView ? magicModalTransition : modalTransition;
+
                                 switch (modal.view) {
                                     case 'settings':
                                         modalContent = <SettingsPage />;
@@ -998,12 +1055,12 @@ export default function App() {
                                     <motion.div
                                         key={modal.view + index}
                                         className="absolute inset-0 bg-light-bg dark:bg-dark-bg"
-                                        variants={modalVariants}
+                                        variants={variantsToUse}
                                         initial="initial"
                                         animate="in"
                                         exit="out"
-                                        transition={modalTransition}
-                                        style={{ zIndex: 30 + index, willChange: 'transform' }}
+                                        transition={transitionToUse}
+                                        style={{ zIndex: 30 + index, willChange: 'transform, opacity' }}
                                     >
                                         {modalContent}
                                     </motion.div>
