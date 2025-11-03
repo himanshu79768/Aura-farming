@@ -282,7 +282,7 @@ const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClo
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-2 bg-black/50"
+                    className="fixed inset-0 z-50 flex items-end justify-center p-2 bg-black/50"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -904,7 +904,7 @@ const AuraAiPage: React.FC = () => {
                     layout
                     transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                     onSubmit={handleSend}
-                    className="group w-full max-w-xl mx-auto"
+                    className="group w-full max-w-xl md:max-w-3xl mx-auto"
                 >
                     <div className="relative rounded-2xl shadow-xl dark:shadow-3xl p-[2px]">
                         <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
@@ -927,16 +927,10 @@ const AuraAiPage: React.FC = () => {
                                 onChange={e => setInput(e.target.value)}
                                 onFocus={() => setIsTextareaFocused(true)}
                                 onBlur={() => setIsTextareaFocused(false)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
                                 placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."}
                                 disabled={isLoading}
                                 rows={1}
-                                className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base"
+                                className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base transition-[height] duration-200 ease-in-out"
                             />
                             <div className="p-2 flex justify-between items-center">
                                 <div className="flex items-center gap-2">
@@ -970,7 +964,7 @@ const AuraAiPage: React.FC = () => {
             <AnimatePresence>
                 {attachments.length > 0 && (
                     <motion.div 
-                        className="w-full max-w-xl mx-auto px-4"
+                        className="w-full max-w-xl md:max-w-3xl mx-auto px-4"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
@@ -988,7 +982,7 @@ const AuraAiPage: React.FC = () => {
                 layout
                 exit={{ opacity: 0, y: 10 }}
                 transition={{ duration: 0.15 }}
-                className="w-full max-w-xl mt-4"
+                className="w-full max-w-xl md:max-w-3xl mt-4"
             >
                 <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-left">Get Started</h3>
                 <div className="grid grid-cols-2 gap-3 w-full">
@@ -1098,7 +1092,7 @@ const AuraAiPage: React.FC = () => {
                         <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
                             <Paperclip size={20} />
                         </button>
-                        <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
+                        <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2 transition-[height] duration-200 ease-in-out" />
                         <div className="flex items-center gap-1 flex-shrink-0">
                             <button type="button" onClick={handleMicClick} className={`p-1 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
                                 {isListening ? <MicOff size={20} /> : <Mic size={20} />}

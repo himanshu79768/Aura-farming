@@ -28,6 +28,7 @@ const MODAL_VIEW_ICONS: Partial<Record<View, React.ReactNode>> = {
     journalView: <FileText size={14} />,
     breathing: <Wind size={14} />,
     auraCheckin: <Sparkles size={14} />,
+    auraAI: <Sparkles size={14} />,
     soundOptions: <Music size={14} />,
 };
 
