@@ -169,6 +169,7 @@ const AttachmentIcon: React.FC<{ type: string }> = ({ type }) => {
     if (type === 'application/pdf') return <PdfIcon className="w-full h-full" />;
     if (type.includes('word')) return <WordIcon className="w-full h-full" />;
     if (type.includes('presentation') || type.includes('powerpoint')) return <PptIcon className="w-full h-full" />;
+    if (type === 'application/vnd.aura.journal') return <BookText className="w-full h-full text-blue-400 shrink-0" />;
     return <FileText className="w-full h-full text-gray-400 shrink-0" />;
 };
 
@@ -378,7 +379,7 @@ const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClo
 
 
 const AuraAiPage: React.FC = () => {
-    const { navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, settings } = useAppContext();
+    const { journalEntries, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, settings } = useAppContext();
     const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -629,6 +630,23 @@ const AuraAiPage: React.FC = () => {
 
         if (attachments.length > 0) {
             for (const attachment of attachments) {
+                 if (attachment.mimeType === 'application/vnd.aura.journal') {
+                    userMessagePartsForDisplay.push({
+                        inlineData: {
+                            data: '', // Not used for rendering
+                            mimeType: attachment.mimeType,
+                            name: attachment.name,
+                        }
+                    });
+                    const journal = journalEntries.find(j => j.id === attachment.id);
+                    if (journal) {
+                        const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
+                        const journalContextForModel = `The user has attached context from a journal entry titled "${journal.title}". Its content is as follows:\n\n---\n${plainTextContent}\n---`;
+                        userMessagePartsForApi.push({ text: journalContextForModel });
+                    }
+                    continue; // Skip to next attachment
+                }
+
                 userMessagePartsForDisplay.push({
                     inlineData: {
                         data: attachment.data.split(',')[1],
@@ -807,56 +825,19 @@ const AuraAiPage: React.FC = () => {
     };
 
     const handleAddJournalContext = (selectedJournals: JournalEntry[]) => {
-        if (selectedJournals.length === 0 || !chat) return;
+        if (selectedJournals.length === 0) return;
     
-        if (chatState === 'initial') {
-            setChatState('chat');
-        }
+        const journalAttachments: LocalAttachment[] = selectedJournals.map(j => ({
+            id: j.id,
+            mimeType: 'application/vnd.aura.journal',
+            name: j.title || 'Untitled Journal',
+            data: j.id, // Store ID, data url not needed for this type
+        }));
     
-        const contextSummary = selectedJournals.map(j => {
-            const plainTextContent = new DOMParser().parseFromString(j.content, 'text/html').body.textContent || '';
-            return `*   **${j.title || 'Untitled'}**: ${plainTextContent.substring(0, 150)}...`;
-        }).join('\n');
-    
-        const userMessage: ChatMessage = {
-            id: crypto.randomUUID(),
-            role: 'user',
-            parts: [{ text: `I've added context from ${selectedJournals.length} journal entr${selectedJournals.length > 1 ? 'ies' : 'y'}:\n\n${contextSummary}\n\nPlease use this context for my next questions.` }]
-        };
-    
-        setMessages(prev => [...prev, userMessage]);
-        setIsLoading(true);
-    
-        const fullContextForApi = selectedJournals.map(j => {
-             const plainTextContent = new DOMParser().parseFromString(j.content, 'text/html').body.textContent || '';
-            return `From journal "${j.title || 'Untitled'}":\n${plainTextContent}`;
-        }).join('\n\n');
-
-        const apiText = `The user has provided context from ${selectedJournals.length} journal(s). Acknowledge that you have received it and are ready for their questions. The content is:\n\n${fullContextForApi}`;
-
-        chat.sendMessageStream({ message: [{ text: apiText }] }).then(async (result) => {
-            let modelResponseText = '';
-            const modelMessageId = crypto.randomUUID();
-            
-            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
-
-            for await (const chunk of result) {
-                modelResponseText += chunk.text;
-                setMessages(prev => prev.map(msg => 
-                    msg.id === modelMessageId 
-                    ? { ...msg, parts: [{ text: modelResponseText }] }
-                    : msg
-                ));
-            }
-        }).catch(error => {
-            console.error("Aura AI Error:", error);
-            setMessages(prev => [...prev, {
-                id: crypto.randomUUID(),
-                role: 'model',
-                parts: [{ text: "Sorry, I couldn't process the provided context. Please try again." }]
-            }]);
-        }).finally(() => {
-            setIsLoading(false);
+        setAttachments(prev => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const newAttachments = journalAttachments.filter(j => !existingIds.has(j.id));
+            return [...prev, ...newAttachments];
         });
     };
 
@@ -1040,6 +1021,14 @@ const AuraAiPage: React.FC = () => {
                                                     if ('inlineData' in part && typeof part.inlineData === 'object') {
                                                         const { mimeType, data, name } = part.inlineData;
                                                         const fullDataUrl = `data:${mimeType};base64,${data}`;
+                                                        if (mimeType === 'application/vnd.aura.journal') {
+                                                            return (
+                                                                <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg">
+                                                                    <BookText size={16} />
+                                                                    <span className="truncate text-sm font-medium">{name || 'Journal Context'}</span>
+                                                                </div>
+                                                            );
+                                                        }
                                                         if (mimeType?.startsWith('image/')) {
                                                             return <img key={i} src={fullDataUrl} alt={name || "User upload"} className="rounded-lg max-w-full h-auto max-h-64 object-contain" />;
                                                         } else {
