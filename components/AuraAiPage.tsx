@@ -290,14 +290,18 @@ const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClo
                     onClick={handleClose}
                 >
                     <motion.div
-                        className="relative w-full max-w-lg h-[85vh] md:h-[70vh] bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl flex flex-col overflow-hidden"
-                        initial={{ y: "100%", opacity: 0 }}
-                        animate={{ y: "0%", opacity: 1 }}
-                        exit={{ y: "100%", opacity: 0 }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                        className="relative w-full max-w-lg h-[70vh] md:h-[70vh] bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl flex flex-col overflow-hidden"
+                        initial={{ y: "100%" }}
+                        animate={{ y: "0%" }}
+                        exit={{ y: "100%" }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 35 }}
+                        drag="y"
+                        dragConstraints={{ top: 0 }}
+                        onDragEnd={(_, info) => { if (info.offset.y > 100) handleClose(); }}
+                        dragElastic={{ top: 0, bottom: 0.5 }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="absolute top-0 left-0 right-0 md:hidden flex justify-center pt-3 cursor-grab">
+                        <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
                             <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
                         </div>
                         <div className="flex-shrink-0 p-4 pt-6 flex items-center justify-between border-b border-white/10">
@@ -1009,15 +1013,14 @@ const AuraAiPage: React.FC = () => {
     const ChatView = (
         <motion.div
             key="chat-view"
-            className="flex-grow flex flex-col w-full overflow-hidden"
+            className="flex-grow flex flex-col w-full min-h-0"
         >
-            <motion.div
-                className="flex-grow"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.15 }}
-            >
-                <OverscrollContainer ref={scrollRef} className="h-full overflow-y-auto">
+            <OverscrollContainer ref={scrollRef} className="flex-grow w-full overflow-y-auto">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.4, delay: 0.15 }}
+                >
                     <div className="p-4 space-y-6">
                         {messages.map((msg, index) => (
                             <div key={msg.id} className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -1065,8 +1068,8 @@ const AuraAiPage: React.FC = () => {
                             </div>
                         ))}
                     </div>
-                </OverscrollContainer>
-            </motion.div>
+                </motion.div>
+            </OverscrollContainer>
             <div className="flex-shrink-0 w-full p-4 pt-2 bg-light-glass/50 dark:bg-dark-glass/50 shadow-xl dark:shadow-3xl">
                 <AnimatePresence>
                     {attachments.length > 0 && (
