@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare } from 'lucide-react';
+import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, Search, BookOpen } from 'lucide-react';
 import { GoogleGenAI, Chat, Part, Modality } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
 import Header from './Header';
-import { ChatMessage } from '../types';
+import { ChatMessage, JournalEntry } from '../types';
 import AttachmentTypeModal from './AttachmentTypeModal';
 import OverscrollContainer from './OverscrollContainer';
+import SearchBar from './SearchBar';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
@@ -121,12 +122,63 @@ const ActionButtons: React.FC<{ message: ChatMessage }> = ({ message }) => {
     );
 };
 
+const WordIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 48 48" className={className}>
+        <path fill="#283593" d="M9,33.595l14.911-18.706L41,26v13.306C41,41.346,39.346,43,37.306,43H15.332	C11.835,43,9,40.164,9,36.667C9,36.667,9,33.595,9,33.595z"></path><linearGradient id="qh2LT5tehRDFkLLfb-odWa_EqxMzyq5jqdz_gr1" x1="9" x2="33.506" y1="364.445" y2="364.445" gradientTransform="translate(0 -339.89)" gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#66c0ff"></stop><stop offset=".26" stopColor="#0094f0"></stop></linearGradient><path fill="url(#qh2LT5tehRDFkLLfb-odWa_EqxMzyq5jqdz_gr1)" d="M9,20.208c0-2.624,2.126-4.75,4.749-4.75h21.857L41,12.778v13.527	C41,28.346,39.346,30,37.306,30H15.332C11.835,30,9,32.836,9,36.333L9,20.208L9,20.208z"></path><path fill="#1e88e5" fillOpacity=".6" d="M9,20.208c0-2.624,2.126-4.75,4.749-4.75h21.857L41,12.778v13.527	C41,28.346,39.346,30,37.306,30H15.332C11.835,30,9,32.836,9,36.333L9,20.208L9,20.208z"></path><path fill="#00e5ff" d="M9,10.333C9,6.836,11.835,4,15.332,4h21.975C39.346,4,41,5.654,41,7.694v5.611	C41,15.346,39.346,17,37.306,17H15.332C11.835,17,9,19.836,9,23.333C9,23.333,9,10.333,9,10.333z"></path><path fill="#1565c0" d="M7.5,23h10c1.933,0,3.5,1.567,3.5,3.5v10c0,1.933-1.567,3.5-3.5,3.5h-10C5.567,40,4,38.433,4,36.5	v-10C4,24.567,5.567,23,7.5,23z"></path><path fill="#fff" d="M18.327,26.643l-2.092,9.713l-2.501,0.002L12.5,30.529l-1.293,5.829H8.683l-2.01-9.713h2.062	l1.24,6.41l1.232-6.41h2.528l1.291,6.41l1.21-6.41L18.327,26.643L18.327,26.643z"></path>
+    </svg>
+);
+
+const PdfIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" aria-label="PDF" role="img" viewBox="0 0 512 512" className={className}>
+        <rect width="512" height="512" rx="15%" fill="#c80a0a"/>
+        <path fill="#ffffff" d="M413 302c-9-10-29-15-56-15-16 0-33 2-53 5a252 252 0 0 1-52-69c10-30 17-59 17-81 0-17-6-44-30-44-7 0-13 4-17 10-10 18-6 58 13 100a898 898 0 0 1-50 117c-53 22-88 46-91 65-2 9 4 24 25 24 31 0 65-45 91-91a626 626 0 0 1 92-24c38 33 71 38 87 38 32 0 35-23 24-35zM227 111c8-12 26-8 26 16 0 16-5 42-15 72-18-42-18-75-11-88zM100 391c3-16 33-38 80-57-26 44-52 72-68 72-10 0-13-9-12-15zm197-98a574 574 0 0 0-83 22 453 453 0 0 0 36-84 327 327 0 0 0 47 62zm13 4c32-5 59-4 71-2 29 6 19 41-13 33-23-5-42-18-58-31z"/>
+    </svg>
+);
+
+const PptIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" className={className}>
+        <defs><linearGradient id="a" x1="4.494" y1="-1748.086" x2="13.832" y2="-1731.914" gradientTransform="translate(0 1756)" gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ca4c28"/><stop offset="0.5" stopColor="#c5401e"/><stop offset="1" stopColor="#b62f14"/></linearGradient></defs><title>file_type_powerpoint</title><path d="M18.93,17.3,16.977,3h-.146A12.9,12.9,0,0,0,3.953,15.854V16Z" style={{fill:"#ed6c47"}}/><path d="M17.123,3h-.146V16l6.511,2.6L30,16v-.146A12.9,12.9,0,0,0,17.123,3Z" style={{fill:"#ff8f6b"}}/><path d="M30,16v.143A12.905,12.905,0,0,1,17.12,29h-.287A12.907,12.907,0,0,1,3.953,16.143V16Z" style={{fill:"#d35230"}}/><path d="M17.628,9.389V23.26a1.2,1.2,0,0,1-.742,1.1,1.16,1.16,0,0,1-.45.091H7.027c-.182-.208-.358-.429-.521-.65a12.735,12.735,0,0,1-2.553-7.657v-.286A12.705,12.705,0,0,1,6.05,8.85c.143-.221.293-.442.456-.65h9.93A1.2,1.2,0,0,1,17.628,9.389Z" style={{opacity:0.1,isolation:"isolate"}}/><path d="M16.977,10.04V23.911a1.15,1.15,0,0,1-.091.448,1.2,1.2,0,0,1-1.1.741H7.62q-.309-.314-.593-.65c-.182-.208-.358-.429-.521-.65a12.735,12.735,0,0,1-2.553-7.657v-.286A12.705,12.705,0,0,1,6.05,8.85h9.735A1.2,1.2,0,0,1,16.977,10.04Z" style={{opacity:0.2,isolation:"isolate"}}/><path d="M16.977,10.04V22.611A1.2,1.2,0,0,1,15.785,23.8H6.506a12.735,12.735,0,0,1-2.553-7.657v-.286A12.705,12.705,0,0,1,6.05,8.85h9.735A1.2,1.2,0,0,1,16.977,10.04Z" style={{opacity:0.2,isolation:"isolate"}}/><path d="M16.326,10.04V22.611A1.2,1.2,0,0,1,15.134,23.8H6.506a12.735,12.735,0,0,1-2.553-7.657v-.286A12.705,12.705,0,0,1,6.05,8.85h9.084A1.2,1.2,0,0,1,16.326,10.04Z" style={{opacity:0.2,isolation:"isolate"}}/><path d="M3.194,8.85H15.132a1.193,1.193,0,0,1,1.194,1.191V21.959a1.193,1.193,0,0,1-1.194,1.191H3.194A1.192,1.192,0,0,1,2,21.959V10.041A1.192,1.192,0,0,1,3.194,8.85Z" style={{fill:"url(#a)"}}/><path d="M9.293,12.028a3.287,3.287,0,0,1,2.174.636,2.27,2.27,0,0,1,.756,1.841,2.555,2.555,0,0,1-.373,1.376,2.49,2.49,0,0,1-1.059.935A3.607,3.607,0,0,1,9.2,17.15H7.687v2.8H6.141V12.028ZM7.686,15.94H9.017a1.735,1.735,0,0,0,1.177-.351,1.3,1.3,0,0,0,.4-1.025q0-1.309-1.525-1.31H7.686V15.94Z" style={{fill:"#fff"}}/>
+    </svg>
+);
+
 const AttachmentIcon: React.FC<{ type: string }> = ({ type }) => {
-    if (type.startsWith('image/')) return <ImageIcon size={24} className="text-purple-400 shrink-0" />;
-    if (type === 'application/pdf') return <FileText size={24} className="text-red-400 shrink-0" />;
-    if (type.includes('word')) return <FileText size={24} className="text-blue-500 shrink-0" />;
-    if (type.includes('presentation') || type.includes('powerpoint')) return <FileText size={24} className="text-orange-500 shrink-0" />;
-    return <FileText size={24} className="text-gray-400 shrink-0" />;
+    if (type.startsWith('image/')) return <ImageIcon className="w-full h-full text-purple-400 shrink-0" />;
+    if (type === 'application/pdf') return <PdfIcon className="w-full h-full" />;
+    if (type.includes('word')) return <WordIcon className="w-full h-full" />;
+    if (type.includes('presentation') || type.includes('powerpoint')) return <PptIcon className="w-full h-full" />;
+    return <FileText className="w-full h-full text-gray-400 shrink-0" />;
+};
+
+type LocalAttachment = { id: string; data: string; mimeType: string; name: string };
+
+const AttachmentPreview: React.FC<{ attachment: LocalAttachment; onRemove: () => void; }> = ({ attachment, onRemove }) => {
+    const isImage = attachment.mimeType.startsWith('image/');
+    return (
+        <motion.div
+            layout
+            className="relative flex-shrink-0 mt-2 mr-2"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        >
+            <div className="w-32 h-32 rounded-xl border border-white/10 bg-light-bg-secondary dark:bg-dark-bg">
+                {isImage ? (
+                    <img src={attachment.data} alt={attachment.name} className="w-full h-full object-contain rounded-xl" />
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-center p-2">
+                        <div className="w-14 h-14">
+                            <AttachmentIcon type={attachment.mimeType} />
+                        </div>
+                        <p className="text-xs mt-2 leading-tight break-words w-full line-clamp-3">{attachment.name}</p>
+                    </div>
+                )}
+            </div>
+            <button onClick={onRemove} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center border-2 border-light-bg-secondary dark:border-dark-bg-secondary shadow-md">
+                <X size={14} />
+            </button>
+        </motion.div>
+    );
 };
 
 // --- Audio Helper Functions ---
@@ -160,17 +212,156 @@ async function decodeAudioData(
 }
 
 
+interface JournalContextModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onAddContext: (selectedJournals: JournalEntry[]) => void;
+}
+
+const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClose, onAddContext }) => {
+    const { journalEntries, vibrate, playUISound } = useAppContext();
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredJournals = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return journalEntries;
+        }
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        return journalEntries.filter(entry =>
+            entry.title?.toLowerCase().includes(lowerCaseQuery) ||
+            entry.content.toLowerCase().includes(lowerCaseQuery)
+        );
+    }, [journalEntries, searchQuery]);
+
+    const handleToggle = (id: string) => {
+        vibrate();
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleAddContext = () => {
+        playUISound('success');
+        const selectedJournals = journalEntries.filter(j => selectedIds.includes(j.id));
+        onAddContext(selectedJournals);
+        onClose();
+        // Reset state for next time
+        setSelectedIds([]);
+        setSearchQuery('');
+    };
+    
+    const handleClose = () => {
+        playUISound('tap');
+        onClose();
+    }
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-2 bg-black/50"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={handleClose}
+                >
+                    <motion.div
+                        className="relative w-full max-w-lg h-[85vh] md:h-[70vh] bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl flex flex-col overflow-hidden"
+                        initial={{ y: "100%", opacity: 0 }}
+                        animate={{ y: "0%", opacity: 1 }}
+                        exit={{ y: "100%", opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="absolute top-0 left-0 right-0 md:hidden flex justify-center pt-3 cursor-grab">
+                            <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                        </div>
+                        <div className="flex-shrink-0 p-4 pt-6 flex items-center justify-between border-b border-white/10">
+                            <h2 className="text-xl font-bold">Add Journal Context</h2>
+                            <button onClick={handleClose} className="p-2 -mr-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><X size={20}/></button>
+                        </div>
+                        <div className="flex-shrink-0 p-4">
+                            <SearchBar
+                                searchQuery={searchQuery}
+                                setSearchQuery={setSearchQuery}
+                                placeholder="Search journals..."
+                            />
+                        </div>
+
+                        <OverscrollContainer className="flex-grow overflow-y-auto">
+                            <div className="p-4 pt-0 space-y-2">
+                                {filteredJournals.length > 0 ? filteredJournals.map(entry => (
+                                    <motion.button
+                                        key={entry.id}
+                                        onClick={() => handleToggle(entry.id)}
+                                        className={`w-full flex items-center gap-4 text-left p-3 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 ${selectedIds.includes(entry.id) ? 'selected-journal-item' : 'border-transparent'}`}
+                                    >
+                                        <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md border-2 transition-all ${selectedIds.includes(entry.id) ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-400'}`}>
+                                            {selectedIds.includes(entry.id) && <Check size={16} className="text-white"/>}
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <p className="font-semibold truncate">{entry.title || "Untitled Entry"}</p>
+                                            <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                                                {new Date(entry.date).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </motion.button>
+                                )) : (
+                                    <div className="text-center py-16 text-light-text-secondary dark:text-dark-text-secondary">
+                                        <BookOpen size={32} className="mx-auto mb-2" />
+                                        <p>No journals found.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </OverscrollContainer>
+                        
+                        <div className="flex-shrink-0 p-4 border-t border-white/10">
+                            <motion.button
+                                onClick={handleAddContext}
+                                disabled={selectedIds.length === 0}
+                                className="w-full py-3 font-semibold bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 flex items-center justify-center gap-2"
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                Add Context ({selectedIds.length})
+                            </motion.button>
+                        </div>
+                         <style>{`
+                            .dark\\:bg-dark-primary {
+                                background-color: hsl(var(--accent-dark));
+                            }
+                            .bg-light-primary {
+                                background-color: hsl(var(--accent-light));
+                            }
+                            .selected-journal-item {
+                                background-color: hsla(var(--accent-light), 0.1);
+                                border-color: hsla(var(--accent-light), 0.3);
+                            }
+                            html.dark .selected-journal-item {
+                                background-color: hsla(var(--accent-dark), 0.1);
+                                border-color: hsla(var(--accent-dark), 0.3);
+                            }
+                         `}</style>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+};
+
+
 const AuraAiPage: React.FC = () => {
     const { navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, settings } = useAppContext();
     const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [attachment, setAttachment] = useState<{ data: string; mimeType: string; name: string } | null>(null);
+    const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
     const [isListening, setIsListening] = useState(false);
     const [showAttachmentModal, setShowAttachmentModal] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [chatState, setChatState] = useState<'initial' | 'chat'>(messages.length > 0 ? 'chat' : 'initial');
+    const [isJournalContextModalOpen, setIsJournalContextModalOpen] = useState(false);
     
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -399,7 +590,7 @@ const AuraAiPage: React.FC = () => {
 
         const currentInput = isProgrammaticSend ? e : input;
         
-        if (!currentInput.trim() && !attachment) return;
+        if (!currentInput.trim() && attachments.length === 0) return;
 
         if (chatState === 'initial') {
             setChatState('chat');
@@ -408,42 +599,44 @@ const AuraAiPage: React.FC = () => {
         const userMessagePartsForDisplay: Part[] = [];
         const userMessagePartsForApi: Part[] = [];
 
-        if (attachment) {
-            userMessagePartsForDisplay.push({
-                inlineData: {
-                    data: attachment.data.split(',')[1],
-                    mimeType: attachment.mimeType,
-                    name: attachment.name,
-                }
-            });
-
-            if (attachment.mimeType.startsWith('image/')) {
-                userMessagePartsForApi.push({
+        if (attachments.length > 0) {
+            for (const attachment of attachments) {
+                userMessagePartsForDisplay.push({
                     inlineData: {
                         data: attachment.data.split(',')[1],
                         mimeType: attachment.mimeType,
+                        name: attachment.name,
                     }
                 });
-            } else if (attachment.mimeType === 'application/pdf') {
-                const pdfData = dataURLToUint8Array(attachment.data);
-                try {
-                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                    let pdfText = '';
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        pdfText += textContent.items.map(item => ('str' in item ? item.str : '')).join(' ');
+
+                if (attachment.mimeType.startsWith('image/')) {
+                    userMessagePartsForApi.push({
+                        inlineData: {
+                            data: attachment.data.split(',')[1],
+                            mimeType: attachment.mimeType,
+                        }
+                    });
+                } else if (attachment.mimeType === 'application/pdf') {
+                    const pdfData = dataURLToUint8Array(attachment.data);
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                        let pdfText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            pdfText += textContent.items.map(item => ('str' in item ? item.str : '')).join(' ');
+                        }
+                        const pdfContentForModel = `The user attached a PDF named "${attachment.name}". Its content is: ${pdfText}`;
+                        userMessagePartsForApi.push({ text: pdfContentForModel });
+                    } catch (error) {
+                        console.error("PDF processing error:", error);
+                        showAlertModal({ title: "PDF Error", message: "Could not process the attached PDF." });
+                        return;
                     }
-                    const pdfContentForModel = `The user attached a PDF named "${attachment.name}". Its content is: ${pdfText}`;
-                    userMessagePartsForApi.push({ text: pdfContentForModel });
-                } catch (error) {
-                    console.error("PDF processing error:", error);
-                    showAlertModal({ title: "PDF Error", message: "Could not process the attached PDF." });
-                    return;
+                } else {
+                    const otherFileContentForModel = `The user has attached a file named "${attachment.name}" of type ${attachment.mimeType}. You cannot process its contents, but you should acknowledge that it has been attached.`;
+                    userMessagePartsForApi.push({ text: otherFileContentForModel });
                 }
-            } else {
-                const otherFileContentForModel = `The user has attached a file named "${attachment.name}" of type ${attachment.mimeType}. You cannot process its contents, but you should acknowledge that it has been attached.`;
-                userMessagePartsForApi.push({ text: otherFileContentForModel });
             }
         }
         
@@ -464,7 +657,7 @@ const AuraAiPage: React.FC = () => {
 
         setMessages(prev => [...prev, userMessage]);
         setInput('');
-        setAttachment(null);
+        setAttachments([]);
         setIsLoading(true);
         let modelResponseText = '';
 
@@ -521,7 +714,13 @@ const AuraAiPage: React.FC = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const dataUrl = event.target?.result as string;
-            setAttachment({ data: dataUrl, mimeType: file.type, name: file.name });
+            const newAttachment: LocalAttachment = {
+                id: crypto.randomUUID(),
+                data: dataUrl,
+                mimeType: file.type,
+                name: file.name
+            };
+            setAttachments(prev => [...prev, newAttachment]);
         };
         reader.onerror = () => {
             showAlertModal({ title: "Error", message: "Failed to read the file." });
@@ -529,8 +728,8 @@ const AuraAiPage: React.FC = () => {
         reader.readAsDataURL(file);
     };
 
-    const handleRemoveAttachment = () => {
-        setAttachment(null);
+    const handleRemoveAttachment = (idToRemove: string) => {
+        setAttachments(prev => prev.filter(att => att.id !== idToRemove));
     };
 
     const handleMicClick = () => {
@@ -557,7 +756,7 @@ const AuraAiPage: React.FC = () => {
         }
         setMessages([]);
         setInput('');
-        setAttachment(null);
+        setAttachments([]);
         initializeChat();
         setChatState('initial');
     };
@@ -565,6 +764,65 @@ const AuraAiPage: React.FC = () => {
     const handleHistoryClick = () => {
         vibrate();
         setIsHistoryOpen(true);
+    };
+    
+    const handleAddContextClick = () => {
+        vibrate();
+        setIsJournalContextModalOpen(true);
+    };
+
+    const handleAddJournalContext = (selectedJournals: JournalEntry[]) => {
+        if (selectedJournals.length === 0 || !chat) return;
+    
+        if (chatState === 'initial') {
+            setChatState('chat');
+        }
+    
+        const contextSummary = selectedJournals.map(j => {
+            const plainTextContent = new DOMParser().parseFromString(j.content, 'text/html').body.textContent || '';
+            return `*   **${j.title || 'Untitled'}**: ${plainTextContent.substring(0, 150)}...`;
+        }).join('\n');
+    
+        const userMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'user',
+            parts: [{ text: `I've added context from ${selectedJournals.length} journal entr${selectedJournals.length > 1 ? 'ies' : 'y'}:\n\n${contextSummary}\n\nPlease use this context for my next questions.` }]
+        };
+    
+        setMessages(prev => [...prev, userMessage]);
+        setIsLoading(true);
+    
+        const fullContextForApi = selectedJournals.map(j => {
+             const plainTextContent = new DOMParser().parseFromString(j.content, 'text/html').body.textContent || '';
+            return `From journal "${j.title || 'Untitled'}":\n${plainTextContent}`;
+        }).join('\n\n');
+
+        const apiText = `The user has provided context from ${selectedJournals.length} journal(s). Acknowledge that you have received it and are ready for their questions. The content is:\n\n${fullContextForApi}`;
+
+        chat.sendMessageStream({ message: [{ text: apiText }] }).then(async (result) => {
+            let modelResponseText = '';
+            const modelMessageId = crypto.randomUUID();
+            
+            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
+
+            for await (const chunk of result) {
+                modelResponseText += chunk.text;
+                setMessages(prev => prev.map(msg => 
+                    msg.id === modelMessageId 
+                    ? { ...msg, parts: [{ text: modelResponseText }] }
+                    : msg
+                ));
+            }
+        }).catch(error => {
+            console.error("Aura AI Error:", error);
+            setMessages(prev => [...prev, {
+                id: crypto.randomUUID(),
+                role: 'model',
+                parts: [{ text: "Sorry, I couldn't process the provided context. Please try again." }]
+            }]);
+        }).finally(() => {
+            setIsLoading(false);
+        });
     };
 
     const loadHistory = (historyMessages: ChatMessage[]) => {
@@ -617,71 +875,91 @@ const AuraAiPage: React.FC = () => {
                 <h2 className="text-2xl font-semibold">How can I help you today?</h2>
             </motion.div>
             
-            <motion.form
-                layoutId="aura-ai-input-form"
-                layout
-                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                onSubmit={handleSend}
-                className="group w-full max-w-xl mx-auto my-6"
-            >
-                <div className="relative flex flex-col bg-light-glass/50 dark:bg-dark-glass/50 rounded-2xl min-h-[140px] border-2 border-transparent focus-within:border-light-primary dark:focus-within:border-dark-primary transition-colors duration-300 shadow-lg dark:shadow-2xl">
-                    <div className="p-3">
-                        <motion.button 
-                            type="button" 
-                            onClick={handleHistoryClick}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
-                            <BookText size={16}/>
-                            Add context
-                        </motion.button>
-                    </div>
-                    <textarea
-                        ref={textareaRef}
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSend();
-                            }
-                        }}
-                        placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."}
-                        disabled={isLoading}
-                        rows={1}
-                        className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base"
-                    />
-                    <div className="p-2 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
-                                <Paperclip size={20} />
-                            </button>
+            <div className="w-full my-6">
+                <motion.form
+                    layoutId="aura-ai-input-form"
+                    layout
+                    transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    onSubmit={handleSend}
+                    className="group w-full max-w-xl mx-auto"
+                >
+                    <div className="relative flex flex-col bg-light-glass/50 dark:bg-dark-glass/50 rounded-2xl min-h-[140px] border-2 border-transparent focus-within:border-light-primary dark:focus-within:border-dark-primary transition-colors duration-300 shadow-lg dark:shadow-2xl">
+                        <div className="p-3">
                             <motion.button 
                                 type="button" 
+                                onClick={handleAddContextClick}
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={() => showAlertModal({ title: "Coming Soon", message: "Research mode will enable deeper thinking for complex tasks."})} 
                                 className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
-                                <BrainCircuit size={16}/>
-                                Research
+                                <BookText size={16}/>
+                                Add context
                             </motion.button>
                         </div>
-                        <div className="flex items-center gap-1">
-                            <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-                            </button>
-                            <button type="submit" disabled={(!input.trim() && !attachment) || isLoading} className="w-9 h-9 flex items-center justify-center bg-light-accent dark:bg-dark-accent text-white rounded-full disabled:opacity-50 transition-transform duration-200">
-                                <Send size={18} />
-                            </button>
+                        <textarea
+                            ref={textareaRef}
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSend();
+                                }
+                            }}
+                            placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."}
+                            disabled={isLoading}
+                            rows={1}
+                            className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base"
+                        />
+                        <div className="p-2 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
+                                    <Paperclip size={20} />
+                                </button>
+                                <motion.button 
+                                    type="button" 
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => showAlertModal({ title: "Coming Soon", message: "Research mode will enable deeper thinking for complex tasks."})} 
+                                    className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
+                                    <BrainCircuit size={16}/>
+                                    Research
+                                </motion.button>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                    {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                                </button>
+                                <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-light-accent dark:bg-dark-accent text-white rounded-full disabled:opacity-50 transition-transform duration-200">
+                                    <Send size={18} />
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </motion.form>
+                </motion.form>
+            </div>
 
+            <AnimatePresence>
+                {attachments.length > 0 && (
+                    <motion.div 
+                        className="w-full max-w-xl mx-auto px-4"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                    >
+                        <div className="flex gap-3 overflow-x-auto pb-2">
+                            {attachments.map(att => (
+                                <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            
             <motion.div
+                layout
                 exit={{ opacity: 0, y: 10 }}
                 transition={{ duration: 0.15 }}
-                className="grid grid-cols-2 gap-3 w-full max-w-xl"
+                className="grid grid-cols-2 gap-3 w-full max-w-xl mt-4"
             >
                 {starterPrompts.map(prompt => (
                     <button key={prompt.text} onClick={() => handleSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-transparent hover:border-light-primary/50 dark:hover:border-dark-primary/50 transition-all flex items-center gap-3">
@@ -754,17 +1032,20 @@ const AuraAiPage: React.FC = () => {
                     </div>
                 </OverscrollContainer>
             </motion.div>
-            <div className="flex-shrink-0 w-full p-4 border-t border-white/10">
+            <div className="flex-shrink-0 w-full p-4 pt-2 border-t border-white/10">
                 <AnimatePresence>
-                    {attachment && (
-                        <motion.div className="mb-2 p-2 bg-light-glass dark:bg-dark-glass rounded-lg flex items-center justify-between" initial={{ opacity: 0, height: 0, marginBottom: 0 }} animate={{ opacity: 1, height: 'auto', marginBottom: '0.5rem' }} exit={{ opacity: 0, height: 0, marginBottom: 0 }}>
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <AttachmentIcon type={attachment.mimeType} />
-                                <span className="text-sm truncate">{attachment.name}</span>
+                    {attachments.length > 0 && (
+                        <motion.div 
+                            className="w-full pb-2"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                        >
+                            <div className="flex gap-3 overflow-x-auto pb-2">
+                                {attachments.map(att => (
+                                    <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />
+                                ))}
                             </div>
-                            <button onClick={handleRemoveAttachment} className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded-full flex-shrink-0">
-                                <X size={16} />
-                            </button>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -775,7 +1056,10 @@ const AuraAiPage: React.FC = () => {
                     onSubmit={handleSend}
                     className="relative flex gap-2 items-center"
                 >
-                    <button type="button" onClick={handleAttachmentClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
+                    <button type="button" onClick={handleAddContextClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Add journal context">
+                        <BookText size={20} />
+                    </button>
+                    <button type="button" onClick={handleAttachmentClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
                         <Paperclip size={20} />
                     </button>
                     <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
@@ -783,7 +1067,7 @@ const AuraAiPage: React.FC = () => {
                         <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
                             {isListening ? <MicOff size={20} /> : <Mic size={20} />}
                         </button>
-                        <button type="submit" disabled={(!input.trim() && !attachment) || isLoading} className="w-9 h-9 flex items-center justify-center bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 transition-transform duration-200">
+                        <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 transition-transform duration-200">
                            <Send size={18} />
                         </button>
                     </div>
@@ -836,6 +1120,12 @@ const AuraAiPage: React.FC = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+            
+            <JournalContextModal 
+                isOpen={isJournalContextModalOpen}
+                onClose={() => setIsJournalContextModalOpen(false)}
+                onAddContext={handleAddJournalContext}
+            />
 
             <div className="flex-grow flex flex-col w-full overflow-hidden">
                 <AnimatePresence mode="wait">
@@ -922,6 +1212,18 @@ const AuraAiPage: React.FC = () => {
                 .prose-styles li:not(:last-child) { margin-bottom: 0.25rem; }
                 .prose-styles strong { font-weight: 600; }
                 .prose-styles em { font-style: italic; }
+                .line-clamp-2 {
+                    overflow: hidden;
+                    display: -webkit-box;
+                    -webkit-box-orient: vertical;
+                    -webkit-line-clamp: 2;
+                }
+                 .line-clamp-3 {
+                    overflow: hidden;
+                    display: -webkit-box;
+                    -webkit-box-orient: vertical;
+                    -webkit-line-clamp: 3;
+                }
             `}</style>
         </div>
     );

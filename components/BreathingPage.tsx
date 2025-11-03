@@ -15,7 +15,7 @@ type Phase = keyof typeof PHASES;
 const CYCLE: Phase[] = ['inhale', 'hold1', 'exhale', 'hold2'];
 
 const BreathingPage: React.FC = () => {
-    const { navigateBack, playSound, vibrate } = useAppContext();
+    const { navigateBack, playFocusSound, vibrate } = useAppContext();
     const [phase, setPhase] = useState<Phase>('idle');
     const [cyclesLeft, setCyclesLeft] = useState(5);
     const [isActive, setIsActive] = useState(false);
@@ -25,8 +25,8 @@ const BreathingPage: React.FC = () => {
 
         const { duration } = PHASES[phase];
         
-        if (phase === 'inhale') playSound('inhale');
-        if (phase === 'exhale') playSound('exhale');
+        if (phase === 'inhale') playFocusSound('inhale');
+        if (phase === 'exhale') playFocusSound('exhale');
         vibrate('light');
 
         const timer = setTimeout(() => {
@@ -49,7 +49,7 @@ const BreathingPage: React.FC = () => {
         }, duration * 1000);
 
         return () => clearTimeout(timer);
-    }, [phase, isActive, cyclesLeft, playSound, vibrate]);
+    }, [phase, isActive, cyclesLeft, playFocusSound, vibrate]);
 
     const handleStart = () => {
         setIsActive(true);

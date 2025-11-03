@@ -24,7 +24,7 @@ const MusicPill: React.FC = () => (
 );
 
 const FlowPage: React.FC = () => {
-    const { navigateBack, addFocusSession, settings, playSound, vibrate } = useAppContext();
+    const { navigateBack, addFocusSession, settings, playFocusSound, vibrate } = useAppContext();
     const [mode, setMode] = useState<'counting' | 'focus' | 'break' | 'finished'>('counting');
     const [countdown, setCountdown] = useState(3);
     const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -37,7 +37,7 @@ const FlowPage: React.FC = () => {
             if (mode === 'counting') {
                 setCountdown(prev => {
                     if (prev <= 1) {
-                        playSound(settings.focusSound);
+                        playFocusSound(settings.focusSound);
                         vibrate('medium');
                         setMode('focus');
                         setTimeLeft(25 * 60);
@@ -51,12 +51,12 @@ const FlowPage: React.FC = () => {
                         if (mode === 'focus') {
                             addFocusSession(25 * 60, 'Flow Session');
                             vibrate('heavy');
-                            playSound(settings.focusSound);
+                            playFocusSound(settings.focusSound);
                             setMode('break');
                             return 5 * 60;
                         } else { // mode is 'break'
                             vibrate('heavy');
-                            playSound(settings.focusSound);
+                            playFocusSound(settings.focusSound);
                             setMode('finished');
                             return 0;
                         }
@@ -67,7 +67,7 @@ const FlowPage: React.FC = () => {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [mode, addFocusSession, settings.focusSound, playSound, vibrate]);
+    }, [mode, addFocusSession, settings.focusSound, playFocusSound, vibrate]);
 
 
     useEffect(() => {
