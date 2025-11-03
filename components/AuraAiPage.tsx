@@ -362,6 +362,7 @@ const AuraAiPage: React.FC = () => {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [chatState, setChatState] = useState<'initial' | 'chat'>(messages.length > 0 ? 'chat' : 'initial');
     const [isJournalContextModalOpen, setIsJournalContextModalOpen] = useState(false);
+    const [isTextareaFocused, setIsTextareaFocused] = useState(false);
     
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -869,8 +870,8 @@ const AuraAiPage: React.FC = () => {
                 transition={{ duration: 0.15 }}
                 className="flex flex-col items-center"
             >
-                <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary border border-light-primary/20 dark:border-dark-primary/20">
-                    <Sparkles size={40} />
+                <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-light-glass/80 dark:bg-dark-glass/80 border border-white/10">
+                    <Sparkles size={40} className="text-cyan-400"/>
                 </div>
                 <h2 className="text-2xl font-semibold">How can I help you today?</h2>
             </motion.div>
@@ -883,55 +884,60 @@ const AuraAiPage: React.FC = () => {
                     onSubmit={handleSend}
                     className="group w-full max-w-xl mx-auto"
                 >
-                    <div className="relative flex flex-col bg-light-glass/50 dark:bg-dark-glass/50 rounded-2xl min-h-[140px] border-2 border-transparent focus-within:border-light-primary dark:focus-within:border-dark-primary transition-colors duration-300 shadow-lg dark:shadow-2xl">
-                        <div className="p-3">
-                            <motion.button 
-                                type="button" 
-                                onClick={handleAddContextClick}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
-                                <BookText size={16}/>
-                                Add context
-                            </motion.button>
-                        </div>
-                        <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleSend();
-                                }
-                            }}
-                            placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."}
-                            disabled={isLoading}
-                            rows={1}
-                            className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base"
-                        />
-                        <div className="p-2 flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                                <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
-                                    <Paperclip size={20} />
-                                </button>
+                    <div className={`relative rounded-2xl shadow-xl dark:shadow-3xl transition-all duration-300 ${isTextareaFocused ? 'bg-light-primary dark:bg-dark-primary p-[2px]' : 'bg-transparent p-[2px]'}`}>
+                        <div className="relative flex flex-col bg-light-glass/50 dark:bg-dark-glass/50 rounded-[14px] min-h-[136px] transition-colors duration-300">
+                            <div className="p-3">
                                 <motion.button 
                                     type="button" 
+                                    onClick={handleAddContextClick}
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    onClick={() => showAlertModal({ title: "Coming Soon", message: "Research mode will enable deeper thinking for complex tasks."})} 
-                                    className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
-                                    <BrainCircuit size={16}/>
-                                    Research
+                                    className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors"
+                                >
+                                    <BookText size={16} />
+                                    <span className="text-sm">Add context</span>
                                 </motion.button>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                                    {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-                                </button>
-                                <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-light-accent dark:bg-dark-accent text-white rounded-full disabled:opacity-50 transition-transform duration-200">
-                                    <Send size={18} />
-                                </button>
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onFocus={() => setIsTextareaFocused(true)}
+                                onBlur={() => setIsTextareaFocused(false)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."}
+                                disabled={isLoading}
+                                rows={1}
+                                className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base"
+                            />
+                            <div className="p-2 flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
+                                        <Paperclip size={20} />
+                                    </button>
+                                    <motion.button 
+                                        type="button" 
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => showAlertModal({ title: "Coming Soon", message: "Research mode will enable deeper thinking for complex tasks."})} 
+                                        className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
+                                        <BrainCircuit size={16}/>
+                                        Research
+                                    </motion.button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                        {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                                    </button>
+                                    <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200">
+                                        <Send size={18} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -959,14 +965,17 @@ const AuraAiPage: React.FC = () => {
                 layout
                 exit={{ opacity: 0, y: 10 }}
                 transition={{ duration: 0.15 }}
-                className="grid grid-cols-2 gap-3 w-full max-w-xl mt-4"
+                className="w-full max-w-xl mt-4"
             >
-                {starterPrompts.map(prompt => (
-                    <button key={prompt.text} onClick={() => handleSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-transparent hover:border-light-primary/50 dark:hover:border-dark-primary/50 transition-all flex items-center gap-3">
-                        <span className="text-light-primary dark:text-dark-primary">{prompt.icon}</span>
-                        <span>{prompt.text}</span>
-                    </button>
-                ))}
+                <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-center">Get Started</h3>
+                <div className="grid grid-cols-2 gap-3 w-full">
+                    {starterPrompts.map(prompt => (
+                        <button key={prompt.text} onClick={() => handleSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-transparent hover:border-light-primary/50 dark:hover:border-dark-primary/50 transition-all flex items-center gap-3">
+                            <span className="text-gray-500 dark:text-gray-400">{prompt.icon}</span>
+                            <span>{prompt.text}</span>
+                        </button>
+                    ))}
+                </div>
             </motion.div>
         </motion.div>
     );
@@ -1032,7 +1041,7 @@ const AuraAiPage: React.FC = () => {
                     </div>
                 </OverscrollContainer>
             </motion.div>
-            <div className="flex-shrink-0 w-full p-4 pt-2 border-t border-white/10">
+            <div className="flex-shrink-0 w-full p-4 pt-2 bg-light-glass/50 dark:bg-dark-glass/50 shadow-xl dark:shadow-3xl">
                 <AnimatePresence>
                     {attachments.length > 0 && (
                         <motion.div 
@@ -1067,7 +1076,7 @@ const AuraAiPage: React.FC = () => {
                         <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
                             {isListening ? <MicOff size={20} /> : <Mic size={20} />}
                         </button>
-                        <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-light-primary dark:bg-dark-primary text-white rounded-full disabled:opacity-50 transition-transform duration-200">
+                        <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200">
                            <Send size={18} />
                         </button>
                     </div>
