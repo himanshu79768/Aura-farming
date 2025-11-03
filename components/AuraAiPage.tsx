@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, Search, BookOpen } from 'lucide-react';
@@ -385,6 +386,7 @@ const AuraAiPage: React.FC = () => {
     const [chatState, setChatState] = useState<'initial' | 'chat'>(messages.length > 0 ? 'chat' : 'initial');
     const [isJournalContextModalOpen, setIsJournalContextModalOpen] = useState(false);
     const [isTextareaFocused, setIsTextareaFocused] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(false);
     
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -397,6 +399,10 @@ const AuraAiPage: React.FC = () => {
     const isPlayingRef = useRef<boolean>(false);
     const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const nextStartTimeRef = useRef<number>(0);
+
+    useEffect(() => {
+        setIsDesktop(!('ontouchstart' in window) || navigator.maxTouchPoints === 0);
+    }, []);
 
     const processAudioQueue = useCallback(() => {
         const audioContext = audioContextRef.current;
@@ -595,12 +601,7 @@ const AuraAiPage: React.FC = () => {
         if (textareaRef.current) {
             const el = textareaRef.current;
             el.style.height = 'auto'; // Reset height to shrink if text is deleted
-            // A small timeout helps the browser calculate scrollHeight correctly after state changes
-            setTimeout(() => {
-                if (textareaRef.current) {
-                    el.style.height = `${el.scrollHeight}px`;
-                }
-            }, 0);
+            el.style.height = `${el.scrollHeight}px`; // Set to content height
         }
     }, [input]);
 
@@ -709,6 +710,13 @@ const AuraAiPage: React.FC = () => {
             }]);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (isDesktop && e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
         }
     };
     
@@ -927,10 +935,11 @@ const AuraAiPage: React.FC = () => {
                                 onChange={e => setInput(e.target.value)}
                                 onFocus={() => setIsTextareaFocused(true)}
                                 onBlur={() => setIsTextareaFocused(false)}
+                                onKeyDown={handleKeyDown}
                                 placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."}
                                 disabled={isLoading}
                                 rows={1}
-                                className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base transition-[height] duration-200 ease-in-out"
+                                className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base"
                             />
                             <div className="p-2 flex justify-between items-center">
                                 <div className="flex items-center gap-2">
@@ -1092,7 +1101,7 @@ const AuraAiPage: React.FC = () => {
                         <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
                             <Paperclip size={20} />
                         </button>
-                        <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2 transition-[height] duration-200 ease-in-out" />
+                        <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
                         <div className="flex items-center gap-1 flex-shrink-0">
                             <button type="button" onClick={handleMicClick} className={`p-1 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
                                 {isListening ? <MicOff size={20} /> : <Mic size={20} />}
