@@ -884,8 +884,9 @@ const AuraAiPage: React.FC = () => {
                     onSubmit={handleSend}
                     className="group w-full max-w-xl mx-auto"
                 >
-                    <div className={`relative rounded-2xl shadow-xl dark:shadow-3xl transition-all duration-300 border-2 ${isTextareaFocused ? 'border-cyan-400' : 'border-transparent'}`}>
-                        <div className="relative flex flex-col bg-light-glass/50 dark:bg-dark-glass/50 rounded-[14px] min-h-[136px] transition-colors duration-300">
+                    <div className="relative rounded-2xl shadow-xl dark:shadow-3xl p-[2px]">
+                        <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
+                        <div className="relative flex flex-col bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-[14px] min-h-[136px] transition-colors duration-300">
                             <div className="p-3">
                                 <motion.button 
                                     type="button" 
@@ -967,10 +968,10 @@ const AuraAiPage: React.FC = () => {
                 transition={{ duration: 0.15 }}
                 className="w-full max-w-xl mt-4"
             >
-                <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-center">Get Started</h3>
+                <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-left">Get Started</h3>
                 <div className="grid grid-cols-2 gap-3 w-full">
                     {starterPrompts.map(prompt => (
-                        <button key={prompt.text} onClick={() => handleSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-transparent hover:border-light-primary/50 dark:hover:border-dark-primary/50 transition-all flex items-center gap-3">
+                        <button key={prompt.text} onClick={() => handleSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-white/20 dark:border-white/10 shadow-lg hover:shadow-xl transition-all flex items-center gap-3">
                             <span className="text-gray-500 dark:text-gray-400">{prompt.icon}</span>
                             <span>{prompt.text}</span>
                         </button>
@@ -1058,29 +1059,34 @@ const AuraAiPage: React.FC = () => {
                         </motion.div>
                     )}
                 </AnimatePresence>
-                <motion.form
+                 <motion.div
                     layoutId="aura-ai-input-form"
                     layout
                     transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                    onSubmit={handleSend}
-                    className={`relative flex gap-2 items-center p-1 rounded-2xl border-2 transition-colors bg-light-bg-secondary dark:bg-dark-bg-secondary ${isTextareaFocused ? 'border-cyan-400' : 'border-transparent'}`}
+                    className="relative rounded-2xl p-[2px]"
                 >
-                    <button type="button" onClick={handleAddContextClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Add journal context">
-                        <BookText size={20} />
-                    </button>
-                    <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
-                        <Paperclip size={20} />
-                    </button>
-                    <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <button type="button" onClick={handleMicClick} className={`p-1 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                    <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
+                    <form
+                        onSubmit={handleSend}
+                        className="relative flex gap-2 items-center p-1 rounded-[14px] bg-light-bg-secondary dark:bg-dark-bg-secondary"
+                    >
+                        <button type="button" onClick={handleAddContextClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Add journal context">
+                            <BookText size={20} />
                         </button>
-                        <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200">
-                           <Send size={18} />
+                        <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file">
+                            <Paperclip size={20} />
                         </button>
-                    </div>
-                </motion.form>
+                        <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                            <button type="button" onClick={handleMicClick} className={`p-1 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                            </button>
+                            <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200">
+                               <Send size={18} />
+                            </button>
+                        </div>
+                    </form>
+                </motion.div>
             </div>
         </motion.div>
     );
