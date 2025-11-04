@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor, ChatMessage } from './types';
+import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor, ChatMessage, ChatSession } from './types';
 import HomePage from './components/HomePage';
 import FocusPage from './components/FocusPage';
 import QuotesPage from './components/QuotesPage';
@@ -32,6 +32,9 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import GlobalSearch from './components/GlobalSearch';
 import AuraCheckinPage from './components/AuraCheckinPage';
 import AuraAiPage from './components/AuraAiPage';
+import AuraAiSettingsPage from './components/AuraAiSettingsPage';
+import AuraAiPersonalizationPage from './components/AuraAiPersonalizationPage';
+import AuraAiServiceAgreementsPage from './components/AuraAiServiceAgreementsPage';
 import { playUISound, setSoundEnabled, SoundType } from './services/soundService';
 
 
@@ -228,6 +231,7 @@ const MagicTransitionEffect: React.FC<{ origin: { x: number; y: number }; onComp
                     top: origin.y,
                     translateX: '-50%',
                     translateY: '-50%',
+                    boxShadow: '0 0 100px 50px rgba(96, 165, 250, 0.3)',
                 }}
                 initial={{
                     width: '6rem', // approx button size with glow
@@ -294,8 +298,9 @@ interface AppContextType {
   currentView: View;
   modalStack: { view: View; params?: any }[];
   isImmersive: boolean;
-  auraChatSessions: ChatMessage[][];
+  auraChatSessions: ChatSession[];
   saveChatSession: (messages: ChatMessage[]) => void;
+  deleteChatSessions: (indices: number[]) => void;
   toggleImmersive: () => void;
   toggleSearch: () => void;
   isAiLoading: boolean;
@@ -335,6 +340,11 @@ const DEFAULT_SETTINGS: Settings = {
     accentColor: 'blue',
     speakAuraAI: false,
     buttonSounds: true,
+    auraAiVoice: 'Zephyr',
+    auraAiPitch: 1,
+    auraAiSpeed: 1,
+    auraAiTone: 'default',
+    auraAiPersonalizationData: '',
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -366,7 +376,7 @@ export default function App() {
   const [focusSearchQuery, setFocusSearchQuery] = useState('');
   const [isImmersive, setIsImmersive] = useLocalStorage('isImmersive', false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [auraChatSessions, setAuraChatSessions] = useState<ChatMessage[][]>([]);
+  const [auraChatSessions, setAuraChatSessions] = useState<ChatSession[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [magicTransition, setMagicTransition] = useState<{ active: boolean; origin: { x: number; y: number } }>({ active: false, origin: { x: 0, y: 0 } });
   
@@ -448,17 +458,37 @@ export default function App() {
             const data = snapshot.val() as UserData & { journalEntries?: Record<string, any>, focusHistory?: Record<string, any> };
             setUserProfile({ name: data.name || '', completedSessions: data.completedSessions || 0 });
             setSettings({
-                theme: data.theme || Theme.Auto, sound: data.sound ?? true, haptics: data.haptics ?? true,
-                minimalism: data.minimalism ?? false, focusSound: data.focusSound || 'chime', appIcon: data.appIcon || 'default',
-                hapticIntensity: data.hapticIntensity || 'medium', focusMusic: data.focusMusic || 'Rain Drops',
-                gradientIntensity: data.gradientIntensity ?? 75,
-                accentColor: data.accentColor || 'blue',
-                speakAuraAI: data.speakAuraAI ?? false,
-                buttonSounds: data.buttonSounds ?? true,
+                theme: data.theme || DEFAULT_SETTINGS.theme,
+                sound: data.sound ?? DEFAULT_SETTINGS.sound,
+                haptics: data.haptics ?? DEFAULT_SETTINGS.haptics,
+                minimalism: data.minimalism ?? DEFAULT_SETTINGS.minimalism,
+                focusSound: data.focusSound || DEFAULT_SETTINGS.focusSound,
+                appIcon: data.appIcon || DEFAULT_SETTINGS.appIcon,
+                hapticIntensity: data.hapticIntensity || DEFAULT_SETTINGS.hapticIntensity,
+                focusMusic: data.focusMusic || DEFAULT_SETTINGS.focusMusic,
+                gradientIntensity: data.gradientIntensity ?? DEFAULT_SETTINGS.gradientIntensity,
+                accentColor: data.accentColor || DEFAULT_SETTINGS.accentColor,
+                speakAuraAI: data.speakAuraAI ?? DEFAULT_SETTINGS.speakAuraAI,
+                buttonSounds: data.buttonSounds ?? DEFAULT_SETTINGS.buttonSounds,
+                auraAiVoice: data.auraAiVoice || DEFAULT_SETTINGS.auraAiVoice,
+                auraAiPitch: data.auraAiPitch ?? DEFAULT_SETTINGS.auraAiPitch,
+                auraAiSpeed: data.auraAiSpeed ?? DEFAULT_SETTINGS.auraAiSpeed,
+                auraAiTone: data.auraAiTone || DEFAULT_SETTINGS.auraAiTone,
+                auraAiPersonalizationData: data.auraAiPersonalizationData || DEFAULT_SETTINGS.auraAiPersonalizationData,
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
-            setAuraChatSessions(data.auraChatSessions || []);
+            
+            const loadedSessionsRaw = data.auraChatSessions || [];
+            const migratedSessions: ChatSession[] = loadedSessionsRaw.map((session: any) => {
+                if (Array.isArray(session)) { // Old format: ChatMessage[]
+                    // Assign a very old timestamp to legacy chats without one
+                    return { messages: session, timestamp: new Date(0).toISOString() };
+                }
+                return session; // New format: ChatSession
+            }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            setAuraChatSessions(migratedSessions);
+
 
             const journalEntriesArray = data.journalEntries 
                 ? Object.entries(data.journalEntries).map(([id, entry]) => ({ id, ...entry } as JournalEntry)).sort((a,b) => b.createdAt - a.createdAt)
@@ -518,10 +548,22 @@ export default function App() {
         if (!dataPathUid) return;
 
         setAuraChatSessions(prevSessions => {
-            const isAlreadySaved = prevSessions.some(session => JSON.stringify(session) === JSON.stringify(messagesToSave));
+            const isAlreadySaved = prevSessions.some(session => JSON.stringify(session.messages) === JSON.stringify(messagesToSave));
             if (isAlreadySaved) return prevSessions;
 
-            const newSessions = [messagesToSave, ...prevSessions].slice(0, 3);
+            const newSession: ChatSession = { messages: messagesToSave, timestamp: new Date().toISOString() };
+            const newSessions = [newSession, ...prevSessions].slice(0, 10);
+            update(ref(db, `users/${dataPathUid}`), { auraChatSessions: newSessions });
+            return newSessions;
+        });
+    }, [currentUser, masterUid]);
+    
+    const deleteChatSessions = useCallback((indicesToDelete: number[]) => {
+        const dataPathUid = masterUid || currentUser?.uid;
+        if (!dataPathUid) return;
+
+        setAuraChatSessions(prevSessions => {
+            const newSessions = prevSessions.filter((_, index) => !indicesToDelete.includes(index));
             update(ref(db, `users/${dataPathUid}`), { auraChatSessions: newSessions });
             return newSessions;
         });
@@ -959,7 +1001,7 @@ export default function App() {
     showConfirmationModal, showAlertModal,
     currentUser,
     currentView, modalStack,
-    auraChatSessions, saveChatSession,
+    auraChatSessions, saveChatSession, deleteChatSessions,
     isImmersive, toggleImmersive,
     toggleSearch,
     isAiLoading, setIsAiLoading,
@@ -968,7 +1010,7 @@ export default function App() {
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
     focusHistory, addFocusSession, deleteMultipleFocusSessions, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
-    auraChatSessions, saveChatSession,
+    auraChatSessions, saveChatSession, deleteChatSessions,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, sessionName,
     focusSearchQuery,
@@ -1060,6 +1102,15 @@ export default function App() {
                                         break;
                                     case 'auraAI':
                                         modalContent = <AuraAiPage />;
+                                        break;
+                                    case 'auraAiSettings':
+                                        modalContent = <AuraAiSettingsPage />;
+                                        break;
+                                    case 'auraAiPersonalization':
+                                        modalContent = <AuraAiPersonalizationPage />;
+                                        break;
+                                    case 'auraAiServiceAgreements':
+                                        modalContent = <AuraAiServiceAgreementsPage />;
                                         break;
                                     case 'journalEntry':
                                         modalContent = <JournalEntryPage {...modal.params} />;

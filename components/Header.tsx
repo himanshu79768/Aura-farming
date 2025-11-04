@@ -143,15 +143,14 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                     {leftAction ? leftAction : (showBackButton && (
                         <motion.button 
                             onClick={handleBackPress} 
-                            className="flex items-center gap-1 text-light-primary dark:text-dark-primary"
+                            className="p-2 -ml-2 text-light-primary dark:text-dark-primary"
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -10 }}
                             whileTap={{ scale: 0.95 }}
                             transition={{ type: "spring", stiffness: 400, damping: 17 }}
                         >
-                            <ChevronLeft className="w-6 h-6" />
-                            <span className="text-lg">Back</span>
+                            <ChevronLeft className="w-7 h-7" />
                         </motion.button>
                     ))}
                 </div>
@@ -162,14 +161,14 @@ const Header: React.FC<HeaderProps> = ({ title, showBackButton = false, onBack, 
                     <div className="relative flex items-center justify-center">
                         <motion.h1 
                             key={title}
-                            className={`font-semibold text-center max-w-[calc(100vw-14rem)] ${effectiveTitleClass}`}
+                            className={`font-semibold text-center max-w-[calc(100vw-8rem)] ${effectiveTitleClass}`}
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                         >
                             {title}
                         </motion.h1>
 
-                        <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-14rem)] absolute invisible -z-10 ${titleClassName || 'text-lg'}`}>{title}</h1>
+                        <h1 ref={measureRef} className={`font-semibold text-center max-w-[calc(100vw-8rem)] absolute invisible -z-10 ${titleClassName || 'text-lg'}`}>{title}</h1>
                     </div>
                 )}
 

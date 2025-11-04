@@ -48,7 +48,7 @@ export interface FocusSession {
   createdAt?: any; // For Firestore serverTimestamp
 }
 
-export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'flow' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView' | 'sessionLinking' | 'linkedJournals' | 'attachmentViewer' | 'auraCheckin' | 'auraAI' | 'auraChatHistory';
+export type View = 'home' | 'focus' | 'quotes' | 'profile' | 'settings' | 'breathing' | 'flow' | 'journal' | 'journalEntry' | 'favorites' | 'focusHistory' | 'focusAnalytics' | 'soundOptions' | 'journalView' | 'sessionLinking' | 'linkedJournals' | 'attachmentViewer' | 'auraCheckin' | 'auraAI' | 'auraChatHistory' | 'auraAiSettings' | 'auraAiPersonalization' | 'auraAiServiceAgreements';
 
 export interface UserProfile {
   name: string;
@@ -63,6 +63,9 @@ export type FocusMusic = 'None' | 'Rain Drops' | 'Cafe Murmur' | 'Forest Creek' 
 
 export type AccentColor = 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'cyan' | 'indigo';
 
+export type AuraAiVoice = 'Zephyr' | 'Kore' | 'Puck' | 'Charon' | 'Fenrir';
+export type AuraAiTone = 'default' | 'funny' | 'professional';
+
 export interface Settings {
   theme: Theme;
   sound: boolean;
@@ -76,12 +79,22 @@ export interface Settings {
   accentColor?: AccentColor;
   speakAuraAI?: boolean;
   buttonSounds?: boolean;
+  auraAiVoice?: AuraAiVoice;
+  auraAiPitch?: number;
+  auraAiSpeed?: number;
+  auraAiTone?: AuraAiTone;
+  auraAiPersonalizationData?: string;
+}
+
+export interface ChatSession {
+  messages: ChatMessage[];
+  timestamp: string; // ISO string
 }
 
 export interface UserData extends Settings, UserProfile {
     mood: Mood;
     favoriteQuotes: Record<string, boolean>;
-    auraChatSessions?: ChatMessage[][];
+    auraChatSessions?: (ChatSession[] | ChatMessage[][]);
 }
 
 
@@ -110,6 +123,7 @@ export interface ChatMessage {
   parts: Part[];
   sources?: { title: string; uri: string }[];
   thinkingSteps?: string[];
+  intermediateThought?: string;
 }
 
 export interface AuraData {

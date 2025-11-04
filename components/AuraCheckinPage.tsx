@@ -74,7 +74,7 @@ const AuraScanner: React.FC<{ mood: Mood }> = ({ mood }) => {
 
 
 const AuraCheckinPage: React.FC = () => {
-    const { navigateBack, navigateTo, mood, userProfile, playSound, vibrate } = useAppContext();
+    const { navigateBack, navigateTo, mood, userProfile, playUISound, vibrate } = useAppContext();
     const [isLoading, setIsLoading] = useState(true);
     const [auraData, setAuraData] = useState<AuraData | null>(null);
 
@@ -86,10 +86,10 @@ const AuraCheckinPage: React.FC = () => {
             setAuraData(data);
             setIsLoading(false);
             vibrate('medium');
-            playSound('complete');
+            playUISound('success');
         };
         getAuraData();
-    }, [mood, userProfile.name, playSound, vibrate]);
+    }, [mood, userProfile.name, playUISound, vibrate]);
     
     const handleSuggestionClick = () => {
         if (auraData?.suggestion.toLowerCase().includes('breath')) {

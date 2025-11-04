@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, BookOpen, ChevronDown, Repeat, TextSelect } from 'lucide-react';
+import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, BookOpen, ChevronDown, Repeat, TextSelect, ChevronRight, Trash2, Settings as SettingsIcon } from 'lucide-react';
 import { GoogleGenAI, Chat, Part, Modality } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
 import Header from './Header';
-import { ChatMessage, JournalEntry } from '../types';
+import { ChatMessage, JournalEntry, ChatSession } from '../types';
 import AttachmentTypeModal from './AttachmentTypeModal';
 import OverscrollContainer from './OverscrollContainer';
 import SearchBar from './SearchBar';
@@ -183,19 +183,15 @@ const CodeBlock: React.FC<{ codeWithLang: string }> = ({ codeWithLang }) => {
     );
 };
 
+const GeneratingTableIndicator: React.FC = () => (
+    <div className="my-2 p-4 rounded-lg bg-black/5 dark:bg-white/5 animate-pulse flex items-center justify-center gap-2 border border-white/10">
+        <div className="w-5 h-5 border-2 border-dashed rounded-md border-light-text-secondary dark:border-dark-text-secondary animate-spin"></div>
+        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Generating table...</p>
+    </div>
+);
+
 const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
     const html = useMemo(() => {
-        const lines = text.split('\n');
-        const htmlElements: string[] = [];
-        let inList: 'ul' | 'ol' | null = null;
-
-        const closeList = () => {
-            if (inList) {
-                htmlElements.push(`</${inList}>`);
-                inList = null;
-            }
-        };
-
         const applyInlineFormatting = (str: string) => {
             let formattedStr = str
                 .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0;" />')
@@ -227,10 +223,34 @@ const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
             }
             return formattedStr;
         };
+        
+        let markdown = text;
+        const tables: string[] = [];
+        // Extract tables and replace with placeholders
+        markdown = markdown.replace(/^((?:\|.*\|(?:\r\n|\n|\r))+)/gm, (tableBlock) => {
+            tables.push(tableBlock);
+            return `_TABLE_PLACEHOLDER_${tables.length - 1}_`;
+        });
+
+        const lines = markdown.split('\n');
+        const htmlElements: string[] = [];
+        let inList: 'ul' | 'ol' | null = null;
+
+        const closeList = () => {
+            if (inList) {
+                htmlElements.push(`</${inList}>`);
+                inList = null;
+            }
+        };
 
         lines.forEach(line => {
             if (line.trim() === '') {
                 closeList();
+                return;
+            }
+             if (line.startsWith('_TABLE_PLACEHOLDER_')) {
+                closeList();
+                htmlElements.push(`<p>${line}</p>`);
                 return;
             }
 
@@ -306,34 +326,126 @@ const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
         });
 
         closeList();
-        return htmlElements.join('');
+        
+        let finalHtml = htmlElements.join('');
+
+        tables.forEach((tableBlock, index) => {
+            const tableRows = tableBlock.trim().split('\n');
+            if (tableRows.length < 2) return;
+            const headerCells = tableRows[0].split('|').slice(1, -1).map(c => c.trim());
+            const bodyRows = tableRows.slice(2);
+
+            const tableHtml = `
+                <table class="aura-table">
+                    <thead>
+                        <tr>${headerCells.map(h => `<th>${applyInlineFormatting(h)}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+                        ${bodyRows.map(row => `<tr>${row.split('|').slice(1, -1).map(c => `<td>${applyInlineFormatting(c.trim())}</td>`).join('')}</tr>`).join('')}
+                    </tbody>
+                </table>
+            `;
+            finalHtml = finalHtml.replace(`_TABLE_PLACEHOLDER_${index}_`, tableHtml);
+        });
+        
+        return finalHtml;
     }, [text]);
 
     return <div dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
-const MarkdownRenderer: React.FC<{ text: string }> = ({ text }) => {
-    const content = useMemo(() => {
-        const regex = /(```[\s\S]*?```|!\[Image:[\s\S]*?\])/g;
-        const parts = text.split(regex).filter(Boolean);
 
-        return parts.map((part, index) => {
-            if (part.startsWith('```')) {
-                return <CodeBlock key={index} codeWithLang={part} />;
+const useTypewriter = (text: string, speed = 0, enabled = true) => {
+    const [displayedText, setDisplayedText] = useState('');
+    const isFinished = !enabled || displayedText.length === text.length;
+
+    useEffect(() => {
+        if (!enabled) {
+            setDisplayedText(text);
+        } else {
+            // Reset if it's a completely new message (text doesn't start with old text)
+            if (!text.startsWith(displayedText)) {
+                setDisplayedText('');
             }
-            if (part.startsWith('![Image:')) {
-                const match = part.match(/!\[Image:\s*(?:\{)?([\s\S]*?)(?:\})?\]/);
-                const prompt = match ? match[1] : '';
-                if (prompt) {
-                    return <ImageGenerator key={index} prompt={prompt} />;
+        }
+    }, [text, enabled]);
+
+    useEffect(() => {
+        if (!enabled || isFinished) return;
+
+        const timer = setTimeout(() => {
+            const charsToAdd = 5; // Increased speed
+            setDisplayedText(text.slice(0, Math.min(text.length, displayedText.length + charsToAdd)));
+        }, speed);
+
+        return () => clearTimeout(timer);
+    }, [displayedText, text, speed, enabled, isFinished]);
+
+    return { displayedText, isFinished };
+};
+
+const StreamingMarkdownRenderer: React.FC<{ text: string; animate: boolean, onFinished: () => void; }> = React.memo(({ text, animate, onFinished }) => {
+    const { displayedText, isFinished } = useTypewriter(text, 0, animate);
+
+    useEffect(() => {
+        if (isFinished) {
+            onFinished();
+        }
+    }, [isFinished, onFinished]);
+
+    const textToRender = animate ? displayedText : text;
+
+    const content = useMemo(() => {
+        const regex = /(```[\s\S]*?```|!\[Image:[\s\S]*?\]|^(?:\|.*\|[^\r\n]*\r?\n?)+)/gm;
+        
+        if (!animate) {
+            const parts = text.split(regex).filter(Boolean);
+            return parts.map((part, index) => {
+                if (part.startsWith('```')) return <CodeBlock key={index} codeWithLang={part} />;
+                if (part.startsWith('![Image:')) {
+                    const match = part.match(/!\[Image:\s*(?:\{)?([\s\S]*?)(?:\})?\]/);
+                    if (match?.[1]) return <ImageGenerator key={index} prompt={match[1]} />;
                 }
+                return <RegularMarkdown key={index} text={part} />;
+            });
+        }
+
+        const fullParts = text.split(regex).filter(Boolean);
+        let traversedLength = 0;
+
+        return fullParts.map((part, index) => {
+            const partStart = traversedLength;
+            const partEnd = partStart + part.length;
+            traversedLength = partEnd;
+            
+            const isSpecialBlock = part.startsWith('```') || part.startsWith('![Image:') || part.trim().startsWith('|');
+
+            if (isSpecialBlock) {
+                const isTable = part.trim().startsWith('|');
+
+                if (textToRender.length >= partEnd) {
+                    if (part.startsWith('```')) return <CodeBlock key={index} codeWithLang={part} />;
+                    if (part.startsWith('![Image:')) {
+                        const match = part.match(/!\[Image:\s*(?:\{)?([\s\S]*?)(?:\})?\]/);
+                        if (match?.[1]) return <ImageGenerator key={index} prompt={match[1]} />;
+                    }
+                    if (isTable) {
+                         return <RegularMarkdown key={index} text={part} />;
+                    }
+                } else if (isTable && textToRender.length > partStart) {
+                    return <GeneratingTableIndicator key={index} />;
+                }
+                return null; // Don't render incomplete special blocks
+            } else {
+                const visibleLength = Math.max(0, textToRender.length - partStart);
+                const visiblePart = part.substring(0, visibleLength);
+                return <RegularMarkdown key={index} text={visiblePart} />;
             }
-            return <RegularMarkdown key={index} text={part} />;
         });
-    }, [text]);
+    }, [text, textToRender, animate]);
 
     return <div className="prose-styles">{content}</div>;
-};
+});
 
 const WordIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className={className}>
@@ -376,13 +488,13 @@ const PptIcon: React.FC<{ className?: string }> = ({ className }) => (
     </svg>
 );
 
-const AttachmentIcon: React.FC<{ type: string }> = ({ type }) => {
-    if (type.startsWith('image/')) return <ImageIcon className="w-full h-full text-purple-400 shrink-0" />;
-    if (type === 'application/pdf') return <PdfIcon className="w-full h-full" />;
-    if (type.includes('word')) return <WordIcon className="w-full h-full" />;
-    if (type.includes('presentation') || type.includes('powerpoint')) return <PptIcon className="w-full h-full" />;
-    if (type === 'application/vnd.aura.journal') return <BookText className="w-full h-full text-blue-400 shrink-0" />;
-    return <FileText className="w-full h-full text-gray-400 shrink-0" />;
+const AttachmentIcon: React.FC<{ type: string; className?: string }> = ({ type, className }) => {
+    if (type.startsWith('image/')) return <ImageIcon className={className} />;
+    if (type === 'application/pdf') return <PdfIcon className={className} />;
+    if (type.includes('word')) return <WordIcon className={className} />;
+    if (type.includes('presentation') || type.includes('powerpoint')) return <PptIcon className={className} />;
+    if (type === 'application/vnd.aura.journal') return <BookText className={className} />;
+    return <FileText className={className} />;
 };
 
 type LocalAttachment = { id: string; data: string; mimeType: string; name: string };
@@ -404,7 +516,7 @@ const AttachmentPreview: React.FC<{ attachment: LocalAttachment; onRemove: () =>
                 ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-center p-2">
                         <div className="w-14 h-14">
-                            <AttachmentIcon type={attachment.mimeType} />
+                            <AttachmentIcon type={attachment.mimeType} className="w-full h-full" />
                         </div>
                         <p className="text-xs mt-2 leading-tight break-words w-full line-clamp-3">{attachment.name}</p>
                     </div>
@@ -589,9 +701,50 @@ const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClo
     );
 };
 
+const ThinkingBubble: React.FC = () => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-start gap-3 w-full max-w-full justify-start"
+        >
+            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-text-secondary/10 text-light-text-secondary dark:bg-dark-text-secondary/10 dark:text-dark-text-secondary">
+                <BrainCircuit size={18} />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-light-text-secondary dark:text-dark-text-secondary p-3 bg-light-text-secondary/5 dark:bg-dark-text-secondary/5 rounded-2xl rounded-bl-lg">
+                <span>Thinking</span>
+                <motion.div
+                    animate={{ x: [0, 3, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                    <ChevronRight size={16} />
+                </motion.div>
+            </div>
+        </motion.div>
+    );
+};
+
+const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-start gap-3 w-full max-w-full justify-start"
+        >
+            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-text-secondary/10 text-light-text-secondary dark:bg-dark-text-secondary/10 dark:text-dark-text-secondary">
+                <Sparkles size={18} />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-light-text-secondary dark:text-dark-text-secondary p-3 bg-light-text-secondary/5 dark:bg-dark-text-secondary/5 rounded-2xl rounded-bl-lg">
+                <span>{text}</span>
+            </div>
+        </motion.div>
+    );
+};
 
 const AuraAiPage: React.FC = () => {
-    const { journalEntries, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, settings } = useAppContext();
+    const { journalEntries, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound } = useAppContext();
     const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -605,20 +758,30 @@ const AuraAiPage: React.FC = () => {
     const [isTextareaFocused, setIsTextareaFocused] = useState(false);
     const [isDesktop, setIsDesktop] = useState(false);
     const [isResearchMode, setIsResearchMode] = useState(false);
-    const [thinkingLogVisible, setThinkingLogVisible] = useState(false);
     const [contextMenu, setContextMenu] = useState<{
         isOpen: boolean;
         position: { x: number; y: number };
         message: ChatMessage | null;
     }>({ isOpen: false, position: { x: 0, y: 0 }, message: null });
     const [selectableMessageId, setSelectableMessageId] = useState<string | null>(null);
+    const [animateLastMessage, setAnimateLastMessage] = useState(false);
+    const [finishedTypingMessages, setFinishedTypingMessages] = useState<Set<string>>(new Set());
     
+    // History Selection State
+    const [isHistorySelectionMode, setIsHistorySelectionMode] = useState(false);
+    const [selectedHistoryIndices, setSelectedHistoryIndices] = useState<number[]>([]);
+    const historyLongPressTimer = useRef<number>();
+    const isHistoryLongPress = useRef(false);
+
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recognitionRef = useRef<any>(null);
     const wasLoading = useRef(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    
     const longPressTimer = useRef<number>();
+    const pointerStartPos = useRef({ x: 0, y: 0 });
+    const DRAG_THRESHOLD = 10;
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioQueueRef = useRef<AudioBuffer[]>([]);
@@ -631,8 +794,22 @@ const AuraAiPage: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        const scrollContainer = scrollRef.current;
+        if (!scrollContainer || !contextMenu.isOpen) return;
+
+        const handleScroll = () => {
+            closeContextMenu();
+        };
+
+        scrollContainer.addEventListener('scroll', handleScroll);
+
+        return () => {
+            scrollContainer.removeEventListener('scroll', handleScroll);
+        };
+    }, [contextMenu.isOpen, closeContextMenu]);
+
+    useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            // Clicks on context menu items are handled by their own onClick handlers
             if (contextMenu.isOpen) {
                 closeContextMenu();
             }
@@ -717,7 +894,7 @@ const AuraAiPage: React.FC = () => {
                         responseModalities: [Modality.AUDIO],
                         speechConfig: {
                             voiceConfig: {
-                                prebuiltVoiceConfig: { voiceName: 'Kore' },
+                                prebuiltVoiceConfig: { voiceName: settings.auraAiVoice || 'Zephyr' },
                             },
                         },
                     },
@@ -741,7 +918,7 @@ const AuraAiPage: React.FC = () => {
             console.error("Error with Gemini TTS:", error);
             showAlertModal({title: "Speech Error", message: "Sorry, I couldn't generate the audio for that response."});
         }
-    }, [cancelSpeech, showAlertModal, processAudioQueue]);
+    }, [cancelSpeech, showAlertModal, processAudioQueue, settings.auraAiVoice]);
 
     const initializeChat = useCallback((history: ChatMessage[] = []) => {
         try {
@@ -750,8 +927,23 @@ const AuraAiPage: React.FC = () => {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
             });
             const currentTime = new Date().toLocaleTimeString();
+            const userName = userProfile.name || 'friend';
 
-            const systemInstruction = `You are Aura, a powerful and helpful AI assistant. The current date and time is ${currentDate}, ${currentTime}. Your goal is to provide comprehensive, well-structured, and supportive answers. Keep responses concise and to the point unless the user asks for more detail. Remember the entire conversation history to provide contextual responses. Use markdown extensively for formatting: headings (#, ##, ###, ####), lists, bold, italics, dividers (---), etc. For mathematical formulas, wrap them in double dollar signs (\`$$\`...\`$$\`) and use valid KaTeX (LaTeX) syntax. For example, a simple fraction is \`\\frac{numerator}{denominator}\`, a subscript is \`K_d\`, and a more complex formula like the cost of redeemable debt might look like \`K_d = \\frac{I(1-t) + \\frac{RV-SV}{n}}{\\frac{RV+SV}{2}}\`. Only generate images when the user explicitly asks for one or when a visual diagram would significantly aid an explanation, using the specific format: \`![Image: {A descriptive prompt for the image}]\`. Do not generate images for every response and do not use regular markdown image syntax \`![]()\`.`;
+            let systemInstruction = `You are Aura, a powerful and helpful AI assistant. Your personality is friendly, engaging, and supportive. ALWAYS use emojis to make the conversation more vibrant 😃. The current date and time is ${currentDate}, ${currentTime}. The user you're talking to is named ${userName}. Your instructions are critically important and non-negotiable. You MUST follow them for EVERY response, with no exceptions, including when in research mode.
+**Rule 1: Always start with a personal greeting.** For EVERY response, you MUST begin with a friendly, appreciative greeting that uses the user's name (e.g., "Great question, ${userName}! 👍", "Of course, ${userName}! 😊", "I can certainly help with that, ${userName}! ✨").
+**Rule 2: Always end with a follow-up question.** You MUST conclude EVERY response with a relevant, open-ended question to encourage continued conversation.
+The ONLY exception to this two-part structure is the very first message of a brand new conversation, where you should just greet the user by name without a follow-up question.
+Your goal is to provide comprehensive, well-structured answers. Use markdown extensively for formatting: headings (#, ##, ###, ####), lists, bold, italics, dividers (---), etc. For mathematical formulas, wrap them in double dollar signs (\`$$\`...\`$$\`) and use valid KaTeX (LaTeX) syntax. For example, a simple fraction is \`\\frac{numerator}{denominator}\`, a subscript is \`K_d\`, and a more complex formula like the cost of redeemable debt might look like \`K_d = \\frac{I(1-t) + \\frac{RV-SV}{n}}{\\frac{RV+SV}{2}}\`. Only generate images when the user explicitly asks for one or when a visual diagram would significantly aid an explanation, using the specific format: \`![Image: {A descriptive prompt for the image}]\`. Do not generate images for every response and do not use regular markdown image syntax \`![]()\`.`;
+
+            if (settings.auraAiTone === 'funny') {
+                systemInstruction += "\n**Tone Instruction:** You must also incorporate lighthearted humor, witty remarks, and occasional jokes into your responses. Keep it fun and amusing!";
+            } else if (settings.auraAiTone === 'professional') {
+                systemInstruction += "\n**Tone Instruction:** Your tone must be formal, precise, and professional. Avoid casual language, emojis (except for professional ones like ✔️ or 📈), and focus on delivering information with clarity and authority.";
+            }
+
+            if (settings.auraAiPersonalizationData) {
+                systemInstruction += `\n**Personalization Context:** Remember these details about the user to provide more relevant and personalized responses:\n${settings.auraAiPersonalizationData}`;
+            }
 
             const chatHistory = history.map(({ role, parts }) => ({
                 role,
@@ -780,7 +972,7 @@ const AuraAiPage: React.FC = () => {
             console.error("Failed to initialize Aura AI:", error);
             showAlertModal({title: "Connection Error", message: "Could not connect to Aura AI. Please check your connection and try again."})
         }
-    }, [showAlertModal]);
+    }, [showAlertModal, userProfile.name, settings.auraAiTone, settings.auraAiPersonalizationData]);
 
     const messagesRef = useRef(messages);
     messagesRef.current = messages;
@@ -856,7 +1048,11 @@ const AuraAiPage: React.FC = () => {
     // Scroll to bottom
     useEffect(() => {
         if (chatState === 'chat' && scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            setTimeout(() => {
+                 if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }
+            }, 100);
         }
     }, [messages, isLoading, chatState]);
 
@@ -918,34 +1114,82 @@ const AuraAiPage: React.FC = () => {
         setInput('');
         setAttachments([]);
         setIsLoading(true);
-        let modelResponseText = '';
+        setAnimateLastMessage(true);
 
-        try {
-            const streamOptions: { message: Part[]; config?: any } = { message: userMessagePartsForApi };
-            if (isResearchMode) {
-                streamOptions.config = { thinkingConfig: { thinkingBudget: 24576 } };
+        if (isResearchMode) {
+            let finalModelResponseText = '';
+            let finalThinkingSteps: string[] = [];
+            try {
+                const streamOptions = { message: userMessagePartsForApi, config: { thinkingConfig: { thinkingBudget: 24576 } } };
+                const result = await chat.sendMessageStream(streamOptions);
+
+                for await (const chunk of result) {
+                    if (chunk.thinkingState?.lastAction) {
+                        const newSteps = [...finalThinkingSteps, chunk.thinkingState.lastAction];
+                        finalThinkingSteps = [...new Set(newSteps)];
+                    }
+                    if (chunk.text) {
+                        finalModelResponseText += chunk.text;
+                    }
+                }
+                
+                if (finalThinkingSteps.length > 0) {
+                    const modelMessageId = crypto.randomUUID();
+                    const thinkingMessage: ChatMessage = { id: modelMessageId, role: 'model', parts: [], thinkingSteps: finalThinkingSteps };
+                    setMessages(prev => [...prev, thinkingMessage]);
+                    
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    
+                    setMessages(prev => prev.map(m => m.id === modelMessageId 
+                        ? { ...m, thinkingSteps: undefined, intermediateThought: "Finalizing the details..." } 
+                        : m
+                    ));
+
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    setMessages(prev => prev.map(m => m.id === modelMessageId 
+                        ? { ...m, intermediateThought: undefined, parts: [{ text: finalModelResponseText }] } 
+                        : m
+                    ));
+
+                } else {
+                    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: finalModelResponseText }] }]);
+                }
+
+            } catch (error) {
+                console.error("Aura AI Error:", error);
+                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble with research mode right now. Please try again." }] }]);
+            } finally {
+                setIsLoading(false);
             }
-
-            const result = await chat.sendMessageStream(streamOptions);
-            const modelMessageId = crypto.randomUUID();
-            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }], thinkingSteps: [] }]);
-
-            for await (const chunk of result) {
-                modelResponseText += chunk.text;
-                setMessages(prev => prev.map(msg => msg.id === modelMessageId ? { ...msg, parts: [{ text: modelResponseText }], thinkingSteps: chunk.thinkingState?.lastAction ? [...(msg.thinkingSteps || []), chunk.thinkingState.lastAction].filter((v,i,a)=>a.indexOf(v)===i) : msg.thinkingSteps } : msg));
+        } else {
+            // Normal streaming mode
+            let modelResponseText = '';
+            try {
+                const result = await chat.sendMessageStream({ message: userMessagePartsForApi });
+                const modelMessageId = crypto.randomUUID();
+                setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
+    
+                for await (const chunk of result) {
+                    if (chunk.text) {
+                        modelResponseText += chunk.text;
+                        setMessages(prev => prev.map(msg => 
+                            msg.id === modelMessageId ? { ...msg, parts: [{ text: modelResponseText }] } : msg
+                        ));
+                    }
+                }
+    
+            } catch (error) {
+                console.error("Aura AI Error:", error);
+                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble connecting right now. Please try again later." }] }]);
+            } finally {
+                setIsLoading(false);
             }
-
-        } catch (error) {
-            console.error("Aura AI Error:", error);
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble connecting right now. Please try again later." }] }]);
-        } finally {
-            setIsLoading(false);
         }
     };
     
     const handleProgrammaticSend = (prompt: string) => {
         setInput(prompt);
-        // Use a timeout to allow state to update before sending
         setTimeout(() => handleSend(prompt), 0);
     };
 
@@ -1010,6 +1254,8 @@ const AuraAiPage: React.FC = () => {
         setAttachments([]);
         initializeChat();
         setChatState('initial');
+        setAnimateLastMessage(false);
+        setFinishedTypingMessages(new Set());
     };
     
     const handleHistoryClick = () => {
@@ -1030,12 +1276,14 @@ const AuraAiPage: React.FC = () => {
         setAttachments(prev => [...prev, ...journalAttachments.filter(j => !prev.some(p => p.id === j.id))]);
     };
 
-    const loadHistory = (historyMessages: ChatMessage[]) => {
+    const loadHistory = (session: ChatSession) => {
         if (messages.length > 0) saveChatSession(messages);
-        setMessages(historyMessages);
-        initializeChat(historyMessages);
+        setMessages(session.messages);
+        initializeChat(session.messages);
         setChatState('chat');
         setIsHistoryOpen(false);
+        setAnimateLastMessage(false);
+        setFinishedTypingMessages(new Set(session.messages.map(m => m.id)));
     };
 
     const handleBack = () => {
@@ -1066,15 +1314,52 @@ const AuraAiPage: React.FC = () => {
     const openContextMenu = (e: React.PointerEvent | React.MouseEvent, message: ChatMessage) => {
         e.preventDefault();
         e.stopPropagation();
-        setContextMenu({ isOpen: true, position: { x: e.clientX, y: e.clientY }, message });
+
+        const menuWidth = 192; // w-48
+        const menuHeight = 280; // Estimated height
+        const margin = 16; // p-4
+
+        let x = e.clientX;
+        let y = e.clientY;
+
+        if (x + menuWidth + margin > window.innerWidth) {
+            x = window.innerWidth - menuWidth - margin;
+        }
+        if (y + menuHeight + margin > window.innerHeight) {
+            y = window.innerHeight - menuHeight - margin;
+        }
+        if (x < margin) x = margin;
+        if (y < margin) y = margin;
+
+        setContextMenu({ isOpen: true, position: { x, y }, message });
     };
 
     const handlePointerDown = (e: React.PointerEvent, message: ChatMessage) => {
-        if (e.pointerType === 'touch') {
-            longPressTimer.current = window.setTimeout(() => openContextMenu(e, message), 500);
+        pointerStartPos.current = { x: e.clientX, y: e.clientY };
+        longPressTimer.current = window.setTimeout(() => {
+            longPressTimer.current = undefined; // Mark as fired
+            openContextMenu(e, message);
+        }, 500);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (longPressTimer.current) {
+            const dx = Math.abs(e.clientX - pointerStartPos.current.x);
+            const dy = Math.abs(e.clientY - pointerStartPos.current.y);
+            if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                clearTimeout(longPressTimer.current);
+                longPressTimer.current = undefined;
+            }
         }
     };
-    const handlePointerUp = () => clearTimeout(longPressTimer.current);
+
+    const handlePointerUp = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = undefined;
+        }
+    };
+
     const handleContextMenu = (e: React.MouseEvent, message: ChatMessage) => openContextMenu(e, message);
 
     const handleSelectText = () => {
@@ -1100,7 +1385,7 @@ const AuraAiPage: React.FC = () => {
         const attachmentParts = lastUserMessage.parts.filter(p => 'inlineData' in p) as Part & { inlineData: { data: string; mimeType: string; name: string } }[];
         
         const attachmentsToSet: LocalAttachment[] = attachmentParts.map(p => ({
-            id: p.id || crypto.randomUUID(), data: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`,
+            id: (p as any).id || crypto.randomUUID(), data: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`,
             mimeType: p.inlineData.mimeType, name: p.inlineData.name || 'attachment'
         }));
 
@@ -1132,6 +1417,102 @@ const AuraAiPage: React.FC = () => {
         );
     };
 
+    // --- History Deletion Logic ---
+    const exitHistorySelectionMode = useCallback(() => {
+        setIsHistorySelectionMode(false);
+        setSelectedHistoryIndices([]);
+    }, []);
+    
+    const handleHistoryPointerDown = useCallback((index: number) => {
+        isHistoryLongPress.current = false;
+        historyLongPressTimer.current = window.setTimeout(() => {
+            isHistoryLongPress.current = true;
+            vibrate();
+            playUISound('tap');
+            if (!isHistorySelectionMode) {
+                setIsHistorySelectionMode(true);
+            }
+            setSelectedHistoryIndices(prev => (prev.includes(index) ? prev : [...prev, index]));
+        }, 500);
+    }, [isHistorySelectionMode, vibrate, playUISound]);
+    
+    const handleHistoryPointerUpOrLeave = useCallback(() => {
+        clearTimeout(historyLongPressTimer.current);
+    }, []);
+    
+    const handleHistoryItemClick = useCallback((session: ChatSession, index: number) => {
+        if (isHistoryLongPress.current) {
+            isHistoryLongPress.current = false;
+            return;
+        }
+        
+        if (isHistorySelectionMode) {
+            vibrate();
+            playUISound('tap');
+            setSelectedHistoryIndices(prev => {
+                const newIndices = prev.includes(index)
+                    ? prev.filter(i => i !== index)
+                    : [...prev, index];
+                
+                if (newIndices.length === 0) {
+                    setIsHistorySelectionMode(false);
+                }
+                
+                return newIndices;
+            });
+        } else {
+            loadHistory(session);
+        }
+    }, [isHistorySelectionMode, vibrate, playUISound, loadHistory]);
+
+    const handleDeleteSelectedHistory = () => {
+        if (selectedHistoryIndices.length === 0) return;
+        showConfirmationModal({
+            title: `Delete ${selectedHistoryIndices.length} chat${selectedHistoryIndices.length > 1 ? 's' : ''}?`,
+            message: 'This action cannot be undone.',
+            confirmText: 'Delete',
+            onConfirm: () => {
+                deleteChatSessions(selectedHistoryIndices);
+                exitHistorySelectionMode();
+            },
+        });
+    };
+    
+    const historyHeaderProps = isHistorySelectionMode ? {
+        leftAction: (
+            <motion.button onClick={exitHistorySelectionMode} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                <X size={24} />
+            </motion.button>
+        ),
+        title: `${selectedHistoryIndices.length} selected`,
+        rightAction: (
+            <motion.button onClick={handleDeleteSelectedHistory} disabled={selectedHistoryIndices.length === 0} className="p-2 rounded-full hover:bg-red-500/10 text-red-500 disabled:opacity-50">
+                <Trash2 size={20} />
+            </motion.button>
+        )
+    } : {
+        title: "History",
+        showBackButton: true,
+        onBack: () => setIsHistoryOpen(false),
+    };
+
+    const formatTimeAgo = (isoString: string) => {
+        const date = new Date(isoString);
+        const now = new Date();
+        const diffInSeconds = (now.getTime() - date.getTime()) / 1000;
+        const diffInHours = Math.round(diffInSeconds / 3600);
+        const diffInDays = Math.round(diffInHours / 24);
+
+        if (diffInHours < 24) {
+            if (diffInHours < 1) return 'Just now';
+            return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+        }
+        if (diffInDays <= 7) {
+            return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+        }
+        return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
     const ContextMenu = () => {
         if (!contextMenu.isOpen || !contextMenu.message) return null;
         const { position, message } = contextMenu;
@@ -1151,7 +1532,7 @@ const AuraAiPage: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                transition={{ type: 'spring', stiffness: 600, damping: 35 }}
             >
                 <button onClick={handleCopy} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Copy size={16}/>Copy</span></button>
                 <button onClick={() => handleShare(message)} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Share2 size={16}/>Share</span></button>
@@ -1183,111 +1564,169 @@ const AuraAiPage: React.FC = () => {
     ];
 
     const InitialView = (
-        <motion.div key="initial-view" className="flex-grow flex flex-col items-center justify-center text-center px-4">
+    <motion.div key="initial-view" className="flex-grow flex flex-col items-center justify-center text-center px-4">
+        <div className="flex flex-col items-center justify-center">
             <motion.div exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }} className="flex flex-col items-center">
                 <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-light-glass/80 dark:bg-dark-glass/80 border border-white/10">
                     <Sparkles size={40} className="text-cyan-400"/>
                 </div>
                 <h2 className="text-2xl font-semibold">How can I help you today?</h2>
             </motion.div>
-            <div className="w-full my-6">
-                <motion.form layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="group w-full max-w-xl md:max-w-3xl mx-auto">
-                    <div className="relative rounded-2xl shadow-xl dark:shadow-3xl p-[2px]">
-                        <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
-                        <div className="relative flex flex-col bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-[14px] min-h-[136px] transition-colors duration-300">
-                            <div className="p-3 flex gap-2">
-                                <motion.button type="button" onClick={handleAddContextClick} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
-                                    <BookText size={16} /><span className="text-sm">Add context</span>
-                                </motion.button>
-                                <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { vibrate(); setIsResearchMode(prev => !prev); }} className={`flex items-center gap-2 px-3 h-9 text-sm rounded-full transition-colors ${isResearchMode ? 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary' : 'text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10'}`}>
-                                    <BrainCircuit size={16}/><span>Research {isResearchMode ? 'On' : 'Off'}</span>
-                                </motion.button>
-                            </div>
-                            <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."} disabled={isLoading} rows={1} className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base" />
-                            <div className="p-2 flex justify-between items-center">
-                                <div className="flex items-center gap-1"><button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0"><Paperclip size={20} /></button></div>
-                                <div className="flex items-center gap-1">
-                                    <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
-                                    <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
-                                </div>
+        </div>
+        
+        <div className="w-full max-w-xl md:max-w-3xl my-8">
+            <motion.div layout exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.15 }} className="w-full">
+                <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-left">What should we do?</h3>
+                <div className="grid grid-cols-2 gap-3 w-full">
+                    {starterPrompts.map(prompt => 
+                        <button key={prompt.text} onClick={() => handleProgrammaticSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-white/20 dark:border-white/10 shadow-lg hover:shadow-xl transition-all flex items-center gap-3">
+                            <span className="text-gray-500 dark:text-gray-400">{prompt.icon}</span>
+                            <span>{prompt.text}</span>
+                        </button>
+                    )}
+                </div>
+            </motion.div>
+
+            <AnimatePresence>
+                {attachments.length > 0 && (
+                    <motion.div 
+                        className="w-full mt-4" 
+                        initial={{ opacity: 0, height: 0 }} 
+                        animate={{ opacity: 1, height: 'auto' }} 
+                        exit={{ opacity: 0, height: 0 }}
+                    >
+                        <div className="flex gap-3 overflow-x-auto pb-2">
+                            {attachments.map(att => <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />)}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            
+            <motion.form layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="group w-full mx-auto mt-4">
+                <div className="relative rounded-2xl shadow-xl dark:shadow-3xl p-[2px]">
+                    <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
+                    <div className="relative flex flex-col bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-[14px] min-h-[136px] transition-colors duration-300">
+                        <div className="p-3 flex gap-2">
+                            <motion.button type="button" onClick={handleAddContextClick} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
+                                <BookText size={16} /><span className="text-sm">Add context</span>
+                            </motion.button>
+                            <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { vibrate(); setIsResearchMode(prev => !prev); }} className={`flex items-center gap-2 px-3 h-9 text-sm rounded-full transition-colors ${isResearchMode ? 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary' : 'text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10'}`}>
+                                <BrainCircuit size={16}/><span>Research {isResearchMode ? 'On' : 'Off'}</span>
+                            </motion.button>
+                        </div>
+                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."} disabled={isLoading} rows={1} className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base" />
+                        <div className="p-2 flex justify-between items-center">
+                            <div className="flex items-center gap-1"><button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0"><Paperclip size={20} /></button></div>
+                            <div className="flex items-center gap-1">
+                                <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
+                                <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
                             </div>
                         </div>
                     </div>
-                </motion.form>
-            </div>
-            <AnimatePresence>{attachments.length > 0 && <motion.div className="w-full max-w-xl md:max-w-3xl mx-auto px-4" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}><div className="flex gap-3 overflow-x-auto pb-2">{attachments.map(att => <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />)}</div></motion.div>}</AnimatePresence>
-            <motion.div layout exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.15 }} className="w-full max-w-xl md:max-w-3xl mt-4">
-                <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-left">Get Started</h3>
-                <div className="grid grid-cols-2 gap-3 w-full">{starterPrompts.map(prompt => <button key={prompt.text} onClick={() => handleProgrammaticSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-white/20 dark:border-white/10 shadow-lg hover:shadow-xl transition-all flex items-center gap-3"><span className="text-gray-500 dark:text-gray-400">{prompt.icon}</span><span>{prompt.text}</span></button>)}</div>
-            </motion.div>
-        </motion.div>
-    );
+                </div>
+            </motion.form>
+        </div>
+    </motion.div>
+);
     
     const ChatView = (
         <motion.div key="chat-view" className="flex-grow flex flex-col w-full min-h-0">
-            <OverscrollContainer ref={scrollRef} className="flex-grow w-full overflow-y-auto">
+            <OverscrollContainer ref={scrollRef} className="flex-grow w-full overflow-y-auto pb-28 md:pb-32">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, delay: 0.15 }}>
                     <div className="p-4 space-y-6">
                         {messages.map((msg, index) => {
-                            const lastThinkingStep = msg.thinkingSteps?.[msg.thinkingSteps.length - 1];
+                            const textParts = msg.parts.filter(p => 'text' in p && p.text.trim());
+                            const attachmentParts = msg.parts.filter(p => 'inlineData' in p);
+                            const hasText = textParts.length > 0;
+                            const hasAttachments = attachmentParts.length > 0;
+                            const modelHasText = msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text;
+                            const modelIsThinking = msg.role === 'model' && msg.thinkingSteps?.length && !modelHasText;
+                            const modelHasIntermediateThought = msg.role === 'model' && msg.intermediateThought && !modelHasText;
+                            const isLastMessage = index === messages.length - 1;
+                            const animate = isLastMessage && msg.role === 'model' && animateLastMessage;
+                            
                             return (
                                 <div key={msg.id} className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                    <div
-                                        onContextMenu={(e) => msg.role === 'model' && handleContextMenu(e, msg)}
-                                        onPointerDown={(e) => msg.role === 'model' && handlePointerDown(e, msg)}
-                                        onPointerUp={msg.role === 'model' ? handlePointerUp : undefined}
-                                        style={{ userSelect: selectableMessageId === msg.id ? 'text' : undefined }}
-                                        className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                    >
-                                        {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary"><Sparkles size={18} /></div>}
-                                        <div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-light-primary dark:bg-dark-primary text-white rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass rounded-bl-lg'}`}>
-                                            {msg.role === 'model' ? 
-                                                (<div>
-                                                    {isLoading && index === messages.length - 1 && lastThinkingStep && (
-                                                        <div className="mb-2 border-b border-white/10 pb-2">
-                                                            <button onClick={() => setThinkingLogVisible(prev => !prev)} className="w-full flex items-center justify-between gap-2 text-xs text-light-text-secondary dark:text-dark-text-secondary">
-                                                                <div className="flex items-center gap-2 overflow-hidden"><BrainCircuit size={14} className="text-light-primary dark:text-dark-primary animate-pulse flex-shrink-0"/><span className="truncate text-left">{lastThinkingStep}</span></div>
-                                                                <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${thinkingLogVisible ? 'rotate-180' : ''}`} />
-                                                            </button>
-                                                            <AnimatePresence>{thinkingLogVisible && msg.thinkingSteps && msg.thinkingSteps.length > 1 && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden"><ul className="mt-2 pl-5 text-xs text-light-text-secondary dark:text-dark-text-secondary list-disc space-y-1">{msg.thinkingSteps.slice(0, -1).map((step, i) => <li key={i} className="opacity-70">{step}</li>)}</ul></motion.div>}</AnimatePresence>
-                                                        </div>
-                                                    )}
-                                                    <div className={isLoading && index === messages.length - 1 && !lastThinkingStep ? 'typing-cursor' : ''}>
-                                                        {msg.parts[0] && 'text' in msg.parts[0] ? <MarkdownRenderer text={msg.parts[0].text} /> : <span className="opacity-0">.</span>}
+                                    {modelIsThinking ? <ThinkingBubble /> : modelHasIntermediateThought ? <ThoughtBubble text={msg.intermediateThought!} /> : (
+                                        <div
+                                            style={{ userSelect: selectableMessageId === msg.id ? 'text' : 'none' }}
+                                            className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                        >
+                                            {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary"><Sparkles size={18} /></div>}
+                                            <div
+                                                onContextMenu={(e) => msg.role === 'model' && handleContextMenu(e, msg)}
+                                                onPointerDown={(e) => msg.role === 'model' && handlePointerDown(e, msg)}
+                                                onPointerMove={(e) => msg.role === 'model' && handlePointerMove(e)}
+                                                onPointerUp={msg.role === 'model' ? handlePointerUp : undefined}
+                                                onPointerLeave={msg.role === 'model' ? handlePointerUp : undefined}
+                                                className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}
+                                            >
+                                                {msg.role === 'user' ? (
+                                                    (hasText || hasAttachments) && (
+                                                        <>
+                                                            {hasAttachments && (
+                                                                <div className="flex flex-wrap justify-end gap-2 mb-2">
+                                                                    {attachmentParts.map((part, i) => {
+                                                                        const { mimeType, name } = (part as any).inlineData;
+                                                                        return (
+                                                                            <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full backdrop-blur-sm">
+                                                                                <div className="w-5 h-5 flex-shrink-0"><AttachmentIcon type={mimeType || ''} className="w-full h-full text-white" /></div>
+                                                                                <span className="text-sm text-white truncate max-w-[150px]">{name || 'Attachment'}</span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                            {hasText && (
+                                                                <div className="p-3 rounded-2xl bg-light-primary dark:bg-dark-primary text-white rounded-br-lg">
+                                                                {textParts.map((part, i) => (
+                                                                    <div key={i} className="text-base md:text-lg" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
+                                                                ))}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )
+                                                ) : (
+                                                    <div className={isLoading && isLastMessage ? 'typing-cursor' : ''}>
+                                                        {modelHasText ? <StreamingMarkdownRenderer text={(msg.parts[0] as any).text} animate={animate} onFinished={() => {
+                                                            setFinishedTypingMessages(prev => new Set(prev).add(msg.id));
+                                                        }}/> : <span className="opacity-0">.</span>}
                                                     </div>
-                                                </div>) : 
-                                                (<div className="flex flex-col gap-2">
-                                                    {msg.parts.map((part, i) => {
-                                                        if ('inlineData' in part && typeof part.inlineData === 'object') {
-                                                            const { mimeType, data, name } = part.inlineData;
-                                                            if (mimeType === 'application/vnd.aura.journal') return <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg"><BookText size={16} /><span className="truncate text-sm font-medium">{name || 'Journal Context'}</span></div>;
-                                                            const fullDataUrl = `data:${mimeType};base64,${data}`;
-                                                            if (mimeType?.startsWith('image/')) return <img key={i} src={fullDataUrl} alt={name || "User upload"} className="rounded-lg max-w-full h-auto max-h-64 object-contain" />;
-                                                            return <div key={i} className="flex items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-lg"><AttachmentIcon type={mimeType || ''} /><span className="truncate text-sm font-medium">{name || 'Attached File'}</span></div>;
-                                                        }
-                                                        if ('text' in part && part.text) return <div key={i} style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{part.text}</div>;
-                                                        return null;
-                                                    })}
-                                                </div>)
-                                            }
+                                                )}
+                                            </div>
+                                            {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400"><UserIcon size={18} /></div>}
                                         </div>
-                                        {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400"><UserIcon size={18} /></div>}
-                                    </div>
-                                    {msg.role === 'model' && !(isLoading && index === messages.length - 1) && msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text && <div className="flex flex-col items-start gap-2 mt-2 ml-11"><ActionButtons message={msg} /></div>}
+                                    )}
+                                    <AnimatePresence>
+                                    {msg.role === 'model' && !modelIsThinking && !modelHasIntermediateThought && modelHasText && finishedTypingMessages.has(msg.id) && !isLoading && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, y: 5 }} 
+                                            animate={{ opacity: 1, y: 0 }} 
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.4 }}
+                                            className="flex flex-col items-start gap-2 mt-2 ml-11"
+                                        >
+                                            <ActionButtons message={msg} />
+                                        </motion.div>
+                                    )}
+                                    </AnimatePresence>
                                 </div>
                             )
                         })}
+                        <AnimatePresence>
+                           {isLoading && isResearchMode && <ThinkingBubble />}
+                       </AnimatePresence>
                     </div>
                 </motion.div>
             </OverscrollContainer>
-            <div className="flex-shrink-0 w-full p-4 pt-2 bg-light-glass/50 dark:bg-dark-glass/50 shadow-xl dark:shadow-3xl">
+             <div className="absolute bottom-0 left-0 right-0 p-4 pt-2 bg-gradient-to-t from-light-bg via-light-bg dark:from-dark-bg dark:via-dark-bg to-transparent">
                 <AnimatePresence>{attachments.length > 0 && <motion.div className="w-full pb-2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}><div className="flex gap-3 overflow-x-auto pb-2">{attachments.map(att => <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />)}</div></motion.div>}</AnimatePresence>
                  <motion.div layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} className="relative">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-center p-1 rounded-2xl bg-light-bg-secondary dark:bg-dark-bg-secondary border border-white/10 focus-within:border-light-primary/50 dark:focus-within:border-dark-primary/50 transition-colors">
-                        <button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file"><Paperclip size={20} /></button>
-                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2" />
+                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-end p-2 rounded-2xl bg-light-bg-secondary dark:bg-dark-bg-secondary border border-white/10 focus-within:border-light-primary/50 dark:focus-within:border-dark-primary/50 transition-colors shadow-lg">
+                        <button type="button" onClick={handleAttachmentClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file"><Paperclip size={20} /></button>
+                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2.5" />
                         <div className="flex items-center gap-1 flex-shrink-0">
-                            <button type="button" onClick={handleMicClick} className={`p-1 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
+                            <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
                             <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
                         </div>
                     </form>
@@ -1302,23 +1741,69 @@ const AuraAiPage: React.FC = () => {
             <ContextMenu />
             <AnimatePresence>
                 {isHistoryOpen && (
-                    <motion.div className="fixed inset-0 z-40 bg-black/50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsHistoryOpen(false)}>
-                        <motion.div className="absolute top-0 right-0 bottom-0 w-full max-w-sm bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md border-l border-white/10" initial={{ x: "100%" }} animate={{ x: "0%" }} exit={{ x: "100%" }} transition={{ type: 'spring', stiffness: 400, damping: 40 }} onClick={e => e.stopPropagation()}>
-                            <Header title="History" showBackButton onBack={() => setIsHistoryOpen(false)} />
-                            <OverscrollContainer className="h-full overflow-y-auto">
+                    <motion.div className="fixed inset-0 z-40 bg-black/50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if(!isHistorySelectionMode) setIsHistoryOpen(false) }}>
+                        <motion.div 
+                            className="absolute top-0 right-0 bottom-0 w-full max-w-sm bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-[2px] border-l border-white/10 flex flex-col"
+                            initial={{ x: "100%" }} 
+                            animate={{ x: "0%" }} 
+                            exit={{ x: "100%" }} 
+                            transition={{ type: 'spring', stiffness: 400, damping: 40 }} 
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <Header {...historyHeaderProps} />
+                            <OverscrollContainer className="flex-grow overflow-y-auto">
                                 <div className="p-4 space-y-3">
                                     {auraChatSessions.length > 0 ? auraChatSessions.map((session, index) => {
-                                        const firstUserMessage = session.find(msg => msg.role === 'user')?.parts.find(p => 'text' in p) as { text: string } | undefined;
-                                        return <button key={index} onClick={() => loadHistory(session)} className="w-full p-3 bg-light-glass dark:bg-dark-glass rounded-lg text-left"><p className="font-medium truncate">{firstUserMessage?.text || "Chat with attachments"}</p><p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{session.length} messages</p></button>
+                                        const firstUserMessage = session.messages.find(msg => msg.role === 'user')?.parts.find(p => 'text' in p) as { text: string } | undefined;
+                                        const isSelected = selectedHistoryIndices.includes(index);
+                                        return (
+                                            <motion.div
+                                                key={index}
+                                                onClick={() => handleHistoryItemClick(session, index)}
+                                                onPointerDown={() => handleHistoryPointerDown(index)}
+                                                onPointerUp={handleHistoryPointerUpOrLeave}
+                                                onPointerLeave={handleHistoryPointerUpOrLeave}
+                                                className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 border cursor-pointer ${isSelected ? 'bg-light-primary/20 dark:bg-dark-primary/20 border-light-primary/50 dark:border-dark-primary/50' : 'bg-light-glass dark:bg-dark-glass border-transparent'}`}
+                                                whileTap={{ scale: 0.98 }}
+                                            >
+                                                <AnimatePresence>
+                                                    {isHistorySelectionMode && (
+                                                        <motion.div
+                                                            initial={{ scale: 0, opacity: 0 }}
+                                                            animate={{ scale: 1, opacity: 1 }}
+                                                            exit={{ scale: 0, opacity: 0 }}
+                                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                            className="w-6 h-6 flex-shrink-0"
+                                                        >
+                                                            <div className={`w-full h-full rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-400'}`}>
+                                                                {isSelected && <Check size={16} className="text-white" />}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                                <div className="flex-grow overflow-hidden">
+                                                    <p className="font-medium truncate">{firstUserMessage?.text || "Chat with attachments"}</p>
+                                                    <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{formatTimeAgo(session.timestamp)}</p>
+                                                </div>
+                                            </motion.div>
+                                        );
                                     }) : <div className="text-center text-light-text-secondary dark:text-dark-text-secondary pt-16"><BookText size={40} className="mx-auto mb-4" /><p>No recent chats.</p></div>}
                                 </div>
                             </OverscrollContainer>
+                             {!isHistorySelectionMode && (
+                                <div className="p-4 flex-shrink-0">
+                                    <button onClick={() => navigateTo('auraAiSettings')} className="w-full flex items-center justify-start gap-3 px-3 py-2 border border-black/10 dark:border-white/10 rounded-lg font-medium text-light-text-secondary dark:text-dark-text-secondary">
+                                        <SettingsIcon size={18} />
+                                        Aura AI Settings
+                                    </button>
+                                </div>
+                            )}
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
             <JournalContextModal isOpen={isJournalContextModalOpen} onClose={() => setIsJournalContextModalOpen(false)} onAddContext={handleAddJournalContext} />
-            <div className="flex-grow flex flex-col w-full overflow-hidden">
+            <div className={`flex-grow flex flex-col w-full min-h-0 transition-all duration-300 ${isHistoryOpen ? 'backdrop-blur-sm' : ''}`}>
                 <AnimatePresence mode="wait">{chatState === 'initial' ? InitialView : ChatView}</AnimatePresence>
             </div>
              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
@@ -1338,6 +1823,8 @@ const AuraAiPage: React.FC = () => {
                 .dark\\:border-dark-primary { border-color: hsl(var(--accent-dark)); }
                 .border-light-primary\\/20 { border-color: hsla(var(--accent-light), 0.2); }
                 .dark\\:border-dark-primary\\/20 { border-color: hsla(var(--accent-dark), 0.2); }
+                .border-light-primary\\/50 { border-color: hsla(var(--accent-light), 0.5); }
+                .dark\\:border-dark-primary\\/50 { border-color: hsla(var(--accent-dark), 0.5); }
                  .hover\\:bg-light-primary\\/10:hover { background-color: hsla(var(--accent-light), 0.1); }
                 .dark\\:hover\\:bg-dark-primary\\/10:hover { background-color: hsla(var(--accent-dark), 0.1); }
                 .hover\\:text-light-primary:hover { color: hsl(var(--accent-light)); }
@@ -1346,7 +1833,8 @@ const AuraAiPage: React.FC = () => {
                 .dark\\:hover\\:border-dark-primary\\/50:hover { border-color: hsla(var(--accent-dark), 0.5); }
                 .focus-within\\:border-light-primary\\/50:focus-within { border-color: hsla(var(--accent-light), 0.5); }
                 .dark\\:focus-within\\:border-dark-primary\\/50:focus-within { border-color: hsla(var(--accent-dark), 0.5); }
-                .prose-styles p:not(:last-child) { margin-bottom: 0.5rem; }
+                .prose-styles { font-size: 1.1rem; line-height: 1.7; color: inherit; }
+                .prose-styles p:not(:last-child) { margin-bottom: 0.75rem; }
                 .prose-styles ul, .prose-styles ol { margin-left: 1.25rem; margin-top: 0.5rem; margin-bottom: 0.75rem; }
                 .prose-styles ul { list-style-type: disc; }
                 .prose-styles ol { list-style-type: decimal; }
@@ -1371,6 +1859,11 @@ const AuraAiPage: React.FC = () => {
                 html.dark .prose-styles a { color: hsl(var(--accent-dark)); }
                 .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
                  .line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+                .prose-styles .aura-table { display: block; overflow-x: auto; white-space: nowrap; max-width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9em; border-radius: 0.75rem; border: 1px solid rgba(128, 128, 128, 0.2); }
+                .prose-styles .aura-table th, .prose-styles .aura-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(128, 128, 128, 0.2); white-space: normal; }
+                html.dark .prose-styles .aura-table { border-color: rgba(128, 128, 128, 0.2); }
+                html.dark .prose-styles .aura-table th { background-color: rgba(128, 128, 128, 0.15); }
+                html.dark .prose-styles .aura-table th, html.dark .prose-styles .aura-table td { border-color: rgba(128, 128, 128, 0.2); }
             `}</style>
         </div>
     );

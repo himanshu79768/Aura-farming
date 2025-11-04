@@ -6,6 +6,9 @@ export const VIEW_PARENTS: Partial<Record<View, View>> = {
     'flow': 'home',
     'auraCheckin': 'home',
     'auraAI': 'home',
+    'auraAiSettings': 'auraAI',
+    'auraAiPersonalization': 'auraAiSettings',
+    'auraAiServiceAgreements': 'auraAiSettings',
     // Focus children
     'soundOptions': 'focus',
     // Journal children
@@ -25,7 +28,7 @@ export const MODAL_VIEWS: View[] = [
     'settings', 'breathing', 'flow', 'journalEntry', 'journalView', 
     'favorites', 'focusHistory', 'focusAnalytics', 'soundOptions', 
     'sessionLinking', 'linkedJournals', 'attachmentViewer', 'auraCheckin',
-    'auraAI'
+    'auraAI', 'auraAiSettings', 'auraAiPersonalization', 'auraAiServiceAgreements'
 ];
 export const ROOT_VIEWS: View[] = ['home', 'focus', 'journal', 'quotes', 'profile'];
 
@@ -130,6 +133,9 @@ export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {
     flow: 'Flow Mode',
     auraCheckin: 'Your Aura',
     auraAI: 'Aura AI',
+    auraAiSettings: 'AI Settings',
+    auraAiPersonalization: 'Personalization',
+    auraAiServiceAgreements: 'Agreements',
     journalEntry: 'Editing Journal',
     journalView: 'View Entry',
     favorites: 'Favorites',
