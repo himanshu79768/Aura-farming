@@ -1,176 +1,270 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart2, TrendingUp } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { TrendingUp, Award, CalendarDays, PieChart as PieChartIcon, Clock, Coffee, Sun, Moon, Sunrise, Sunset, Timer } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { ACCENT_COLORS } from '../constants';
 import OverscrollContainer from './OverscrollContainer';
 
-// Helper function to format date for grouping (YYYY-MM-DD)
 const getDayKey = (date: Date) => date.toISOString().split('T')[0];
 
-type FilterRange = '7d' | '30d';
+type FilterRange = '7d' | '30d' | 'all';
+
+const ChartCard: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; className?: string }> = ({ title, icon, children, className }) => (
+    <motion.div
+        className={`p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10 ${className}`}
+        variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+        }}
+    >
+        <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+            <div className="p-1.5 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg">{icon}</div>
+            {title}
+        </h3>
+        {children}
+    </motion.div>
+);
+
+const PieChart: React.FC<{ data: { label: string; value: number }[]; colors: string[]; hole?: number; }> = ({ data, colors, hole = 0 }) => {
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    if (total === 0) return <div className="flex items-center justify-center h-40 text-sm text-light-text-secondary dark:text-dark-text-secondary">No data for this period</div>;
+
+    let cumulative = 0;
+    const slices = data.map((item, index) => {
+        if (item.value === 0) return null;
+        const percentage = item.value / total;
+        const startAngle = (cumulative / total) * 2 * Math.PI - Math.PI / 2;
+        const endAngle = ((cumulative + item.value) / total) * 2 * Math.PI - Math.PI / 2;
+        cumulative += item.value;
+
+        const largeArcFlag = percentage > 0.5 ? 1 : 0;
+        const r = 50;
+        const rHole = r * (hole / 100);
+
+        const x1 = 50 + r * Math.cos(startAngle);
+        const y1 = 50 + r * Math.sin(startAngle);
+        const x2 = 50 + r * Math.cos(endAngle);
+        const y2 = 50 + r * Math.sin(endAngle);
+
+        let d = `M ${50 + rHole * Math.cos(startAngle)} ${50 + rHole * Math.sin(startAngle)} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} L ${50 + rHole * Math.cos(endAngle)} ${50 + rHole * Math.sin(endAngle)}`;
+
+        if (hole > 0) {
+            d += ` A ${rHole} ${rHole} 0 ${largeArcFlag} 0 ${50 + rHole * Math.cos(startAngle)} ${50 + rHole * Math.sin(startAngle)}`;
+        }
+        
+        d += ' Z';
+        
+        return <motion.path key={index} d={d} fill={colors[index % colors.length]} initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.5, ease: 'easeInOut', delay: index * 0.1 }} />;
+    });
+
+    return (
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+            <div className="w-40 h-40">
+                <svg viewBox="0 0 100 100">{slices}</svg>
+            </div>
+            <div className="flex flex-col gap-2 text-xs">
+                {data.map((item, index) => (
+                    item.value > 0 && <div key={index} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: colors[index % colors.length] }}></div>
+                        <span>{item.label} ({Math.round((item.value / total) * 100)}%)</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 const FocusAnalyticsPage: React.FC = () => {
     const { focusHistory, navigateBack, focusSearchQuery, settings } = useAppContext();
     const [filter, setFilter] = useState<FilterRange>('7d');
-    const [gradientEndColor, setGradientEndColor] = useState('hsl(217, 91%, 60%)');
 
-    useEffect(() => {
+    const chartColors = useMemo(() => {
         const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         const colorKey = settings.accentColor || 'blue';
         const accentHsl = ACCENT_COLORS[colorKey][isDark ? 'dark' : 'light'];
-        setGradientEndColor(`hsl(${accentHsl.replace(/ /g, ',')})`);
+        const [h, s, l] = accentHsl.split(' ').map(parseFloat);
+        return [
+            `hsl(${h}, ${s}%, ${l}%)`,
+            `hsl(${h}, ${s}%, ${l - 10}%)`,
+            `hsl(${h}, ${s}%, ${l + 10}%)`,
+            `hsl(${h}, ${s - 20}%, ${l}%)`,
+            `hsl(${h}, ${s}%, ${l - 20}%)`,
+            `hsl(${h}, ${s}%, ${l + 20}%)`,
+            `hsl(${h + 30}, ${s}%, ${l}%)`,
+        ];
     }, [settings.theme, settings.accentColor]);
 
-    const chartData = useMemo(() => {
+    const filteredHistory = useMemo(() => {
         const searchFilteredHistory = focusSearchQuery.trim()
             ? focusHistory.filter(session => session.name?.toLowerCase().includes(focusSearchQuery.toLowerCase()))
             : focusHistory;
 
-        if (!searchFilteredHistory || searchFilteredHistory.length === 0) return { labels: [], data: [] };
-        
-        const daysToAnalyze = filter === '7d' ? 7 : 30;
-        const dataByDate: Record<string, number> = {};
+        if (filter === 'all') return searchFilteredHistory;
 
-        // Initialize last N days with 0 minutes
-        for (let i = daysToAnalyze - 1; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            dataByDate[getDayKey(d)] = 0;
-        }
+        const now = new Date();
+        const daysToSubtract = filter === '7d' ? 7 : 30;
+        const cutoffDate = new Date();
+        cutoffDate.setDate(now.getDate() - daysToSubtract);
+        cutoffDate.setHours(0, 0, 0, 0);
 
-        searchFilteredHistory.forEach(session => {
-            const date = new Date(session.date);
-            const key = getDayKey(date);
-            if (dataByDate[key] !== undefined) {
-                dataByDate[key] += session.duration / 60; // store in minutes
-            }
-        });
-
-        const sortedEntries = Object.entries(dataByDate).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
-
-        const labels = sortedEntries.map(([date], index) => {
-            const d = new Date(date);
-            if (filter === '7d') {
-                return d.toLocaleDateString(undefined, { weekday: 'short' });
-            } else { // filter is '30d'
-                // Show label for the first day, last day, and every 5th day to avoid clutter.
-                if (index === 0 || index === sortedEntries.length - 1 || (index + 1) % 5 === 0) {
-                     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-                }
-                return ''; // Return empty string for other labels
-            }
-        });
-
-        return {
-            labels,
-            data: sortedEntries.map(([, minutes]) => Math.round(minutes)),
-        };
-
+        return searchFilteredHistory.filter(session => new Date(session.date) >= cutoffDate);
     }, [focusHistory, filter, focusSearchQuery]);
 
-    const maxMinutes = Math.max(...chartData.data, 30); // Ensure a minimum height for the chart
+    const analyticsData = useMemo(() => {
+        if (filteredHistory.length === 0) return null;
+        
+        // Key Metrics
+        const totalSeconds = filteredHistory.reduce((acc, s) => acc + s.duration, 0);
+        const longestSession = Math.round(Math.max(...filteredHistory.map(s => s.duration)) / 60);
 
-    const linePath = useMemo(() => {
-        if (chartData.data.length < 2) return "";
-        const width = 300; // SVG width
-        const height = 150; // SVG height
-        const points = chartData.data.map((minutes, index) => {
-            const x = (index / (chartData.data.length - 1)) * width;
-            const y = height - (minutes / maxMinutes) * height;
-            return `${x},${y}`;
+        // Most Productive Day
+        const dailyTotals = filteredHistory.reduce((acc, session) => {
+            const day = getDayKey(new Date(session.date));
+            acc[day] = (acc[day] || 0) + session.duration;
+            return acc;
+        }, {} as Record<string, number>);
+
+        let mostProductiveDay = { date: '', minutes: 0 };
+        if (Object.keys(dailyTotals).length > 0) {
+            const [date, duration] = Object.entries(dailyTotals).reduce((max, current) => current[1] > max[1] ? current : max);
+            mostProductiveDay = { date, minutes: Math.round(duration / 60) };
+        }
+
+        // Time of Day Data (Donut Chart)
+        const timeOfDayData = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Night': 0 };
+        filteredHistory.forEach(s => {
+            const hour = new Date(s.date).getHours();
+            if (hour >= 5 && hour < 12) timeOfDayData['Morning'] += s.duration;
+            else if (hour >= 12 && hour < 17) timeOfDayData['Afternoon'] += s.duration;
+            else if (hour >= 17 && hour < 21) timeOfDayData['Evening'] += s.duration;
+            else timeOfDayData['Night'] += s.duration;
         });
-        return `M ${points.join(' ')}`;
-    }, [chartData.data, maxMinutes]);
 
+        // Day of Week Data (Pie Chart)
+        const dayOfWeekData = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        filteredHistory.forEach(s => {
+            const dayIndex = new Date(s.date).getDay();
+            dayOfWeekData[days[dayIndex]] += s.duration;
+        });
+        
+        // Session Length Data (Bar Chart)
+        // FIX: Explicitly type sessionLengthData to help TypeScript infer correct types for `count` and `Object.values`.
+        const sessionLengthData: Record<string, number> = { '0-15m': 0, '15-30m': 0, '30-45m': 0, '45-60m': 0, '60+m': 0 };
+        filteredHistory.forEach(s => {
+            const mins = s.duration / 60;
+            if (mins <= 15) sessionLengthData['0-15m']++;
+            else if (mins <= 30) sessionLengthData['15-30m']++;
+            else if (mins <= 45) sessionLengthData['30-45m']++;
+            else if (mins <= 60) sessionLengthData['45-60m']++;
+            else sessionLengthData['60+m']++;
+        });
+
+        // Daily Trend (Line Chart)
+        // FIX: Use Math.floor to ensure we have an integer for days, which can help with type inference.
+        const daysToAnalyze = filter === 'all' ? Math.max(7, Math.floor((new Date().getTime() - new Date(filteredHistory[filteredHistory.length - 1].date).getTime()) / (1000*60*60*24))) : (filter === '7d' ? 7 : 30);
+        const trendDataByDate: Record<string, number> = {};
+        for (let i = daysToAnalyze - 1; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            trendDataByDate[getDayKey(d)] = 0;
+        }
+        filteredHistory.forEach(s => {
+            const key = getDayKey(new Date(s.date));
+            if (trendDataByDate[key] !== undefined) trendDataByDate[key] += s.duration / 60;
+        });
+        const dailyTrendData = Object.entries(trendDataByDate).map(([date, minutes]) => ({ date, minutes: Math.round(minutes) }));
+
+        return {
+            totalSeconds,
+            longestSession,
+            mostProductiveDay,
+            timeOfDayData,
+            dayOfWeekData,
+            sessionLengthData,
+            dailyTrendData,
+        };
+    }, [filteredHistory]);
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <Header title="Focus Analytics" showBackButton onBack={navigateBack} />
             <OverscrollContainer className="flex-grow w-full overflow-y-auto">
-                <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto p-4 pt-4 pb-24">
-                    {focusSearchQuery && (
-                        <p className="text-center text-sm text-light-text-secondary dark:text-dark-text-secondary mb-4">
-                            Showing results for: <span className="font-semibold text-light-text dark:text-dark-text">"{focusSearchQuery}"</span>
-                        </p>
-                    )}
+                <div className="w-full max-w-md md:max-w-4xl mx-auto p-4 pt-4 pb-24">
                     <div className="flex justify-center mb-6">
                         <div className="flex items-center bg-light-glass dark:bg-dark-glass p-1 rounded-full border border-white/10">
-                            {(['7d', '30d'] as FilterRange[]).map(f => (
+                            {(['7d', '30d', 'all'] as FilterRange[]).map(f => (
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f)}
                                     className={`px-4 py-1.5 text-sm rounded-full transition-colors ${filter === f ? 'bg-light-bg-secondary dark:bg-dark-bg-secondary' : 'text-light-text-secondary dark:text-dark-text-secondary'}`}
                                 >
-                                    {`Last ${f.replace('d', '')} days`}
+                                    {f === 'all' ? 'All Time' : `Last ${f.replace('d', '')} Days`}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {focusHistory.length === 0 ? (
+                    {!analyticsData ? (
                         <div className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 -mt-16">
-                            <BarChart2 className="w-12 h-12 mb-4" />
-                            <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">Not enough data.</h2>
-                            <p>Complete some focus sessions to see your analytics.</p>
+                            <PieChartIcon className="w-12 h-12 mb-4" />
+                            <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No focus data available.</h2>
+                            <p>Complete some sessions to see your analytics.</p>
                         </div>
                     ) : (
-                        <div className="space-y-8">
-                            <div>
-                                <h2 className="font-semibold px-1 mb-4 flex items-center gap-2"><BarChart2 size={16}/> Daily Summary</h2>
-                                <div className="w-full h-64 p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10 flex items-end justify-around gap-1">
-                                    {chartData.data.map((minutes, index) => (
-                                        <div key={index} className="flex flex-col items-center h-full flex-grow relative pt-5">
-                                            <motion.div
-                                                className="w-full bg-light-primary dark:bg-dark-primary rounded-t-md"
-                                                initial={{ height: 0 }}
-                                                animate={{ height: `${(minutes / maxMinutes) * 100}%` }}
-                                                transition={{ type: 'spring', stiffness: 100, damping: 15, delay: index * 0.02 }}
-                                            >
-                                                <AnimatePresence>
-                                                {minutes > 0 && (
-                                                    <motion.span 
-                                                        className="absolute -top-0 left-1/2 -translate-x-1/2 text-xs font-bold"
-                                                        initial={{ opacity: 0 }}
-                                                        animate={{ opacity: 1 }}
-                                                        exit={{ opacity: 0 }}
-                                                    >
-                                                        {minutes}
-                                                    </motion.span>
-                                                )}
-                                                </AnimatePresence>
-                                            </motion.div>
-                                            <p className="text-xs mt-2 text-light-text-secondary dark:text-dark-text-secondary">{chartData.labels[index]}</p>
+                        <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <ChartCard title="Total Sessions" icon={<Timer size={16} />} className="md:col-span-1 h-36">
+                                <p className="text-4xl font-bold">{filteredHistory.length}</p>
+                            </ChartCard>
+                            <ChartCard title="Total Time" icon={<Clock size={16} />} className="md:col-span-1 h-36">
+                                <p className="text-4xl font-bold">{Math.floor(analyticsData.totalSeconds / 3600)}<span className="text-xl">h</span> {Math.floor((analyticsData.totalSeconds % 3600) / 60)}<span className="text-xl">m</span></p>
+                            </ChartCard>
+                            <ChartCard title="Longest Session" icon={<Award size={16} />} className="md:col-span-1 h-36">
+                                <p className="text-4xl font-bold">{analyticsData.longestSession}<span className="text-xl">m</span></p>
+                            </ChartCard>
+                             <ChartCard title="Peak Day" icon={<CalendarDays size={16} />} className="md:col-span-1 h-36">
+                                <p className="text-3xl font-bold">{analyticsData.mostProductiveDay.minutes}<span className="text-xl">m</span></p>
+                                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{new Date(analyticsData.mostProductiveDay.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
+                            </ChartCard>
+
+                            <ChartCard title="Focus by Time of Day" icon={<Coffee size={16} />} className="md:col-span-2">
+                                <PieChart
+                                    data={[
+                                        { label: 'Morning', value: analyticsData.timeOfDayData['Morning'] },
+                                        { label: 'Afternoon', value: analyticsData.timeOfDayData['Afternoon'] },
+                                        { label: 'Evening', value: analyticsData.timeOfDayData['Evening'] },
+                                        { label: 'Night', value: analyticsData.timeOfDayData['Night'] },
+                                    ]}
+                                    colors={chartColors}
+                                    hole={60}
+                                />
+                            </ChartCard>
+
+                            <ChartCard title="Focus by Day" icon={<PieChartIcon size={16} />} className="md:col-span-2">
+                                <PieChart data={Object.entries(analyticsData.dayOfWeekData).map(([label, value]) => ({ label, value }))} colors={chartColors} />
+                            </ChartCard>
+                            
+                             <ChartCard title="Session Length" icon={<TrendingUp size={16} />} className="md:col-span-4">
+                                <div className="space-y-3 text-xs">
+                                    {Object.entries(analyticsData.sessionLengthData).map(([label, count]) => (
+                                        <div key={label} className="flex items-center gap-2">
+                                            <span className="w-16 text-right shrink-0 text-light-text-secondary dark:text-dark-text-secondary">{label}</span>
+                                            <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-4">
+                                                <motion.div
+                                                    className="h-4 rounded-full bg-light-primary dark:bg-dark-primary flex items-center justify-end pr-2 text-white font-bold"
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${(count / Math.max(1, ...Object.values(analyticsData.sessionLengthData))) * 100}%` }}
+                                                    transition={{ type: 'spring', stiffness: 100, damping: 15 }}
+                                                >
+                                                   {count > 0 && <span>{count}</span>}
+                                                </motion.div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                            <div>
-                                <h2 className="font-semibold px-1 mb-4 flex items-center gap-2"><TrendingUp size={16}/> Focus Trend</h2>
-                                <div className="w-full h-48 p-4 bg-light-glass dark:bg-dark-glass rounded-xl border border-white/10">
-                                    <svg width="100%" height="100%" viewBox="0 0 300 150" preserveAspectRatio="none">
-                                        <motion.path
-                                            d={linePath}
-                                            fill="none"
-                                            stroke="url(#line-gradient)"
-                                            strokeWidth="3"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            initial={{ pathLength: 0 }}
-                                            animate={{ pathLength: 1 }}
-                                            transition={{ duration: 1.5, ease: "easeInOut" }}
-                                        />
-                                        <defs>
-                                            <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" stopColor={gradientEndColor} stopOpacity="0.7" />
-                                                <stop offset="100%" stopColor={gradientEndColor} />
-                                            </linearGradient>
-                                        </defs>
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                            </ChartCard>
+                        </motion.div>
                     )}
                 </div>
             </OverscrollContainer>

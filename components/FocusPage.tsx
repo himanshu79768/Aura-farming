@@ -216,7 +216,7 @@ const FocusPage: React.FC = () => {
 
             if (isPaused) {
                 const elapsed = timerDuration - timeLeft;
-                if (elapsed > 1) {
+                if (elapsed >= 300) { // 5 minutes minimum
                     const name = sessionName || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
                     addFocusSession(elapsed, name);
                 }
@@ -333,10 +333,14 @@ const FocusPage: React.FC = () => {
   const handleSave = () => {
       vibrate();
       const elapsed = timerDuration - timeLeft;
-      if (elapsed > 1) { // Save only if more than a second has passed
+      const MIN_DURATION_SECONDS = 300; // 5 minutes
+
+      if (elapsed >= MIN_DURATION_SECONDS) {
         const name = sessionName || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
         addFocusSession(elapsed, name);
         showAlertModal({ title: "Session Saved", message: `You've saved a ${Math.round(elapsed / 60)} minute session.`, type: 'success' });
+      } else if (elapsed > 1) { // It was a session but too short
+        showAlertModal({ title: "Session Not Saved", message: "Focus sessions must be at least 5 minutes to be recorded." });
       }
       
       if (mode === 'pomodoro') {

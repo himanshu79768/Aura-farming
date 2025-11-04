@@ -264,6 +264,7 @@ interface AppContextType {
   duplicateJournalEntry: (id: string) => Promise<boolean>;
   focusHistory: FocusSession[];
   addFocusSession: (durationInSeconds: number, name?: string) => void;
+  deleteMultipleFocusSessions: (ids: string[]) => Promise<boolean>;
   playFocusSound: (sound: string) => void;
   playUISound: (sound: SoundType) => void;
   vibrate: (style?: 'light' | 'medium' | 'heavy') => void;
@@ -378,6 +379,10 @@ export default function App() {
   const [isPillDragging, setIsPillDragging] = useState(false);
   const constraintsRef = useRef(null);
   const isKeyboardOpen = useVirtualKeyboard();
+  const timerDurationRef = useRef(timerState.duration);
+  useEffect(() => {
+    timerDurationRef.current = timerState.duration;
+  }, [timerState.duration]);
 
   const [confirmationModalState, setConfirmationModalState] = useState({
     isOpen: false,
@@ -644,6 +649,40 @@ export default function App() {
     updateUserData({ completedSessions: (userProfile.completedSessions || 0) + 1 });
   }, [currentUser, masterUid, playFocusSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
 
+    const deleteMultipleFocusSessions = useCallback(async (ids: string[]): Promise<boolean> => {
+        const dataPathUid = masterUid || currentUser?.uid;
+        if (!dataPathUid || ids.length === 0) return false;
+
+        try {
+            const updates: { [key: string]: any } = {};
+            ids.forEach(id => {
+                updates[`/users/${dataPathUid}/focusHistory/${id}`] = null;
+            });
+
+            const newSessionCount = Math.max(0, (userProfile.completedSessions || 0) - ids.length);
+            updates[`/users/${dataPathUid}/completedSessions`] = newSessionCount;
+
+            await update(ref(db), updates);
+            playUISound('delete');
+            return true;
+        } catch (error) {
+            console.error("Error deleting multiple focus sessions:", error);
+            showAlertModal({ title: "Delete Failed", message: "Could not delete the selected sessions. Please try again." });
+            return false;
+        }
+    }, [currentUser, masterUid, showAlertModal, userProfile.completedSessions]);
+
+  const resetTimer = useCallback((vibrateFeedback = true) => {
+    if (vibrateFeedback) {
+        vibrate();
+        playUISound('delete');
+    }
+    setTimerState(s => ({ ...s, endTime: 0, isActive: false }));
+    setTimeLeft(timerDurationRef.current);
+    setIsTimerFinished(false);
+    setSessionName('');
+  }, [vibrate]);
+
   useEffect(() => {
     if (!timerState.isActive || timerState.endTime <= 0) {
       return;
@@ -658,13 +697,21 @@ export default function App() {
       } else {
         setTimeLeft(0);
         setTimerState(s => ({ ...s, isActive: false }));
-        setIsTimerFinished(true);
-        addFocusSession(timerState.duration, sessionName);
+        
+        const MIN_DURATION_SECONDS = 300; // 5 minutes
+
+        if (timerState.duration >= MIN_DURATION_SECONDS) {
+            setIsTimerFinished(true);
+            addFocusSession(timerState.duration, sessionName);
+        } else {
+            resetTimer(false); // don't vibrate, just reset
+            showAlertModal({ title: "Session Not Recorded", message: "Focus sessions must be at least 5 minutes to be recorded." });
+        }
       }
     };
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [timerState, sessionName, addFocusSession]);
+  }, [timerState, sessionName, addFocusSession, resetTimer, showAlertModal]);
   
     const navigateTo = useCallback((view: View, params?: any) => {
         setForwardStack([]);
@@ -860,7 +907,7 @@ export default function App() {
       const newDuration = minutes * 60;
       setTimerState({ 
           duration: newDuration, 
-          endTime: autostart ? Date.now() + newDuration : 0, 
+          endTime: autostart ? Date.now() + newDuration * 1000 : 0, 
           isActive: autostart 
       });
       setTimeLeft(newDuration);
@@ -875,18 +922,7 @@ export default function App() {
     } else if (timeLeft > 0) {
       setTimerState(s => ({ ...s, isActive: true, endTime: Date.now() + timeLeft * 1000 }));
     }
-  }, [isTimerFinished, timerState.isActive, timeLeft]);
-
-  const resetTimer = useCallback((vibrateFeedback = true) => {
-    if (vibrateFeedback) {
-        vibrate();
-        playUISound('delete');
-    }
-    setTimerState(s => ({ ...s, endTime: 0, isActive: false }));
-    setTimeLeft(timerState.duration);
-    setIsTimerFinished(false);
-    setSessionName('');
-  }, [vibrate, timerState.duration]);
+  }, [isTimerFinished, timerState.isActive, timeLeft, resetTimer]);
 
   const handleConfirm = () => {
       confirmationModalState.onConfirm();
@@ -915,7 +951,7 @@ export default function App() {
   const appContextValue = useMemo(() => ({
     mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
+    focusHistory, addFocusSession, deleteMultipleFocusSessions, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
     timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
     focusSearchQuery, setFocusSearchQuery,
@@ -931,7 +967,7 @@ export default function App() {
   }), [
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
+    focusHistory, addFocusSession, deleteMultipleFocusSessions, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
     auraChatSessions, saveChatSession,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, sessionName,

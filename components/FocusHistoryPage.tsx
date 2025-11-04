@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Timer, BarChart, Clock, Download, BookOpen } from 'lucide-react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Timer, BarChart, Clock, Download, BookOpen, X, Trash2, Check } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import SearchBar from './SearchBar';
@@ -56,14 +56,21 @@ type FilterRange = '7d' | '30d' | 'all';
 interface SessionItemProps {
     session: FocusSession;
     isLinked: boolean;
+    isSelected: boolean;
+    isSelectionMode: boolean;
     onClick: () => void;
+    onPointerDown: (id: string) => void;
+    onPointerUpOrLeave: () => void;
 }
 
-const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked, onClick }) => {
+const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked, isSelected, isSelectionMode, onClick, onPointerDown, onPointerUpOrLeave }) => {
     return (
-        <motion.button
+        <motion.div
             onClick={onClick}
-            className="w-full flex justify-between items-center p-4 bg-black/5 dark:bg-white/5 rounded-xl text-left"
+            onPointerDown={() => onPointerDown(session.id)}
+            onPointerUp={onPointerUpOrLeave}
+            onPointerLeave={onPointerUpOrLeave}
+            className={`w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all duration-200 ${isSelected ? 'bg-light-primary/20 dark:bg-dark-primary/20 border-light-primary/50 dark:border-dark-primary/50' : 'bg-black/5 dark:bg-white/5 border-transparent'} border`}
             variants={{
                 hidden: { opacity: 0, x: -20 },
                 visible: { opacity: 1, x: 0 }
@@ -71,7 +78,22 @@ const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked,
             whileTap={{ scale: 0.98 }}
             layout
         >
-            <div>
+            <AnimatePresence>
+                {isSelectionMode && (
+                    <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        className="w-6 h-6 flex-shrink-0"
+                    >
+                        <div className={`w-full h-full rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-500'}`}>
+                            {isSelected && <Check size={16} className="text-white" />}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <div className="flex-grow overflow-hidden">
                 <p className="font-medium flex items-center gap-2">
                     <span>{session.name || 'Focus Session'}</span>
                     {isLinked && (
@@ -82,16 +104,25 @@ const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked,
                     {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, {new Date(session.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                 </p>
             </div>
-            <div className="font-medium text-right">
+            <div className="font-medium text-right flex-shrink-0">
                 {Math.round(session.duration / 60)} min
             </div>
-        </motion.button>
+        </motion.div>
     );
 });
 
+
 const FocusHistoryPage: React.FC = () => {
-    const { focusHistory, navigateBack, navigateTo, focusSearchQuery, setFocusSearchQuery, journalEntries } = useAppContext();
+    const { 
+        focusHistory, navigateBack, navigateTo, focusSearchQuery, setFocusSearchQuery, 
+        journalEntries, showConfirmationModal, deleteMultipleFocusSessions, vibrate, playUISound 
+    } = useAppContext();
     const [filter, setFilter] = useState<FilterRange>('all');
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    
+    const longPressTimerRef = useRef<number>();
+    const isLongPress = useRef(false);
 
     const linkedSessionIds = useMemo(() => {
         const ids = new Set<string>();
@@ -153,9 +184,91 @@ const FocusHistoryPage: React.FC = () => {
         document.body.removeChild(link);
     };
 
+    const handlePointerDown = useCallback((sessionId: string) => {
+        isLongPress.current = false;
+        longPressTimerRef.current = window.setTimeout(() => {
+            isLongPress.current = true;
+            vibrate();
+            playUISound('tap');
+            if (!isSelectionMode) {
+                setIsSelectionMode(true);
+            }
+            setSelectedIds(prev => (prev.includes(sessionId) ? prev : [...prev, sessionId]));
+        }, 500); // 500ms for long press
+    }, [isSelectionMode, vibrate, playUISound]);
+
+    const handlePointerUpOrLeave = useCallback(() => {
+        clearTimeout(longPressTimerRef.current);
+    }, []);
+
+    const handleItemClick = useCallback((session: FocusSession) => {
+        if (isLongPress.current) {
+            isLongPress.current = false;
+            return;
+        }
+
+        if (isSelectionMode) {
+            vibrate();
+            playUISound('tap');
+            setSelectedIds(prev => {
+                const newIds = prev.includes(session.id)
+                    ? prev.filter(id => id !== session.id)
+                    : [...prev, session.id];
+                
+                if (newIds.length === 0) {
+                    setIsSelectionMode(false);
+                }
+                
+                return newIds;
+            });
+        } else {
+            vibrate();
+            playUISound('tap');
+            navigateTo('linkedJournals', { session });
+        }
+    }, [isSelectionMode, navigateTo, vibrate, playUISound]);
+    
+    const exitSelectionMode = () => {
+        setIsSelectionMode(false);
+        setSelectedIds([]);
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedIds.length === 0) return;
+        showConfirmationModal({
+            title: `Delete ${selectedIds.length} session${selectedIds.length > 1 ? 's' : ''}?`,
+            message: 'This action cannot be undone and will permanently remove the selected sessions.',
+            confirmText: 'Delete',
+            onConfirm: async () => {
+                const success = await deleteMultipleFocusSessions(selectedIds);
+                if (success) {
+                    exitSelectionMode();
+                }
+            },
+        });
+    };
+
+    const headerProps = isSelectionMode ? {
+        leftAction: (
+            <motion.button onClick={exitSelectionMode} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                <X size={24} />
+            </motion.button>
+        ),
+        title: `${selectedIds.length} selected`,
+        rightAction: (
+            <motion.button onClick={handleDeleteSelected} disabled={selectedIds.length === 0} className="p-2 rounded-full hover:bg-red-500/10 text-red-500 disabled:opacity-50">
+                <Trash2 size={20} />
+            </motion.button>
+        )
+    } : {
+        title: "Focus History",
+        showBackButton: true,
+        onBack: navigateBack,
+    };
+
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
-            <Header title="Focus History" showBackButton onBack={navigateBack} />
+            <Header {...headerProps} />
             <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 pt-2 flex-shrink-0">
                 <SearchBar
                     placeholder="Search sessions..."
@@ -222,7 +335,11 @@ const FocusHistoryPage: React.FC = () => {
                                         key={session.id}
                                         session={session}
                                         isLinked={linkedSessionIds.has(session.id)}
-                                        onClick={() => navigateTo('linkedJournals', { session })}
+                                        isSelected={selectedIds.includes(session.id)}
+                                        isSelectionMode={isSelectionMode}
+                                        onClick={() => handleItemClick(session)}
+                                        onPointerDown={handlePointerDown}
+                                        onPointerUpOrLeave={handlePointerUpOrLeave}
                                     />
                                 ))}
                             </motion.div>
@@ -230,6 +347,16 @@ const FocusHistoryPage: React.FC = () => {
                     )}
                 </div>
             </OverscrollContainer>
+             <style>{`
+                .dark\\:bg-dark-primary { background-color: hsl(var(--accent-dark)); }
+                .bg-light-primary { background-color: hsl(var(--accent-light)); }
+                .dark\\:text-dark-primary { color: hsl(var(--accent-dark)); }
+                .text-light-primary { color: hsl(var(--accent-light)); }
+                .bg-light-primary\\/20 { background-color: hsla(var(--accent-light), 0.2); }
+                .dark\\:bg-dark-primary\\/20 { background-color: hsla(var(--accent-dark), 0.2); }
+                .border-light-primary\\/50 { border-color: hsla(var(--accent-light), 0.5); }
+                .dark\\:border-dark-primary\\/50 { border-color: hsla(var(--accent-dark), 0.5); }
+            `}</style>
         </div>
     );
 };
