@@ -132,7 +132,7 @@ export const generateImageForJournal = async (prompt: string): Promise<string | 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
           contents: {
-            parts: [{ text: `Generate an image for a personal journal representing the concept: ${prompt}. The desired style is artistic and evocative, reminiscent of old-style, professional photography. Aim for a soft, creamy texture, warm and slightly desaturated tones, and a gentle, soft-focus aesthetic like an analog film photo. Avoid bright, cartoonish, or digitally sharp styles.` }],
+            parts: [{ text: prompt }],
           },
           config: {
               responseModalities: [Modality.IMAGE],
