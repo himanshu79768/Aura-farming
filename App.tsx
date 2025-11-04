@@ -277,7 +277,7 @@ interface AppContextType {
   timerDuration: number;
   isTimerActive: boolean;
   isTimerFinished: boolean;
-  selectTimerDuration: (minutes: number) => void;
+  selectTimerDuration: (minutes: number, autostart?: boolean) => void;
   toggleTimer: () => void;
   resetTimer: () => void;
   setIsPillDragging: (isDragging: boolean) => void;
@@ -633,6 +633,7 @@ export default function App() {
   const addFocusSession = useCallback((durationInSeconds: number, name?: string) => {
     playFocusSound(settings.focusSound);
     vibrate('heavy');
+    playUISound('success');
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return;
     const historyRef = ref(db, `users/${dataPathUid}/focusHistory`);
@@ -851,11 +852,17 @@ export default function App() {
     return success;
   }, [currentUser, masterUid, journalEntries, addJournalEntry, showAlertModal]);
 
-  const selectTimerDuration = useCallback((minutes: number) => {
-      vibrate();
-      playUISound('tap');
+  const selectTimerDuration = useCallback((minutes: number, autostart = false) => {
+      if (!autostart) {
+        vibrate();
+        playUISound('tap');
+      }
       const newDuration = minutes * 60;
-      setTimerState({ duration: newDuration, endTime: 0, isActive: false });
+      setTimerState({ 
+          duration: newDuration, 
+          endTime: autostart ? Date.now() + newDuration : 0, 
+          isActive: autostart 
+      });
       setTimeLeft(newDuration);
       setIsTimerFinished(false);
   }, [vibrate]);

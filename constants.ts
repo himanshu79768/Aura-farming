@@ -242,3 +242,16 @@ export const DAILY_THOUGHTS = [
     "In the middle of difficulty lies opportunity.",
     "A calm sea does not make a skilled sailor."
 ];
+
+export const SESSION_COMPLETE_AFFIRMATIONS = [
+    "Incredible focus!",
+    "You're on a roll!",
+    "Well done, another step forward.",
+    "Your dedication is inspiring.",
+    "Momentum is building.",
+    "Great work. Keep shining.",
+    "You've unlocked a new level of productivity.",
+    "Deep work achieved.",
+    "Your mind is a powerful tool.",
+    "Another block of time beautifully spent.",
+];
