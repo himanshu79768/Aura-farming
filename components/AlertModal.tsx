@@ -59,7 +59,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
           >
             <div className="flex justify-center mb-4">
               <div className={`p-3 rounded-full ${currentConfig.bg}`}>
@@ -75,7 +75,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
                 onClick={handleClose}
                 className="w-full py-3 text-lg font-semibold bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full shadow-md"
                 whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                transition={{ type: "spring", stiffness: 600, damping: 30 }}
               >
                 {closeText}
               </motion.button>

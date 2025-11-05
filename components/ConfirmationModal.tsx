@@ -54,7 +54,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
           >
             <div className="flex justify-center mb-4">
               <div className="p-3 bg-red-500/10 rounded-full">
@@ -70,7 +70,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 onClick={handleConfirm}
                 className="w-full py-3 text-lg font-semibold bg-red-500 text-white rounded-full shadow-md"
                 whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                transition={{ type: "spring", stiffness: 600, damping: 30 }}
               >
                 {confirmText}
               </motion.button>
@@ -78,7 +78,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 onClick={handleCancel}
                 className="w-full py-3 text-lg font-semibold bg-light-glass dark:bg-dark-glass rounded-full shadow-md"
                 whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                transition={{ type: "spring", stiffness: 600, damping: 30 }}
               >
                 {cancelText}
               </motion.button>

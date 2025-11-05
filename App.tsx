@@ -244,7 +244,7 @@ const MagicTransitionEffect: React.FC<{ origin: { x: number; y: number }; onComp
                     height: '200vmax',
                     opacity: 0,
                 }}
-                transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+                transition={{ duration: 0.5, ease: [0.76, 0, 0.24, 1] }}
             />
         </motion.div>
     );
@@ -323,9 +323,9 @@ export const useAppContext = () => {
 const pageVariants = { initial: { opacity: 0 }, in: { opacity: 1 }, out: { opacity: 0 } };
 const modalVariants = { initial: { x: '100%' }, in: { x: '0%' }, out: { x: '100%' } };
 const magicModalVariants = { initial: { opacity: 0, scale: 0.95 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.95 } };
-const pageTransition = { type: 'tween' as const, ease: 'easeInOut', duration: 0.3 };
-const modalTransition = { type: 'tween' as const, ease: [0.4, 0, 0.2, 1], duration: 0.4 };
-const magicModalTransition = { type: 'tween' as const, ease: [0.4, 0, 0.2, 1], duration: 0.4, delay: 0.1 };
+const pageTransition = { type: 'tween' as const, ease: [0.4, 0, 0.2, 1], duration: 0.25 };
+const modalTransition = { type: 'spring' as const, stiffness: 500, damping: 40 };
+const magicModalTransition = { type: 'spring' as const, stiffness: 500, damping: 40, delay: 0.1 };
 
 const moodFromColors: Record<Mood, string> = {
   [Mood.Calm]: 'from-blue-400/25',
@@ -1085,7 +1085,7 @@ export default function App() {
                     userName={userProfile.name}
                 />
             ) : (
-                <motion.div key="main-app" className="w-full h-full md:flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                <motion.div key="main-app" className="w-full h-full md:flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
                     {!isImmersive && <Sidebar />}
                     <div className={`relative w-full h-full ${isImmersive ? 'md:ml-0' : 'md:ml-64'} transition-[margin-left] duration-300 ease-in-out`}>
                         <div 
@@ -1193,7 +1193,7 @@ export default function App() {
                         initial={{ y: '100%' }}
                         animate={{ y: '0%' }}
                         exit={{ y: '100%' }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                        transition={{ type: 'spring', stiffness: 600, damping: 40 }}
                         className="absolute bottom-0 left-0 right-0 w-full"
                         >
                         <BottomNav currentView={currentView} navigateTo={navigateTo} />

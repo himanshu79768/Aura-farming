@@ -112,7 +112,7 @@ const HomePage: React.FC = () => {
             className="relative inline-flex items-center justify-center rounded-full group"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            transition={{ type: "spring", stiffness: 600, damping: 30 }}
           >
             <div className="absolute -inset-px bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-sm opacity-75 group-hover:opacity-100 transition duration-500"></div>
             <div className="relative flex items-center gap-2 px-6 py-3 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
@@ -125,7 +125,7 @@ const HomePage: React.FC = () => {
             className="flex items-center gap-2 px-6 py-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            transition={{ type: "spring", stiffness: 600, damping: 30 }}
           >
             <Wind className="w-5 h-5 text-blue-400" />
             <span>Breathe</span>
@@ -136,7 +136,7 @@ const HomePage: React.FC = () => {
           aria-label="Refresh content"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          transition={{ type: "spring", stiffness: 600, damping: 30 }}
         >
           <RefreshCw className="w-5 h-5" />
         </motion.button>

@@ -13,7 +13,7 @@ const screenVariants = {
   exit: { opacity: 0, x: -300 },
 };
 // Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
-const transition = { type: 'spring' as const, stiffness: 200, damping: 25 };
+const transition = { type: 'spring' as const, stiffness: 350, damping: 35 };
 
 const FeatureCard: React.FC<{ icon: React.ReactNode; title: string; description: string; delay: number }> = ({ icon, title, description, delay }) => (
     <motion.div 

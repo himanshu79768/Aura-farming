@@ -64,7 +64,7 @@ const Sidebar: React.FC = () => {
         <aside className="fixed top-0 left-0 bottom-0 z-40 hidden md:block w-64 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-xl border-r border-white/20 dark:border-white/10 p-4">
             <nav className="flex flex-col h-full">
                 <div className="flex-grow">
-                    <motion.div layout transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}>
+                    <motion.div layout transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
                         <div>
                             <SidebarHeader>Main</SidebarHeader>
                             {navItems.map(({ view, label, icon }) => (

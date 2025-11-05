@@ -26,7 +26,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => 
       className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-full transition-colors duration-300 tappable ${isActive ? 'text-light-accent dark:text-dark-accent' : 'text-light-text-secondary dark:text-dark-text-secondary hover:text-light-accent dark:hover:text-dark-accent'}`}
       aria-label={`Go to ${label}`}
       whileTap={{ scale: 0.9 }}
-      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      transition={{ type: "spring", stiffness: 600, damping: 30 }}
     >
       {icon}
       {isActive && (
@@ -34,7 +34,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => 
           layoutId="active-nav-indicator"
           className="absolute bottom-1.5 h-1 w-6 bg-light-accent dark:bg-dark-accent rounded-full"
           initial={false}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          transition={{ type: 'spring', stiffness: 600, damping: 35 }}
         />
       )}
     </motion.button>

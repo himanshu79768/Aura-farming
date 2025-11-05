@@ -34,6 +34,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ icon, label, value, onClick }
             className={`${commonClasses} ${buttonClasses}`}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 600, damping: 30 }}
         >
             {content}
         </motion.button>

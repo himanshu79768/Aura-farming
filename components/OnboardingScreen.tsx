@@ -45,7 +45,7 @@ const screenVariants = {
   exit: { opacity: 0, x: -300 },
 };
 // Fix: Corrected Transition type for framer-motion by using 'as const' to assert literal types.
-const transition = { type: 'spring' as const, stiffness: 200, damping: 25 };
+const transition = { type: 'spring' as const, stiffness: 350, damping: 35 };
 
 const contentContainerVariants = {
     hidden: { opacity: 0 },
@@ -183,6 +183,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete, isLoadi
                                 className="w-full flex items-center justify-center gap-2 py-4 text-lg font-semibold bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
+                                transition={{ type: "spring", stiffness: 600, damping: 30 }}
                                 aria-label="Continue"
                             >
                                 {isLoading ? <Loader className="animate-spin" /> : <><span>Continue</span> <ArrowRight size={20} /></>}

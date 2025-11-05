@@ -43,7 +43,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, onClick }) => {
       className={commonClasses}
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.97 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+      transition={{ type: 'spring', stiffness: 600, damping: 30 }}
     >
       {content}
     </motion.button>
@@ -120,7 +120,7 @@ const ProfilePage: React.FC = () => {
                                 onClick={handleEditClick} 
                                 className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10"
                                 whileTap={{ scale: 0.9 }}
-                                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                                transition={{ type: "spring", stiffness: 600, damping: 30 }}
                                 aria-label="Edit name"
                             >
                                 <Edit className="w-5 h-5" />
@@ -143,7 +143,7 @@ const ProfilePage: React.FC = () => {
                         onClick={() => handleNavigate('settings')}
                         className="flex justify-between items-center w-full p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 text-left"
                         whileTap={{ scale: 0.98 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        transition={{ type: "spring", stiffness: 600, damping: 30 }}
                     >
                         <div className="flex items-center gap-3">
                             <SettingsIcon className="w-5 h-5" />
@@ -155,7 +155,7 @@ const ProfilePage: React.FC = () => {
                         onClick={logoutUser}
                         className="flex justify-between items-center w-full p-4 bg-red-500/10 dark:bg-red-500/10 backdrop-blur-md rounded-2xl border border-red-500/20 text-red-400"
                         whileTap={{ scale: 0.98 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        transition={{ type: "spring", stiffness: 600, damping: 30 }}
                     >
                         <div className="flex items-center gap-3">
                             <LogOut className="w-5 h-5" />

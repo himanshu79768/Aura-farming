@@ -175,7 +175,7 @@ const GlobalSearch: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
             onClick={toggleSearch}
         >
             <motion.div
@@ -183,7 +183,7 @@ const GlobalSearch: React.FC = () => {
                 initial={{ scale: 0.95, y: -20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.95, y: -20 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center gap-2 p-3 border-b border-white/10">

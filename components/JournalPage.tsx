@@ -297,7 +297,7 @@ const JournalPage: React.FC = () => {
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            transition={{ type: 'tween', ease: 'easeInOut', duration: 0.3 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 35 }}
                             className="overflow-hidden"
                         >
                            {calendarView}
@@ -385,8 +385,9 @@ const JournalPage: React.FC = () => {
                 <motion.button
                     onClick={handleNewEntry}
                     className="absolute bottom-28 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 600, damping: 30 }}
                     aria-label="New journal entry"
                     initial={{ scale: 0, y: 50 }}
                     animate={{ scale: 1, y: 0 }}

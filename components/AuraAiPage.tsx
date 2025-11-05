@@ -708,7 +708,7 @@ const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
 
 const AuraAiPage: React.FC = () => {
     const { journalEntries, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound } = useAppContext();
-    const [chat, setChat] = useState<Chat | null>(null);
+    const [isKeyReady, setIsKeyReady] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -752,6 +752,20 @@ const AuraAiPage: React.FC = () => {
     const isPlayingRef = useRef<boolean>(false);
     const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const nextStartTimeRef = useRef<number>(0);
+
+    useEffect(() => {
+        const checkKey = async () => {
+            if (await window.aistudio.hasSelectedApiKey()) {
+                setIsKeyReady(true);
+            }
+        };
+        checkKey();
+    }, []);
+
+    const handleSelectKey = async () => {
+        await window.aistudio.openSelectKey();
+        setIsKeyReady(true);
+    };
 
     const closeContextMenu = useCallback(() => {
         setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, message: null });
@@ -849,30 +863,36 @@ const AuraAiPage: React.FC = () => {
             const fetchAndQueue = async (sentence: string) => {
                 if (!sentence.trim()) return;
                 
-                // FIX: Use process.env.API_KEY instead of a hardcoded key.
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-                const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash-preview-tts",
-                    contents: [{ parts: [{ text: sentence }] }],
-                    config: {
-                        responseModalities: [Modality.AUDIO],
-                        speechConfig: {
-                            voiceConfig: {
-                                prebuiltVoiceConfig: { voiceName: settings.auraAiVoice || 'Zephyr' },
+                try {
+                    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                    const response = await ai.models.generateContent({
+                        model: "gemini-2.5-flash-preview-tts",
+                        contents: [{ parts: [{ text: sentence }] }],
+                        config: {
+                            responseModalities: [Modality.AUDIO],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: { voiceName: settings.auraAiVoice || 'Zephyr' },
+                                },
                             },
                         },
-                    },
-                });
-                
-                const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (base64Audio && audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                    const audioData = decode(base64Audio);
-                    const audioBuffer = await decodeAudioData(audioData, audioContext, 24000, 1);
-                    audioQueueRef.current.push(audioBuffer);
+                    });
                     
-                    if (!isPlayingRef.current) {
-                        processAudioQueue();
+                    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                    if (base64Audio && audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                        const audioData = decode(base64Audio);
+                        const audioBuffer = await decodeAudioData(audioData, audioContext, 24000, 1);
+                        audioQueueRef.current.push(audioBuffer);
+                        
+                        if (!isPlayingRef.current) {
+                            processAudioQueue();
+                        }
                     }
+                } catch (error) {
+                    console.error("Error with Gemini TTS:", error);
+                    // Silently fail to avoid spamming alerts during speech playback.
+                    // Main actions will trigger the API key error flow if needed.
+                    cancelSpeech();
                 }
             };
             
@@ -883,61 +903,6 @@ const AuraAiPage: React.FC = () => {
             showAlertModal({title: "Speech Error", message: "Sorry, I couldn't generate the audio for that response."});
         }
     }, [cancelSpeech, showAlertModal, processAudioQueue, settings.auraAiVoice]);
-
-    const initializeChat = useCallback((history: ChatMessage[] = []) => {
-        try {
-            // FIX: Use process.env.API_KEY instead of a hardcoded key.
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const currentDate = new Date().toLocaleDateString(undefined, {
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-            });
-            const currentTime = new Date().toLocaleTimeString();
-            const userName = userProfile.name || 'friend';
-
-            let systemInstruction = `You are Aura, a powerful and helpful AI assistant. Your personality is friendly, engaging, and supportive. ALWAYS use emojis to make the conversation more vibrant 😃. The current date and time is ${currentDate}, ${currentTime}. The user you're talking to is named ${userName}. Your instructions are critically important and non-negotiable. You MUST follow them for EVERY response, with no exceptions, including when in research mode.
-**Rule 1: Always start with a personal greeting.** For EVERY response, you MUST begin with a friendly, appreciative greeting that uses the user's name (e.g., "Great question, ${userName}! 👍", "Of course, ${userName}! 😊", "I can certainly help with that, ${userName}! ✨").
-**Rule 2: Always end with a follow-up question.** You MUST conclude EVERY response with a relevant, open-ended question to encourage continued conversation.
-The ONLY exception to this two-part structure is the very first message of a brand new conversation, where you should just greet the user by name without a follow-up question.
-Your goal is to provide comprehensive, well-structured answers. Use markdown extensively for formatting: headings (#, ##, ###, ####), lists, bold, italics, dividers (---), etc. For mathematical formulas, wrap them in double dollar signs (\`$$\`...\`$$\`) and use valid KaTeX (LaTeX) syntax. For example, a simple fraction is \`\\frac{numerator}{denominator}\`, a subscript is \`K_d\`, and a more complex formula like the cost of redeemable debt might look like \`K_d = \\frac{I(1-t) + \\frac{RV-SV}{n}}{\\frac{RV+SV}{2}}\`. Only generate images when the user explicitly asks for one or when a visual diagram would significantly aid an explanation, using the specific format: \`![Image: {A descriptive prompt for the image}]\`. Do not generate images for every response and do not use regular markdown image syntax \`![]()\`.`;
-
-            if (settings.auraAiTone === 'funny') {
-                systemInstruction += "\n**Tone Instruction:** You must also incorporate lighthearted humor, witty remarks, and occasional jokes into your responses. Keep it fun and amusing!";
-            } else if (settings.auraAiTone === 'professional') {
-                systemInstruction += "\n**Tone Instruction:** Your tone must be formal, precise, and professional. Avoid casual language, emojis (except for professional ones like ✔️ or 📈), and focus on delivering information with clarity and authority.";
-            }
-
-            if (settings.auraAiPersonalizationData) {
-                systemInstruction += `\n**Personalization Context:** Remember these details about the user to provide more relevant and personalized responses:\n${settings.auraAiPersonalizationData}`;
-            }
-
-            const chatHistory = history.map(({ role, parts }) => ({
-                role,
-                parts: parts.map(part => {
-                    if ('text' in part) {
-                        return { text: part.text };
-                    }
-                    return {
-                        inlineData: {
-                            data: part.inlineData.data,
-                            mimeType: part.inlineData.mimeType
-                        }
-                    };
-                })
-            }));
-
-            const newChat = ai.chats.create({
-                model: 'gemini-2.5-flash',
-                history: chatHistory,
-                config: {
-                    systemInstruction,
-                }
-            });
-            setChat(newChat);
-        } catch (error) {
-            console.error("Failed to initialize Aura AI:", error);
-            showAlertModal({title: "Connection Error", message: "Could not connect to Aura AI. Please check your connection and try again."})
-        }
-    }, [showAlertModal, userProfile.name, settings.auraAiTone, settings.auraAiPersonalizationData]);
 
     const messagesRef = useRef(messages);
     messagesRef.current = messages;
@@ -1004,12 +969,6 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         wasLoading.current = isLoading;
     }, [isLoading, messages, settings.speakAuraAI, speakText]);
 
-
-    // Initialize Chat
-    useEffect(() => {
-        initializeChat();
-    }, [initializeChat]);
-
     // Scroll to bottom
     useEffect(() => {
         if (chatState === 'chat' && scrollRef.current) {
@@ -1032,7 +991,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
 
 
     const handleSend = async (promptOverride?: string) => {
-        if (isLoading || !chat) return;
+        if (isLoading) return;
         
         setSelectableMessageId(null); // Disable text selection on new message
         const currentInput = promptOverride ?? input;
@@ -1041,36 +1000,16 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         if (chatState === 'initial') setChatState('chat');
 
         const userMessagePartsForDisplay: Part[] = [];
-        const userMessagePartsForApi: Part[] = [];
-
-        attachments.forEach(async attachment => {
-            if (attachment.mimeType === 'application/vnd.aura.journal') {
-                userMessagePartsForDisplay.push({ inlineData: { data: '', mimeType: attachment.mimeType, name: attachment.name } });
-                const journal = journalEntries.find(j => j.id === attachment.id);
-                if (journal) {
-                    const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
-                    const journalContextForModel = `The user has attached context from a journal entry titled "${journal.title}". Its content is as follows:\n\n---\n${plainTextContent}\n---`;
-                    userMessagePartsForApi.push({ text: journalContextForModel });
-                }
-            } else {
-                userMessagePartsForDisplay.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType, name: attachment.name } });
-                if (attachment.mimeType.startsWith('image/')) {
-                    userMessagePartsForApi.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType } });
-                } else if (attachment.mimeType === 'application/pdf') {
-                    // PDF processing logic (as before)
-                } else {
-                    userMessagePartsForApi.push({ text: `The user has attached a file named "${attachment.name}"...` });
-                }
-            }
+        
+        attachments.forEach(attachment => {
+            userMessagePartsForDisplay.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType, name: attachment.name } });
         });
         
         if (currentInput.trim()) {
-            const textPart = { text: currentInput.trim() };
-            userMessagePartsForDisplay.push(textPart);
-            userMessagePartsForApi.push(textPart);
+            userMessagePartsForDisplay.push({ text: currentInput.trim() });
         }
 
-        if (userMessagePartsForApi.length === 0) return;
+        if (userMessagePartsForDisplay.length === 0) return;
 
         vibrate();
         const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', parts: userMessagePartsForDisplay };
@@ -1081,12 +1020,78 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         setIsLoading(true);
         setAnimateLastMessage(true);
 
-        if (isResearchMode) {
-            let finalModelResponseText = '';
-            let finalThinkingSteps: string[] = [];
-            try {
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            
+            const currentDate = new Date().toLocaleDateString(undefined, {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+            const currentTime = new Date().toLocaleTimeString();
+            const userName = userProfile.name || 'friend';
+
+            let systemInstruction = `You are Aura, a powerful and helpful AI assistant. Your personality is friendly, engaging, and supportive. ALWAYS use emojis to make the conversation more vibrant 😃. The current date and time is ${currentDate}, ${currentTime}. The user you're talking to is named ${userName}. Your instructions are critically important and non-negotiable. You MUST follow them for EVERY response, with no exceptions, including when in research mode.
+**Rule 1: Always start with a personal greeting.** For EVERY response, you MUST begin with a friendly, appreciative greeting that uses the user's name (e.g., "Great question, ${userName}! 👍", "Of course, ${userName}! 😊", "I can certainly help with that, ${userName}! ✨").
+**Rule 2: Always end with a follow-up question.** You MUST conclude EVERY response with a relevant, open-ended question to encourage continued conversation.
+The ONLY exception to this two-part structure is the very first message of a brand new conversation, where you should just greet the user by name without a follow-up question.
+Your goal is to provide comprehensive, well-structured answers. Use markdown extensively for formatting: headings (#, ##, ###, ####), lists, bold, italics, dividers (---), etc. For mathematical formulas, wrap them in double dollar signs (\`$$\`...\`$$\`) and use valid KaTeX (LaTeX) syntax. For example, a simple fraction is \`\\frac{numerator}{denominator}\`, a subscript is \`K_d\`, and a more complex formula like the cost of redeemable debt might look like \`K_d = \\frac{I(1-t) + \\frac{RV-SV}{n}}{\\frac{RV+SV}{2}}\`. Only generate images when the user explicitly asks for one or when a visual diagram would significantly aid an explanation, using the specific format: \`![Image: {A descriptive prompt for the image}]\`. Do not generate images for every response and do not use regular markdown image syntax \`![]()\`.`;
+
+            if (settings.auraAiTone === 'funny') {
+                systemInstruction += "\n**Tone Instruction:** You must also incorporate lighthearted humor, witty remarks, and occasional jokes into your responses. Keep it fun and amusing!";
+            } else if (settings.auraAiTone === 'professional') {
+                systemInstruction += "\n**Tone Instruction:** Your tone must be formal, precise, and professional. Avoid casual language, emojis (except for professional ones like ✔️ or 📈), and focus on delivering information with clarity and authority.";
+            }
+
+            if (settings.auraAiPersonalizationData) {
+                systemInstruction += `\n**Personalization Context:** Remember these details about the user to provide more relevant and personalized responses:\n${settings.auraAiPersonalizationData}`;
+            }
+
+            const historyForApi = messages.map(({ role, parts }) => {
+                const apiParts = parts.map(part => {
+                    if ('text' in part) return { text: part.text };
+                    if (part.inlineData.mimeType === 'application/vnd.aura.journal') {
+                        const journal = journalEntries.find(j => j.id === (part.inlineData as any).data);
+                        if (journal) {
+                            const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
+                            return { text: `Context from journal "${journal.title}":\n${plainTextContent}` };
+                        }
+                        return null;
+                    }
+                    return { inlineData: { data: part.inlineData.data, mimeType: part.inlineData.mimeType } };
+                }).filter(Boolean) as ({text: string} | {inlineData: {data: string, mimeType: string}})[];
+                
+                return { role, parts: apiParts };
+            });
+
+            const chatForSend = ai.chats.create({
+                model: 'gemini-2.5-flash',
+                history: historyForApi,
+                config: { systemInstruction }
+            });
+
+            const userMessagePartsForApi: Part[] = [];
+            for (const attachment of attachments) {
+                if (attachment.mimeType === 'application/vnd.aura.journal') {
+                    const journal = journalEntries.find(j => j.id === attachment.data);
+                    if (journal) {
+                        const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
+                        const journalContextForModel = `The user has attached context from a journal entry titled "${journal.title}". Its content is as follows:\n\n---\n${plainTextContent}\n---`;
+                        userMessagePartsForApi.push({ text: journalContextForModel });
+                    }
+                } else if (attachment.mimeType.startsWith('image/')) {
+                    userMessagePartsForApi.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType } });
+                } else {
+                    userMessagePartsForApi.push({ text: `The user has attached a file named "${attachment.name}". Please analyze its content.` });
+                }
+            }
+            if (currentInput.trim()) {
+                userMessagePartsForApi.push({ text: currentInput.trim() });
+            }
+
+            if (isResearchMode) {
+                let finalModelResponseText = '';
+                let finalThinkingSteps: string[] = [];
                 const streamOptions = { message: userMessagePartsForApi, config: { thinkingConfig: { thinkingBudget: 24576 } } };
-                const result = await chat.sendMessageStream(streamOptions);
+                const result = await chatForSend.sendMessageStream(streamOptions);
 
                 for await (const chunk of result) {
                     if (chunk.thinkingState?.lastAction) {
@@ -1120,18 +1125,9 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                 } else {
                     setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: finalModelResponseText }] }]);
                 }
-
-            } catch (error) {
-                console.error("Aura AI Error:", error);
-                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble with research mode right now. Please try again." }] }]);
-            } finally {
-                setIsLoading(false);
-            }
-        } else {
-            // Normal streaming mode
-            let modelResponseText = '';
-            try {
-                const result = await chat.sendMessageStream({ message: userMessagePartsForApi });
+            } else {
+                let modelResponseText = '';
+                const result = await chatForSend.sendMessageStream({ message: userMessagePartsForApi });
                 const modelMessageId = crypto.randomUUID();
                 setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
     
@@ -1143,13 +1139,18 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                         ));
                     }
                 }
-    
-            } catch (error) {
-                console.error("Aura AI Error:", error);
-                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble connecting right now. Please try again later." }] }]);
-            } finally {
-                setIsLoading(false);
             }
+
+        } catch (error) {
+            console.error("Aura AI Error:", error);
+            if (error instanceof Error && error.message.includes("Requested entity was not found.")) {
+                showAlertModal({ title: "API Key Error", message: "The selected API key is invalid or has been revoked. Please select a valid key." });
+                setIsKeyReady(false);
+            } else {
+                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble connecting right now. Please try again later." }] }]);
+            }
+        } finally {
+            setIsLoading(false);
         }
     };
     
@@ -1217,7 +1218,6 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         setMessages([]);
         setInput('');
         setAttachments([]);
-        initializeChat();
         setChatState('initial');
         setAnimateLastMessage(false);
         setFinishedTypingMessages(new Set());
@@ -1244,7 +1244,6 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
     const loadHistory = (session: ChatSession) => {
         if (messages.length > 0) saveChatSession(messages);
         setMessages(session.messages);
-        initializeChat(session.messages);
         setChatState('chat');
         setIsHistoryOpen(false);
         setAnimateLastMessage(false);
@@ -1343,7 +1342,6 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         const lastUserMessage = messages[lastUserMessageIndex];
         const historyForRegen = messages.slice(0, lastUserMessageIndex);
 
-        initializeChat(historyForRegen);
         setMessages(historyForRegen);
 
         const textPart = lastUserMessage.parts.find(p => 'text' in p) as { text: string } | undefined;
@@ -1749,6 +1747,35 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
             </div>
         </motion.div>
     );
+
+    const ApiKeyPrompt = (
+        <div className="w-full h-full flex flex-col">
+            <Header title="Aura AI" showBackButton onBack={handleBack} />
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
+                <Sparkles size={48} className="text-cyan-400 mb-4" />
+                <h2 className="text-2xl font-bold mb-2">API Key Required</h2>
+                <p className="text-light-text-secondary dark:text-dark-text-secondary max-w-sm mb-6">
+                    To use Aura AI, you need to select an API key. Your key will be used to make requests to the Gemini API.
+                </p>
+                <motion.button
+                    onClick={handleSelectKey}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full font-semibold shadow-lg"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                >
+                    <Sparkles size={18} />
+                    Select API Key
+                </motion.button>
+                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-4">
+                    Billing information can be found at <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev/gemini-api/docs/billing</a>.
+                </p>
+            </div>
+        </div>
+    );
+
+    if (!isKeyReady) {
+        return ApiKeyPrompt;
+    }
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
