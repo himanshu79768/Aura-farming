@@ -109,16 +109,16 @@ export const MUSIC_PRESETS: { name: FocusMusic, src: string }[] = [
 
 // Using HSL values for easy manipulation if needed. Format: 'H S% L%'
 export const ACCENT_COLORS: Record<AccentColor, { name: string; light: string; dark: string }> = {
-    blue: { name: 'Ocean Blue', light: '221 83% 53%', dark: '217 91% 60%' },
-    purple: { name: 'Amethyst', light: '262 82% 58%', dark: '262 82% 64%' },
-    pink: { name: 'Rose', light: '322 81% 55%', dark: '322 73% 62%' },
-    red: { name: 'Crimson', light: '0 84% 60%', dark: '0 84% 67%' },
-    orange: { name: 'Sunset', light: '25 95% 53%', dark: '25 95% 58%' },
-    yellow: { name: 'Marigold', light: '48 96% 53%', dark: '48 96% 58%' },
-    green: { name: 'Emerald', light: '142 71% 45%', dark: '142 63% 52%' },
-    teal: { name: 'Aqua', light: '162 80% 40%', dark: '162 72% 48%' },
-    cyan: { name: 'Sky', light: '184 89% 40%', dark: '184 89% 48%' },
-    indigo: { name: 'Twilight', light: '250 75% 62%', dark: '250 70% 68%' },
+    blue: { name: 'Ocean Blue', light: '221 70% 50%', dark: '221 90% 75%' },
+    purple: { name: 'Amethyst', light: '262 65% 55%', dark: '262 85% 80%' },
+    pink: { name: 'Rose', light: '322 70% 58%', dark: '322 90% 82%' },
+    red: { name: 'Crimson', light: '0 75% 60%', dark: '0 90% 80%' },
+    orange: { name: 'Sunset', light: '25 85% 55%', dark: '25 95% 78%' },
+    yellow: { name: 'Marigold', light: '48 90% 55%', dark: '48 100% 75%' },
+    green: { name: 'Emerald', light: '142 60% 45%', dark: '142 70% 70%' },
+    teal: { name: 'Aqua', light: '162 70% 42%', dark: '162 75% 72%' },
+    cyan: { name: 'Sky', light: '184 80% 45%', dark: '184 85% 75%' },
+    indigo: { name: 'Twilight', light: '250 65% 60%', dark: '250 80% 80%' },
 };
 
 export const BREADCRUMB_TITLES: Partial<Record<View, string>> = {

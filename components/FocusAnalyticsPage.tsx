@@ -1,14 +1,211 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { TrendingUp, Award, CalendarDays, PieChart as PieChartIcon, Clock, Coffee, Sun, Moon, Sunrise, Sunset, Timer } from 'lucide-react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleGenAI } from "@google/genai";
+import { TrendingUp, Award, CalendarDays, PieChart as PieChartIcon, Clock, Coffee, Sun, Moon, Sunrise, Sunset, Timer, Sparkles, Send, X, User as UserIcon } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { ACCENT_COLORS } from '../constants';
 import OverscrollContainer from './OverscrollContainer';
+import { AccentColor, ChatMessage, FocusSession } from '../types';
+
+const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
 
 const getDayKey = (date: Date) => date.toISOString().split('T')[0];
 
 type FilterRange = '7d' | '30d' | 'all';
+
+// --- START OF AI CHAT COMPONENTS (Adapted from AuraAiPage) ---
+
+const useTypewriter = (text: string, speed = 0, enabled = true) => {
+    const [displayedText, setDisplayedText] = useState('');
+    const isFinished = !enabled || displayedText.length === text.length;
+
+    useEffect(() => {
+        if (!enabled) {
+            setDisplayedText(text);
+        } else {
+            if (!text.startsWith(displayedText)) {
+                setDisplayedText('');
+            }
+        }
+    }, [text, enabled]);
+
+    useEffect(() => {
+        if (!enabled || isFinished) return;
+        const timer = setTimeout(() => {
+            const charsToAdd = 5;
+            setDisplayedText(text.slice(0, Math.min(text.length, displayedText.length + charsToAdd)));
+        }, speed);
+        return () => clearTimeout(timer);
+    }, [displayedText, text, speed, enabled, isFinished]);
+
+    return { displayedText, isFinished };
+};
+
+const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
+    const html = useMemo(() => {
+        let formattedStr = text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        return formattedStr;
+    }, [text]);
+    return <div dangerouslySetInnerHTML={{ __html: html }} />;
+});
+
+const StreamingMarkdownRenderer: React.FC<{ text: string; animate: boolean; onFinished: () => void; }> = React.memo(({ text, animate, onFinished }) => {
+    const { displayedText, isFinished } = useTypewriter(text, 0, animate);
+    useEffect(() => { if (isFinished) onFinished(); }, [isFinished, onFinished]);
+    const textToRender = animate ? displayedText : text;
+    return <RegularMarkdown text={textToRender} />;
+});
+
+
+interface AuraAnalyticsChatProps {
+    isOpen: boolean;
+    onClose: () => void;
+    analyticsData: AnalyticsData | null;
+    focusHistory: FocusSession[];
+}
+
+const AuraAnalyticsChat: React.FC<AuraAnalyticsChatProps> = ({ isOpen, onClose, analyticsData, focusHistory }) => {
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        {
+            id: 'initial-aura-message',
+            role: 'model',
+            parts: [{ text: "Hello! I'm here to help you analyze your focus data. Ask me anything about your sessions, productivity patterns, or how you can improve." }]
+        }
+    ]);
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [animateLastMessage, setAnimateLastMessage] = useState(false);
+    const [finishedTypingMessages, setFinishedTypingMessages] = useState<Set<string>>(new Set(['initial-aura-message']));
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages, isLoading]);
+    
+    useEffect(() => {
+        if (textareaRef.current) {
+            const el = textareaRef.current;
+            el.style.height = 'auto';
+            el.style.height = `${el.scrollHeight}px`;
+        }
+    }, [input]);
+
+    const handleSend = async () => {
+        if (isLoading || !input.trim()) return;
+
+        const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', parts: [{ text: input.trim() }] };
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setIsLoading(true);
+        setAnimateLastMessage(true);
+
+        const dataContext = `
+            Here is the user's focus data for the selected period:
+            - Analytics Summary: ${JSON.stringify(analyticsData, null, 2)}
+            - Full Session History: ${JSON.stringify(focusHistory, null, 2)}
+        `;
+
+        const systemInstruction = `You are Aura, an AI assistant specializing in productivity and focus analysis. The user wants to understand their focus habits. Your task is to analyze the user's focus data provided below and answer their questions, offering insights, identifying patterns, and suggesting improvements. Be encouraging and data-driven.\n${dataContext}`;
+        
+        try {
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            const historyForApi = messages.map(({ role, parts }) => ({
+                role, parts: parts.map(p => 'text' in p ? { text: p.text } : p)
+            }));
+            
+            const chatForSend = ai.chats.create({
+                model: 'gemini-2.5-flash',
+                history: historyForApi,
+                config: { systemInstruction }
+            });
+            
+            let modelResponseText = '';
+            const result = await chatForSend.sendMessageStream({ message: input.trim() });
+            const modelMessageId = crypto.randomUUID();
+            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
+
+            for await (const chunk of result) {
+                if (chunk.text) {
+                    modelResponseText += chunk.text;
+                    setMessages(prev => prev.map(msg => 
+                        msg.id === modelMessageId ? { ...msg, parts: [{ text: modelResponseText }] } : msg
+                    ));
+                }
+            }
+        } catch (error) {
+            console.error("Aura AI Error:", error);
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble connecting right now." }] }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    return (
+         <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    className="fixed inset-0 z-50 flex items-end p-2 bg-black/50"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={onClose}
+                >
+                    <motion.div
+                        className="relative w-full max-w-lg h-[70vh] md:h-[80vh] bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl flex flex-col overflow-hidden"
+                        initial={{ y: "100%" }}
+                        animate={{ y: "0%" }}
+                        exit={{ y: "100%" }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 35 }}
+                        drag="y"
+                        dragConstraints={{ top: 0 }}
+                        onDragEnd={(_, info) => { if (info.offset.y > 100) onClose(); }}
+                        dragElastic={{ top: 0, bottom: 0.5 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
+                            <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                        </div>
+                        <div className="flex-shrink-0 p-4 pt-6 flex items-center justify-center border-b border-white/10">
+                            <h2 className="text-xl font-bold">Aura AI Insights</h2>
+                        </div>
+                        <OverscrollContainer ref={scrollRef} className="flex-grow w-full overflow-y-auto">
+                            <div className="p-4 space-y-6">
+                                {messages.map((msg, index) => {
+                                    const isLastMessage = index === messages.length - 1;
+                                    const animate = isLastMessage && msg.role === 'model' && animateLastMessage;
+                                    return (
+                                        <div key={msg.id} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary"><Sparkles size={18} /></div>}
+                                            <div className={`p-3 rounded-2xl max-w-[85%] ${msg.role === 'user' ? 'bg-[#9ED3FF] dark:bg-[#3B3939] text-black dark:text-dark-text rounded-br-lg' : 'bg-light-glass dark:bg-dark-glass'}`}>
+                                                {'text' in msg.parts[0] && <StreamingMarkdownRenderer text={msg.parts[0].text} animate={animate} onFinished={() => setFinishedTypingMessages(prev => new Set(prev).add(msg.id))} />}
+                                            </div>
+                                             {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400"><UserIcon size={18} /></div>}
+                                        </div>
+                                    );
+                                })}
+                                {isLoading && <div className="flex items-start gap-3 justify-start"><div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary"><Sparkles size={18} /></div><div className="p-3 rounded-2xl bg-light-glass dark:bg-dark-glass"><span className="typing-cursor"> </span></div></div>}
+                            </div>
+                        </OverscrollContainer>
+                        <div className="p-4 flex-shrink-0 border-t border-white/10">
+                            <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-end p-1 rounded-full bg-light-glass dark:bg-dark-glass border border-white/10">
+                                <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} placeholder="Ask about your data..." disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-3 py-2.5" />
+                                <button type="submit" disabled={!input.trim() || isLoading} className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
+                            </form>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+};
+
+// --- END OF AI CHAT COMPONENTS ---
 
 const ChartCard: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; className?: string }> = ({ title, icon, children, className }) => (
     <motion.div
@@ -75,7 +272,6 @@ const PieChart: React.FC<{ data: { label: string; value: number }[]; colors: str
     );
 };
 
-// Added an interface for analytics data to provide strong typing for the `useMemo` hook's return value.
 interface AnalyticsData {
     totalSeconds: number;
     longestSession: number;
@@ -87,28 +283,16 @@ interface AnalyticsData {
 }
 
 const FocusAnalyticsPage: React.FC = () => {
-    const { focusHistory, navigateBack, focusSearchQuery, settings } = useAppContext();
+    const { focusHistory, navigateBack, focusSearchQuery, settings, vibrate } = useAppContext();
     const [filter, setFilter] = useState<FilterRange>('7d');
+    const [isAiSheetOpen, setIsAiSheetOpen] = useState(false);
 
     const chartColors = useMemo(() => {
         const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        const colorKey = settings.accentColor || 'blue';
-        const accentHsl = ACCENT_COLORS[colorKey][isDark ? 'dark' : 'light'];
-        // FIX: The HSL string components must be parsed to numbers before arithmetic operations.
-        const hslValues = accentHsl.split(' ').map(v => parseFloat(v));
-        const h = hslValues[0] || 0;
-        const s = hslValues[1] || 0;
-        const l = hslValues[2] || 0;
-        return [
-            `hsl(${h}, ${s}%, ${l}%)`,
-            `hsl(${h}, ${s}%, ${l - 10}%)`,
-            `hsl(${h}, ${s}%, ${l + 10}%)`,
-            `hsl(${h - 20}, ${s}%, ${l}%)`,
-            `hsl(${h}, ${s}%, ${l - 20}%)`,
-            `hsl(${h}, ${s}%, ${l + 20}%)`,
-            `hsl(${h + 30}, ${s}%, ${l}%)`,
-        ];
-    }, [settings.theme, settings.accentColor]);
+        const themeKey = isDark ? 'dark' : 'light';
+        const palette: AccentColor[] = ['blue', 'purple', 'pink', 'orange', 'green', 'teal', 'cyan'];
+        return palette.map(colorName => `hsl(${ACCENT_COLORS[colorName][themeKey]})`);
+    }, [settings.theme]);
 
     const filteredHistory = useMemo(() => {
         const searchFilteredHistory = focusSearchQuery.trim()
@@ -126,32 +310,26 @@ const FocusAnalyticsPage: React.FC = () => {
         return searchFilteredHistory.filter(session => new Date(session.date) >= cutoffDate);
     }, [focusHistory, filter, focusSearchQuery]);
 
-    // Explicitly set return type for useMemo to help TypeScript with type inference.
     const analyticsData = useMemo<AnalyticsData | null>(() => {
         if (filteredHistory.length === 0) return null;
         
-        // Key Metrics
         const totalSeconds = filteredHistory.reduce((acc, s) => acc + s.duration, 0);
         const longestSession = Math.round(Math.max(...filteredHistory.map(s => s.duration), 0) / 60);
 
-        // Most Productive Day & Daily Trend
         const dailyMinutes = filteredHistory.reduce<Record<string, number>>((acc, s) => {
             const day = getDayKey(new Date(s.date));
             acc[day] = (acc[day] || 0) + s.duration / 60;
             return acc;
         }, {});
         
-        // FIX: Explicitly type array destructuring to resolve type inference issue where 'minutes' was 'unknown'.
-        const mostProductiveDay = Object.entries(dailyMinutes).reduce(
-            (max, [date, minutes]: [string, number]) => (minutes > max.minutes ? { date, minutes } : max),
-            { date: '', minutes: 0 }
+        const [date, minutes] = Object.entries(dailyMinutes).reduce(
+            (max, [date, minutes]) => (minutes > max[1] ? [date, minutes] : max),
+            ['', 0]
         );
-        mostProductiveDay.minutes = Math.round(mostProductiveDay.minutes);
+        const mostProductiveDay = { date, minutes: Math.round(minutes) };
         
-        // FIX: Explicitly type array destructuring to resolve type inference issue where 'minutes' was 'unknown'.
-        const dailyTrendData = Object.entries(dailyMinutes).map(([date, minutes]: [string, number]) => ({ date, minutes: Math.round(minutes) })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const dailyTrendData = Object.entries(dailyMinutes).map(([date, minutes]) => ({ date, minutes: Math.round(minutes) })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        // Time of Day, Day of Week, Session Length
         const timeOfDayData: Record<string, number> = { 'Morning (6-12)': 0, 'Afternoon (12-6)': 0, 'Evening (6-12)': 0, 'Night (12-6)': 0 };
         const dayOfWeekData: Record<string, number> = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
         const sessionLengthData: Record<string, number> = { '0-15m': 0, '15-30m': 0, '30-60m': 0, '60m+': 0 };
@@ -227,18 +405,19 @@ const FocusAnalyticsPage: React.FC = () => {
                                 </ChartCard>
                                  <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>} className="md:col-span-2 lg:col-span-2">
                                      <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
+                                        {/* FIX: Handle potential type mismatch errors by ensuring values are numbers before calculation. */}
                                         {(() => {
-                                            // FIX: Cast Object.values to number[] to satisfy Math.max, and calculate maxCount once outside the loop for efficiency.
-                                            const maxCount = Math.max(...(Object.values(analyticsData.dayOfWeekData) as number[]));
-                                            // FIX: Explicitly type map parameters to ensure `count` is a number, resolving arithmetic operation error.
-                                            return Object.entries(analyticsData.dayOfWeekData).map(([day, count]: [string, number]) => {
+                                            const dayDataValues = Object.values(analyticsData.dayOfWeekData);
+                                            const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues) : 0;
+                                            return Object.entries(analyticsData.dayOfWeekData).map(([day, countValue], index) => {
+                                                const count = Number(countValue);
                                                 const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
                                                 return (
                                                     <div key={day} className="flex flex-col items-center flex-grow h-full justify-end">
                                                         <div className="font-semibold text-light-text dark:text-dark-text">{count}</div>
                                                         <motion.div
                                                             className="w-full rounded-t-sm"
-                                                            style={{ backgroundColor: chartColors[0], height: `${height}%` }}
+                                                            style={{ backgroundColor: chartColors[index % chartColors.length], height: `${height}%` }}
                                                             initial={{ scaleY: 0, originY: 1 }}
                                                             animate={{ scaleY: 1 }}
                                                             transition={{ type: 'spring', stiffness: 200, damping: 20 }}
@@ -268,9 +447,35 @@ const FocusAnalyticsPage: React.FC = () => {
                     </div>
                 </div>
             </OverscrollContainer>
+            <AnimatePresence>
+                <motion.button
+                    onClick={() => { vibrate(); setIsAiSheetOpen(true); }}
+                    className="absolute bottom-6 right-6 group z-20"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    aria-label="Aura AI Insights"
+                    initial={{ scale: 0, y: 50 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0, y: 50 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                >
+                    <div className="absolute -inset-1 bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-md opacity-75 group-hover:opacity-100 transition duration-500"></div>
+                    <div className="relative w-16 h-16 flex items-center justify-center bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
+                        <Sparkles size={24} className="text-cyan-400"/>
+                    </div>
+                </motion.button>
+            </AnimatePresence>
+            <AuraAnalyticsChat isOpen={isAiSheetOpen} onClose={() => setIsAiSheetOpen(false)} analyticsData={analyticsData} focusHistory={filteredHistory} />
+            <style>{`
+                @keyframes typing-blink {
+                    0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; }
+                }
+                .typing-cursor::after {
+                    content: '▋'; animation: typing-blink 1s infinite;
+                }
+            `}</style>
         </div>
     );
 };
 
-// FIX: Added default export.
 export default FocusAnalyticsPage;
