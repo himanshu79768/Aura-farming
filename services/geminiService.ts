@@ -1,11 +1,10 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Quote, Mood, AuraData, AITask } from '../types';
 
-const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
-
 export const fetchQuotes = async (): Promise<Quote[]> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    // FIX: Use process.env.API_KEY instead of a hardcoded key.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: "Generate a list of 50 short, powerful, and uplifting quotes or affirmations for focus, calm, and motivation. Please include a diverse range of authors, with a significant portion from Indian philosophers, leaders, and texts (like Vivekananda, Gandhi, the Upanishads, etc.). Authors can be famous figures or 'Anonymous'. Return as a JSON array.",
@@ -44,7 +43,8 @@ export const fetchQuotes = async (): Promise<Quote[]> => {
 
 export const fetchJournalPrompt = async (): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        // FIX: Use process.env.API_KEY instead of a hardcoded key.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Generate a short, insightful, and open-ended journal prompt to encourage self-reflection. It should be a single question or a short statement to ponder.",
@@ -64,7 +64,8 @@ export const fetchJournalPrompt = async (): Promise<string> => {
 
 export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'morning' | 'afternoon' | 'evening'): Promise<AuraData | null> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        // FIX: Use process.env.API_KEY instead of a hardcoded key.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: `The user, ${name}, is feeling ${mood.toLowerCase()} in the ${timeOfDay}. Based on this, provide a concise, one-sentence "aura reading", a short, powerful "affirmation" for them, and a simple one-action "suggestion" (like 'Take 5 deep breaths' or 'Listen to one song'). Respond in JSON format.`,
@@ -92,7 +93,8 @@ export const fetchAuraCheckin = async (mood: Mood, name: string, timeOfDay: 'mor
 
 export const processJournalWithAI = async (task: AITask, content: string, customPrompt?: string): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        // FIX: Use process.env.API_KEY instead of a hardcoded key.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         let prompt = '';
         switch (task) {
             case 'GENERATE':
@@ -128,7 +130,8 @@ export const processJournalWithAI = async (task: AITask, content: string, custom
 
 export const generateImageForJournal = async (prompt: string): Promise<string | null> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        // FIX: Use process.env.API_KEY instead of a hardcoded key.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
           contents: {

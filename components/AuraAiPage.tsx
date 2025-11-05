@@ -14,8 +14,6 @@ import { generateImageForJournal } from '../services/geminiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
-
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'application/pdf',
@@ -75,6 +73,14 @@ const markdownToPlainText = (markdown: string): string => {
 
     // Lists
     text = text.replace(/^\s*[-*]\s+/gm, '• ');
+    
+    // Ordered Lists
+    const olItems = text.match(/^\s*\d+\.\s+/gm);
+    if (olItems) {
+        let counter = 1;
+        text = text.replace(/^\s*\d+\.\s+/gm, () => `  ${counter++}. `);
+    }
+
 
     // Horizontal Rule
     text = text.replace(/^---$/gm, '------------------');
@@ -190,7 +196,7 @@ const GeneratingTableIndicator: React.FC = () => (
     </div>
 );
 
-const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
+const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
     const html = useMemo(() => {
         const applyInlineFormatting = (str: string) => {
             let formattedStr = str
@@ -224,15 +230,7 @@ const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
             return formattedStr;
         };
         
-        let markdown = text;
-        const tables: string[] = [];
-        // Extract tables and replace with placeholders
-        markdown = markdown.replace(/^((?:\|.*\|(?:\r\n|\n|\r))+)/gm, (tableBlock) => {
-            tables.push(tableBlock);
-            return `_TABLE_PLACEHOLDER_${tables.length - 1}_`;
-        });
-
-        const lines = markdown.split('\n');
+        const lines = text.split('\n');
         const htmlElements: string[] = [];
         let inList: 'ul' | 'ol' | null = null;
 
@@ -244,50 +242,15 @@ const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
         };
 
         lines.forEach(line => {
-            if (line.trim() === '') {
-                closeList();
-                return;
-            }
-             if (line.startsWith('_TABLE_PLACEHOLDER_')) {
-                closeList();
-                htmlElements.push(`<p>${line}</p>`);
-                return;
-            }
-
-            if (line.trim().match(/^(-{3,}|\*{3,}|_{3,})$/)) {
-                closeList();
-                htmlElements.push('<hr />');
-                return;
-            }
-            
-            if (line.startsWith('#')) {
-                const h4Match = line.match(/^####\s+(.*)/);
-                if (h4Match) {
-                    closeList();
-                    htmlElements.push(`<h4>${applyInlineFormatting(h4Match[1])}</h4>`);
-                    return;
-                }
-                const h3Match = line.match(/^###\s+(.*)/);
-                if (h3Match) {
-                    closeList();
-                    htmlElements.push(`<h3>${applyInlineFormatting(h3Match[1])}</h3>`);
-                    return;
-                }
-                const h2Match = line.match(/^##\s+(.*)/);
-                if (h2Match) {
-                    closeList();
-                    htmlElements.push(`<h2>${applyInlineFormatting(h2Match[1])}</h2>`);
-                    return;
-                }
-                const h1Match = line.match(/^#\s+(.*)/);
-                if (h1Match) {
-                    closeList();
-                    htmlElements.push(`<h1>${applyInlineFormatting(h1Match[1])}</h1>`);
-                    return;
-                }
-            }
-            
             const ulMatch = line.match(/^(\s*)(\*|-)\s+(.*)/);
+            const olMatch = line.match(/^(\s*)(\d+\.)\s+(.*)/);
+            const h1Match = line.match(/^#\s+(.*)/);
+            const h2Match = line.match(/^##\s+(.*)/);
+            const h3Match = line.match(/^###\s+(.*)/);
+            const h4Match = line.match(/^####\s+(.*)/);
+            const hrMatch = line.trim().match(/^(-{3,}|\*{3,}|_{3,})$/);
+            const isBlankLine = line.trim() === '';
+
             if (ulMatch) {
                 if (inList !== 'ul') {
                     closeList();
@@ -307,52 +270,52 @@ const RegularMarkdown: React.FC<{ text: string }> = ({ text }) => {
                     }
                 }
                 htmlElements.push(`<li>${listItemContent}</li>`);
-                return;
-            }
-            
-            const olMatch = line.match(/^(\s*)(\d+\.)\s+(.*)/);
-            if (olMatch) {
+            } else if (olMatch) {
                 if (inList !== 'ol') {
                     closeList();
                     htmlElements.push('<ol>');
                     inList = 'ol';
                 }
                 htmlElements.push(`<li>${applyInlineFormatting(olMatch[3])}</li>`);
-                return;
+            } else if (h1Match) {
+                closeList();
+                htmlElements.push(`<h1>${applyInlineFormatting(h1Match[1])}</h1>`);
+            } else if (h2Match) {
+                closeList();
+                htmlElements.push(`<h2>${applyInlineFormatting(h2Match[1])}</h2>`);
+            } else if (h3Match) {
+                closeList();
+                htmlElements.push(`<h3>${applyInlineFormatting(h3Match[1])}</h3>`);
+            } else if (h4Match) {
+                closeList();
+                htmlElements.push(`<h4>${applyInlineFormatting(h4Match[1])}</h4>`);
+            } else if (hrMatch) {
+                closeList();
+                htmlElements.push('<hr />');
+            } else if (isBlankLine) {
+                 // Allow blank lines *inside* list items (like after a block)
+                if (inList && htmlElements.length > 0 && !htmlElements[htmlElements.length - 1].endsWith('</p>')) {
+                    // This is a simple heuristic. A more complex parser would be needed for perfect multi-paragraph list items.
+                } else {
+                    closeList();
+                }
+                // Add a blank paragraph for spacing if it's not list-related
+                if(!inList) htmlElements.push('<p><br></p>');
+
+            } else {
+                closeList();
+                htmlElements.push(`<p>${applyInlineFormatting(line)}</p>`);
             }
-            
-            closeList();
-            htmlElements.push(`<p>${applyInlineFormatting(line)}</p>`);
         });
 
         closeList();
         
-        let finalHtml = htmlElements.join('');
-
-        tables.forEach((tableBlock, index) => {
-            const tableRows = tableBlock.trim().split('\n');
-            if (tableRows.length < 2) return;
-            const headerCells = tableRows[0].split('|').slice(1, -1).map(c => c.trim());
-            const bodyRows = tableRows.slice(2);
-
-            const tableHtml = `
-                <table class="aura-table">
-                    <thead>
-                        <tr>${headerCells.map(h => `<th>${applyInlineFormatting(h)}</th>`).join('')}</tr>
-                    </thead>
-                    <tbody>
-                        ${bodyRows.map(row => `<tr>${row.split('|').slice(1, -1).map(c => `<td>${applyInlineFormatting(c.trim())}</td>`).join('')}</tr>`).join('')}
-                    </tbody>
-                </table>
-            `;
-            finalHtml = finalHtml.replace(`_TABLE_PLACEHOLDER_${index}_`, tableHtml);
-        });
-        
-        return finalHtml;
+        // Post-process to merge consecutive empty paragraphs
+        return htmlElements.join('').replace(/(<p><br><\/p>){2,}/g, '<p><br></p>');
     }, [text]);
 
     return <div dangerouslySetInnerHTML={{ __html: html }} />;
-};
+});
 
 
 const useTypewriter = (text: string, speed = 0, enabled = true) => {
@@ -782,6 +745,7 @@ const AuraAiPage: React.FC = () => {
     const longPressTimer = useRef<number>();
     const pointerStartPos = useRef({ x: 0, y: 0 });
     const DRAG_THRESHOLD = 10;
+    const contextMenuRef = useRef<HTMLDivElement>(null);
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioQueueRef = useRef<AudioBuffer[]>([]);
@@ -794,28 +758,27 @@ const AuraAiPage: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const scrollContainer = scrollRef.current;
-        if (!scrollContainer || !contextMenu.isOpen) return;
-
-        const handleScroll = () => {
-            closeContextMenu();
-        };
-
-        scrollContainer.addEventListener('scroll', handleScroll);
-
-        return () => {
-            scrollContainer.removeEventListener('scroll', handleScroll);
-        };
-    }, [contextMenu.isOpen, closeContextMenu]);
-
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (contextMenu.isOpen) {
+        if (!contextMenu.isOpen) return;
+    
+        const handleClickOutside = (e: PointerEvent) => {
+            if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
                 closeContextMenu();
             }
         };
-        window.addEventListener('click', handleClickOutside);
-        return () => window.removeEventListener('click', handleClickOutside);
+    
+        const handleScroll = () => closeContextMenu();
+    
+        // Add listener after a short delay to prevent the same event from closing it.
+        const timerId = setTimeout(() => {
+            document.addEventListener('pointerdown', handleClickOutside);
+            scrollRef.current?.addEventListener('scroll', handleScroll);
+        }, 0);
+    
+        return () => {
+            clearTimeout(timerId);
+            document.removeEventListener('pointerdown', handleClickOutside);
+            scrollRef.current?.removeEventListener('scroll', handleScroll);
+        };
     }, [contextMenu.isOpen, closeContextMenu]);
 
     useEffect(() => {
@@ -886,7 +849,8 @@ const AuraAiPage: React.FC = () => {
             const fetchAndQueue = async (sentence: string) => {
                 if (!sentence.trim()) return;
                 
-                const ai = new GoogleGenAI({ apiKey: API_KEY });
+                // FIX: Use process.env.API_KEY instead of a hardcoded key.
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 const response = await ai.models.generateContent({
                     model: "gemini-2.5-flash-preview-tts",
                     contents: [{ parts: [{ text: sentence }] }],
@@ -922,7 +886,8 @@ const AuraAiPage: React.FC = () => {
 
     const initializeChat = useCallback((history: ChatMessage[] = []) => {
         try {
-            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            // FIX: Use process.env.API_KEY instead of a hardcoded key.
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const currentDate = new Date().toLocaleDateString(undefined, {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
             });
@@ -1316,7 +1281,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         e.stopPropagation();
 
         const menuWidth = 192; // w-48
-        const menuHeight = 280; // Estimated height
+        const menuHeight = message.role === 'user' ? 150 : 280; // Estimated height
         const margin = 16; // p-4
 
         let x = e.clientX;
@@ -1330,7 +1295,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         }
         if (x < margin) x = margin;
         if (y < margin) y = margin;
-
+        
         setContextMenu({ isOpen: true, position: { x, y }, message });
     };
 
@@ -1360,7 +1325,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         }
     };
 
-    const handleContextMenu = (e: React.MouseEvent, message: ChatMessage) => openContextMenu(e, message);
+    const handleContextMenuEvent = (e: React.MouseEvent, message: ChatMessage) => openContextMenu(e, message);
 
     const handleSelectText = () => {
         if (contextMenu.message) setSelectableMessageId(contextMenu.message.id);
@@ -1394,6 +1359,27 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
 
         setTimeout(() => handleSend(), 50);
     };
+    
+    const handleEditMessage = (message: ChatMessage) => {
+        closeContextMenu();
+        const textPart = message.parts.find(p => 'text' in p) as { text: string } | undefined;
+        if (textPart) {
+            setInput(textPart.text);
+        }
+        
+        const attachmentParts = message.parts.filter(p => 'inlineData' in p) as any[];
+        const attachmentsToSet: LocalAttachment[] = attachmentParts.map(p => ({
+            id: p.id || crypto.randomUUID(),
+            data: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`,
+            mimeType: p.inlineData.mimeType,
+            name: p.inlineData.name || 'attachment'
+        }));
+        setAttachments(attachmentsToSet);
+
+        setMessages(prev => prev.filter(m => m.id !== message.id));
+        textareaRef.current?.focus();
+    };
+
 
     const ActionButtons: React.FC<{ message: ChatMessage }> = ({ message }) => {
         const [isCopied, setIsCopied] = useState(false);
@@ -1513,20 +1499,49 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
-    const ContextMenu = () => {
-        if (!contextMenu.isOpen || !contextMenu.message) return null;
-        const { position, message } = contextMenu;
+    const ContextMenu: React.FC = () => {
+        const { isOpen, position, message } = contextMenu;
+        
+        const isLatestUserMessage = useMemo(() => {
+            if (!message || message.role !== 'user' || !messages) return false;
+            const userMessages = messages.filter(m => m.role === 'user');
+            return userMessages.length > 0 && userMessages[userMessages.length - 1].id === message.id;
+        }, [message, messages]);
+        
+        if (!isOpen || !message) return null;
+
         const isLastModelMessage = message.id === messages[messages.length - 1]?.id && messages[messages.length - 1]?.role === 'model';
+
         const handleCopy = () => {
-            const rawMarkdown = message.parts.reduce((acc, part) => 'text' in part ? acc + part.text : acc, '');
-            const plainText = markdownToPlainText(rawMarkdown);
+            const textContent = message.parts.reduce((acc, part) => 'text' in part ? acc + part.text : acc, '');
+            const plainText = message.role === 'model' ? markdownToPlainText(textContent) : textContent;
             navigator.clipboard.writeText(plainText);
-            showAlertModal({ title: "Copied!", message: "Response copied to clipboard.", type: 'success' });
+            showAlertModal({ title: "Copied!", message: "Message copied to clipboard.", type: 'success' });
             closeContextMenu();
         };
 
+        if (message.role === 'user') {
+            return (
+                <motion.div
+                    ref={contextMenuRef}
+                    className="fixed z-50 w-48 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
+                    style={{ top: position.y, left: position.x }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ type: 'spring', stiffness: 600, damping: 35 }}
+                >
+                    <button onClick={handleCopy} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Copy size={16}/>Copy</span></button>
+                    <button onClick={handleSelectText} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><TextSelect size={16}/>Select Text</span></button>
+                    {isLatestUserMessage && <button onClick={() => handleEditMessage(message)} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><SquarePen size={16}/>Edit</span></button>}
+                </motion.div>
+            );
+        }
+
+        // AI (model) message context menu
         return (
             <motion.div
+                ref={contextMenuRef}
                 className="fixed z-50 w-48 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
                 style={{ top: position.y, left: position.x }}
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -1651,16 +1666,14 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                         <div
                                             style={{ userSelect: selectableMessageId === msg.id ? 'text' : 'none' }}
                                             className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                            onContextMenu={(e) => handleContextMenuEvent(e, msg)}
+                                            onPointerDown={(e) => handlePointerDown(e, msg)}
+                                            onPointerMove={handlePointerMove}
+                                            onPointerUp={handlePointerUp}
+                                            onPointerLeave={handlePointerUp}
                                         >
                                             {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary"><Sparkles size={18} /></div>}
-                                            <div
-                                                onContextMenu={(e) => msg.role === 'model' && handleContextMenu(e, msg)}
-                                                onPointerDown={(e) => msg.role === 'model' && handlePointerDown(e, msg)}
-                                                onPointerMove={(e) => msg.role === 'model' && handlePointerMove(e)}
-                                                onPointerUp={msg.role === 'model' ? handlePointerUp : undefined}
-                                                onPointerLeave={msg.role === 'model' ? handlePointerUp : undefined}
-                                                className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}
-                                            >
+                                            <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
                                                 {msg.role === 'user' ? (
                                                     (hasText || hasAttachments) && (
                                                         <>
@@ -1792,9 +1805,8 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                             </OverscrollContainer>
                              {!isHistorySelectionMode && (
                                 <div className="p-4 flex-shrink-0">
-                                    <button onClick={() => navigateTo('auraAiSettings')} className="w-full flex items-center justify-start gap-3 px-3 py-2 border border-black/10 dark:border-white/10 rounded-lg font-medium text-light-text-secondary dark:text-dark-text-secondary">
-                                        <SettingsIcon size={18} />
-                                        Aura AI Settings
+                                    <button onClick={() => navigateTo('auraAiSettings')} className="w-full flex items-center justify-start gap-3 px-3 py-2 border border-black/10 dark:border-white/10 rounded-lg font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                        <SettingsIcon size={18} /><span>AI Settings</span>
                                     </button>
                                 </div>
                             )}
@@ -1802,69 +1814,86 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                     </motion.div>
                 )}
             </AnimatePresence>
+            <AnimatePresence>{chatState === 'initial' ? InitialView : ChatView}</AnimatePresence>
             <JournalContextModal isOpen={isJournalContextModalOpen} onClose={() => setIsJournalContextModalOpen(false)} onAddContext={handleAddJournalContext} />
-            <div className={`flex-grow flex flex-col w-full min-h-0 transition-all duration-300 ${isHistoryOpen ? 'backdrop-blur-sm' : ''}`}>
-                <AnimatePresence mode="wait">{chatState === 'initial' ? InitialView : ChatView}</AnimatePresence>
-            </div>
-             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
+            <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
              <style>{`
-                .katex-display { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; padding: 0.5rem 0; text-align: center; }
-                .math-formula-block { font-family: 'Courier New', Courier, monospace; background-color: rgba(128, 128, 128, 0.1); padding: 0.5em; border-radius: 4px; display: block; overflow-x: auto; margin: 1rem 0; }
-                @keyframes blink-cursor { 50% { opacity: 0; } }
-                .typing-cursor::after { content: '▋'; animation: blink-cursor 1s step-end infinite; display: inline-block; margin-left: 2px; font-weight: 300; color: currentColor; opacity: 0.7; }
+                .prose-styles {
+                    line-height: 1.7;
+                    word-wrap: break-word;
+                }
+                .prose-styles p, .prose-styles ul, .prose-styles ol, .prose-styles h1, .prose-styles h2, .prose-styles h3, .prose-styles h4, .prose-styles table {
+                    margin-top: 0.75em;
+                    margin-bottom: 0.75em;
+                }
+                .prose-styles h1 { font-size: 1.8em; font-weight: bold; }
+                .prose-styles h2 { font-size: 1.5em; font-weight: bold; }
+                .prose-styles h3 { font-size: 1.25em; font-weight: bold; }
+                .prose-styles h4 { font-size: 1.1em; font-weight: bold; }
+                .prose-styles ul { list-style-type: disc; padding-left: 1.5rem; }
+                .prose-styles ol { list-style-type: decimal; padding-left: 1.5rem; }
+                .prose-styles a { color: #60a5fa; text-decoration: underline; }
+                .prose-styles hr { border: none; border-top: 1px solid rgba(128, 128, 128, 0.2); margin: 1.5rem 0; }
+                .prose-styles code {
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                    background-color: rgba(128, 128, 128, 0.1);
+                    padding: 0.2em 0.4em;
+                    border-radius: 0.25rem;
+                    font-size: 0.9em;
+                }
+                .prose-styles pre {
+                    background-color: rgba(0,0,0,0.8) !important;
+                    color: #f8f8f2 !important;
+                    padding: 1rem;
+                    border-radius: 0.5rem;
+                    overflow-x: auto;
+                    font-size: 0.9em;
+                }
+                .prose-styles pre code {
+                    background-color: transparent !important;
+                    padding: 0;
+                }
+                .prose-styles .math-formula-block {
+                    overflow-x: auto;
+                    padding: 0.5rem;
+                    margin: 0.5rem 0;
+                }
+                .prose-styles table.aura-table { width: 100%; border-collapse: collapse; margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; border: 1px solid rgba(128, 128, 128, 0.2); }
+                .prose-styles table.aura-table th, .prose-styles table.aura-table td { border: 1px solid rgba(128, 128, 128, 0.2); padding: 0.5rem; text-align: left; }
+                .prose-styles table.aura-table th { font-weight: 600; background-color: rgba(128, 128, 128, 0.05); }
+
+                @keyframes typing-blink {
+                    0% { opacity: 1; }
+                    50% { opacity: 0; }
+                    100% { opacity: 1; }
+                }
+                .typing-cursor::after {
+                    content: '▋';
+                    animation: typing-blink 1s infinite;
+                    font-size: 1em;
+                    line-height: 1;
+                    margin-left: 0.1em;
+                    vertical-align: baseline;
+                    color: #a0a0a0;
+                }
                 .dark\\:bg-dark-primary { background-color: hsl(var(--accent-dark)); }
                 .bg-light-primary { background-color: hsl(var(--accent-light)); }
-                .text-light-primary { color: hsl(var(--accent-light)); }
                 .dark\\:text-dark-primary { color: hsl(var(--accent-dark)); }
+                .text-light-primary { color: hsl(var(--accent-light)); }
                 .bg-light-primary\\/10 { background-color: hsla(var(--accent-light), 0.1); }
                 .dark\\:bg-dark-primary\\/10 { background-color: hsla(var(--accent-dark), 0.1); }
-                 .border-light-primary { border-color: hsl(var(--accent-light)); }
-                .dark\\:border-dark-primary { border-color: hsl(var(--accent-dark)); }
-                .border-light-primary\\/20 { border-color: hsla(var(--accent-light), 0.2); }
-                .dark\\:border-dark-primary\\/20 { border-color: hsla(var(--accent-dark), 0.2); }
+                .bg-light-primary\\/20 { background-color: hsla(var(--accent-light), 0.2); }
+                .dark\\:bg-dark-primary\\/20 { background-color: hsla(var(--accent-dark), 0.2); }
                 .border-light-primary\\/50 { border-color: hsla(var(--accent-light), 0.5); }
                 .dark\\:border-dark-primary\\/50 { border-color: hsla(var(--accent-dark), 0.5); }
-                 .hover\\:bg-light-primary\\/10:hover { background-color: hsla(var(--accent-light), 0.1); }
+                .focus-within\\:border-light-primary\\/50:focus-within { border-color: hsla(var(--accent-light), 0.5); }
+                .dark\\:focus-within\\:border-dark-primary\\/50:focus-within { border-color: hsla(var(--accent-dark), 0.5); }
+                .hover\\:bg-light-primary\\/10:hover { background-color: hsla(var(--accent-light), 0.1); }
                 .dark\\:hover\\:bg-dark-primary\\/10:hover { background-color: hsla(var(--accent-dark), 0.1); }
                 .hover\\:text-light-primary:hover { color: hsl(var(--accent-light)); }
                 .dark\\:hover\\:text-dark-primary:hover { color: hsl(var(--accent-dark)); }
-                .hover\\:border-light-primary\\/50:hover { border-color: hsla(var(--accent-light), 0.5); }
-                .dark\\:hover\\:border-dark-primary\\/50:hover { border-color: hsla(var(--accent-dark), 0.5); }
-                .focus-within\\:border-light-primary\\/50:focus-within { border-color: hsla(var(--accent-light), 0.5); }
-                .dark\\:focus-within\\:border-dark-primary\\/50:focus-within { border-color: hsla(var(--accent-dark), 0.5); }
-                .prose-styles { font-size: 1.1rem; line-height: 1.7; color: inherit; }
-                .prose-styles p:not(:last-child) { margin-bottom: 0.75rem; }
-                .prose-styles ul, .prose-styles ol { margin-left: 1.25rem; margin-top: 0.5rem; margin-bottom: 0.75rem; }
-                .prose-styles ul { list-style-type: disc; }
-                .prose-styles ol { list-style-type: decimal; }
-                .prose-styles li:not(:last-child) { margin-bottom: 0.25rem; }
-                .prose-styles strong { font-weight: 600; }
-                .prose-styles em { font-style: italic; }
-                .prose-styles h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; margin-top: 1.5rem; }
-                .prose-styles h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; margin-top: 1.25rem; }
-                .prose-styles h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem; }
-                .prose-styles h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem; }
-                .prose-styles hr { border: none; border-top: 1px solid rgba(128,128,128,0.2); margin: 1.5rem auto; }
-                .prose-styles li > label { margin: 0; padding: 0; }
-                .prose-styles code { background-color: rgba(128, 128, 128, 0.15); padding: 0.1em 0.3em; border-radius: 0.25rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.9em; }
-                .prose-styles pre { background-color: rgba(128, 128, 128, 0.1); padding: 0.75rem; border-radius: 0.5rem; margin: 1rem 0; overflow-x: auto; font-size: 0.9em; }
-                .prose-styles pre code { background-color: transparent; padding: 0; border-radius: 0; }
-                .prose-styles u { text-decoration: underline; }
-                .prose-styles s { text-decoration: line-through; }
-                .prose-styles sub { vertical-align: sub; font-size: 0.75em; }
-                .prose-styles sup { vertical-align: super; font-size: 0.75em; }
-                .prose-styles a { color: hsl(var(--accent-light)); text-decoration: none; }
-                .prose-styles a:hover { text-decoration: underline; }
-                html.dark .prose-styles a { color: hsl(var(--accent-dark)); }
-                .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-                 .line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-                .prose-styles .aura-table { display: block; overflow-x: auto; white-space: nowrap; max-width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9em; border-radius: 0.75rem; border: 1px solid rgba(128, 128, 128, 0.2); }
-                .prose-styles .aura-table th, .prose-styles .aura-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(128, 128, 128, 0.2); white-space: normal; }
-                html.dark .prose-styles .aura-table { border-color: rgba(128, 128, 128, 0.2); }
-                html.dark .prose-styles .aura-table th { background-color: rgba(128, 128, 128, 0.15); }
-                html.dark .prose-styles .aura-table th, html.dark .prose-styles .aura-table td { border-color: rgba(128, 128, 128, 0.2); }
-            `}</style>
+             `}</style>
         </div>
     );
 };

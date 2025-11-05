@@ -31,7 +31,8 @@ import AttachmentViewerPage from './components/AttachmentViewerPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import GlobalSearch from './components/GlobalSearch';
 import AuraCheckinPage from './components/AuraCheckinPage';
-import AuraAiPage from './components/AuraAiPage';
+// FIX: Lazy load AuraAiPage to break circular dependency with AppContext.
+const AuraAiPage = React.lazy(() => import('./components/AuraAiPage'));
 import AuraAiSettingsPage from './components/AuraAiSettingsPage';
 import AuraAiPersonalizationPage from './components/AuraAiPersonalizationPage';
 import AuraAiServiceAgreementsPage from './components/AuraAiServiceAgreementsPage';
@@ -480,13 +481,27 @@ export default function App() {
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
             
             const loadedSessionsRaw = data.auraChatSessions || [];
-            const migratedSessions: ChatSession[] = loadedSessionsRaw.map((session: any) => {
-                if (Array.isArray(session)) { // Old format: ChatMessage[]
-                    // Assign a very old timestamp to legacy chats without one
-                    return { messages: session, timestamp: new Date(0).toISOString() };
-                }
-                return session; // New format: ChatSession
-            }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            const migratedSessions: ChatSession[] = loadedSessionsRaw
+                .map((session: any): ChatSession | null => {
+                    if (!session) return null;
+
+                    if (Array.isArray(session)) { // Old format: ChatMessage[]
+                        return { messages: session.filter(Boolean), timestamp: new Date(0).toISOString() };
+                    }
+
+                    if (session && typeof session === 'object' && Array.isArray(session.messages)) {
+                        // New format: ChatSession
+                        return {
+                            messages: session.messages.filter(Boolean),
+                            timestamp: session.timestamp || new Date(0).toISOString(),
+                        };
+                    }
+                    
+                    return null; // Invalid format
+                })
+                .filter((s): s is ChatSession => s !== null)
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
             setAuraChatSessions(migratedSessions);
 
 
@@ -1154,7 +1169,10 @@ export default function App() {
                                         transition={transitionToUse}
                                         style={{ zIndex: 30 + index, willChange: 'transform, opacity' }}
                                     >
-                                        {modalContent}
+                                        {/* FIX: Wrap modal content in Suspense for lazy loading */}
+                                        <React.Suspense fallback={<div />}>
+                                            {modalContent}
+                                        </React.Suspense>
                                     </motion.div>
                                 );
                             })}

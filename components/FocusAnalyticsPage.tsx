@@ -1,5 +1,3 @@
-
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Award, CalendarDays, PieChart as PieChartIcon, Clock, Coffee, Sun, Moon, Sunrise, Sunset, Timer } from 'lucide-react';
@@ -77,7 +75,7 @@ const PieChart: React.FC<{ data: { label: string; value: number }[]; colors: str
     );
 };
 
-// FIX: Added an interface for analytics data to provide strong typing for the `useMemo` hook's return value.
+// Added an interface for analytics data to provide strong typing for the `useMemo` hook's return value.
 interface AnalyticsData {
     totalSeconds: number;
     longestSession: number;
@@ -96,12 +94,12 @@ const FocusAnalyticsPage: React.FC = () => {
         const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         const colorKey = settings.accentColor || 'blue';
         const accentHsl = ACCENT_COLORS[colorKey][isDark ? 'dark' : 'light'];
-        const [h, s, l] = accentHsl.split(' ').map(parseFloat);
+        // The HSL string components must be parsed to numbers before arithmetic operations.
+        const [h, s, l] = accentHsl.split(' ').map(v => parseFloat(v));
         return [
             `hsl(${h}, ${s}%, ${l}%)`,
             `hsl(${h}, ${s}%, ${l - 10}%)`,
             `hsl(${h}, ${s}%, ${l + 10}%)`,
-            // FIX: Corrected invalid hsl color string. Hue should not have a percentage, and saturation was missing.
             `hsl(${h - 20}, ${s}%, ${l}%)`,
             `hsl(${h}, ${s}%, ${l - 20}%)`,
             `hsl(${h}, ${s}%, ${l + 20}%)`,
@@ -125,6 +123,7 @@ const FocusAnalyticsPage: React.FC = () => {
         return searchFilteredHistory.filter(session => new Date(session.date) >= cutoffDate);
     }, [focusHistory, filter, focusSearchQuery]);
 
+    // Explicitly set return type for useMemo to help TypeScript with type inference.
     const analyticsData = useMemo<AnalyticsData | null>(() => {
         if (filteredHistory.length === 0) return null;
         
@@ -146,7 +145,7 @@ const FocusAnalyticsPage: React.FC = () => {
         }
 
         // Time of Day Data (Donut Chart)
-        const timeOfDayData = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Night': 0 };
+        const timeOfDayData: Record<string, number> = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Night': 0 };
         filteredHistory.forEach(s => {
             const hour = new Date(s.date).getHours();
             if (hour >= 5 && hour < 12) timeOfDayData['Morning'] += s.duration;
@@ -156,7 +155,7 @@ const FocusAnalyticsPage: React.FC = () => {
         });
 
         // Day of Week Data (Pie Chart)
-        const dayOfWeekData = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
+        const dayOfWeekData: Record<string, number> = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         filteredHistory.forEach(s => {
             const dayIndex = new Date(s.date).getDay();
@@ -164,7 +163,6 @@ const FocusAnalyticsPage: React.FC = () => {
         });
         
         // Session Length Data (Bar Chart)
-        // FIX: Explicitly typed `sessionLengthData` to ensure TypeScript correctly infers its values as numbers.
         const sessionLengthData: Record<string, number> = { '0-15m': 0, '15-30m': 0, '30-45m': 0, '45-60m': 0, '60+m': 0 };
         filteredHistory.forEach(s => {
             const mins = s.duration / 60;
@@ -176,9 +174,8 @@ const FocusAnalyticsPage: React.FC = () => {
         });
 
         // Daily Trend (Line Chart)
-        // FIX: Wrapped the date calculation in `Math.floor` to ensure `daysToAnalyze` is always an integer.
-        // FIX: Add explicit number type to assist TypeScript's type inference which was causing an arithmetic error.
-        const daysToAnalyze: number = filter === 'all' ? Math.max(7, Math.floor((new Date().getTime() - new Date(filteredHistory[filteredHistory.length - 1].date).getTime()) / (1000*60*60*24))) : (filter === '7d' ? 7 : 30);
+        const dayDiff = Math.floor((new Date().getTime() - new Date(filteredHistory[filteredHistory.length - 1].date).getTime()) / (1000 * 60 * 60 * 24));
+        const daysToAnalyze: number = filter === 'all' ? Math.max(7, isNaN(dayDiff) ? 7 : dayDiff) : (filter === '7d' ? 7 : 30);
         const trendDataByDate: Record<string, number> = {};
         for (let i = daysToAnalyze - 1; i >= 0; i--) {
             const d = new Date(); d.setDate(d.getDate() - i);
@@ -199,7 +196,7 @@ const FocusAnalyticsPage: React.FC = () => {
             sessionLengthData,
             dailyTrendData,
         };
-    }, [filteredHistory]);
+    }, [filteredHistory, filter]);
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
@@ -261,19 +258,18 @@ const FocusAnalyticsPage: React.FC = () => {
                             
                              <ChartCard title="Session Length" icon={<TrendingUp size={16} />} className="md:col-span-4">
                                 <div className="space-y-3 text-xs">
-                                    {Object.entries(analyticsData.sessionLengthData).map(([label, count]) => (
+                                    {/* FIX: Explicitly type map arguments to ensure correct type inference for `count`. */}
+                                    {Object.entries(analyticsData.sessionLengthData).map(([label, count]: [string, number]) => (
                                         <div key={label} className="flex items-center gap-2">
                                             <span className="w-16 text-right shrink-0 text-light-text-secondary dark:text-dark-text-secondary">{label}</span>
                                             <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-4">
                                                 <motion.div
                                                     className="h-4 rounded-full bg-light-primary dark:bg-dark-primary flex items-center justify-end pr-2 text-white font-bold"
                                                     initial={{ width: 0 }}
-                                                    // Fix: Explicitly cast count and Object.values result to number to prevent type errors.
-                                                    animate={{ width: `${(Number(count) / Math.max(1, ...(Object.values(analyticsData.sessionLengthData) as number[]))) * 100}%` }}
+                                                    animate={{ width: `${(count / Math.max(1, ...Object.values(analyticsData.sessionLengthData).map(Number))) * 100}%` }}
                                                     transition={{ type: 'spring', stiffness: 100, damping: 15 }}
                                                 >
-                                                   {/* Fix: Cast count to a number for comparison. */}
-                                                   {Number(count) > 0 && <span>{count}</span>}
+                                                   {count > 0 && <span>{count}</span>}
                                                 </motion.div>
                                             </div>
                                         </div>

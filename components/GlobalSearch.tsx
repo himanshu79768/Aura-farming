@@ -115,7 +115,6 @@ const GlobalSearch: React.FC = () => {
     
     const groupedResults = useMemo(() => {
         // Fix: Explicitly typing the accumulator and casting the initial value for `reduce` ensures correct type inference.
-        // FIX: Explicitly typing the accumulator and casting the initial value for `reduce` ensures correct type inference.
         return allResults.reduce((acc: Record<string, SearchResult[]>, result) => {
             const key = result.type.charAt(0).toUpperCase() + result.type.slice(1) + 's';
             if (!acc[key]) {
@@ -207,8 +206,6 @@ const GlobalSearch: React.FC = () => {
                         <AnimatePresence>
                             {debouncedQuery.trim() ? (
                                 allResults.length > 0 ? (
-                                    // Fix: Switched from Object.entries to Object.keys to ensure proper type inference for the 'items' array, resolving the '.map' of unknown error.
-                                    // FIX: Switched from Object.entries to Object.keys to ensure proper type inference for the 'items' array, resolving the '.map' of unknown error.
                                     Object.keys(groupedResults).map((groupName) => {
                                         const items = groupedResults[groupName];
                                         return (
