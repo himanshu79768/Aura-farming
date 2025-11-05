@@ -213,7 +213,6 @@ const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
                 .replace(/~(.*?)~/g, '<sub>$1</sub>');
             
             if ((window as any).katex) {
-                // Process display mode math blocks
                 formattedStr = formattedStr.replace(/\$\$(.*?)\$\$/gs, (match, formula) => {
                     try {
                         return (window as any).katex.renderToString(formula.trim(), {
@@ -226,7 +225,6 @@ const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
                     }
                 });
             } else {
-                // Fallback if KaTeX is not loaded
                 formattedStr = formattedStr.replace(/\$\$(.*?)\$\$/gs, '<div class="math-formula-block">$1</div>');
             }
             return formattedStr;
@@ -235,6 +233,7 @@ const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
         const lines = text.split('\n');
         const htmlElements: string[] = [];
         let inList: 'ul' | 'ol' | null = null;
+        let i = 0;
 
         const closeList = () => {
             if (inList) {
@@ -243,7 +242,65 @@ const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
             }
         };
 
-        lines.forEach(line => {
+        while (i < lines.length) {
+            const line = lines[i];
+
+            const tableHeaderMatch = line.match(/^\s*\|(.+)\|?\s*$/);
+            const tableSeparatorMatch = (i + 1 < lines.length) && lines[i+1]?.match(/^\s*\|?(\s*:?-+:?\s*\|?)+\s*$/);
+            const blockquoteMatch = line.match(/^\s*>\s?(.*)/);
+
+            if (tableHeaderMatch && tableSeparatorMatch) {
+                closeList();
+                const tableRows: string[] = [];
+                let tableLineIndex = i;
+                
+                while (tableLineIndex < lines.length && (lines[tableLineIndex].match(/^\s*\|/) || lines[tableLineIndex].match(/^\s*\|?(\s*:?-+:?\s*\|?)+\s*$/))) {
+                    tableRows.push(lines[tableLineIndex]);
+                    tableLineIndex++;
+                }
+
+                const parseRow = (rowLine: string) => {
+                    const content = rowLine.trim().replace(/^\||\|$/g, '');
+                    return content.split('|').map(cell => cell.trim());
+                }
+
+                const headers = parseRow(tableRows[0]);
+                const bodyRows = tableRows.slice(2).map(parseRow);
+
+                let tableHtml = '<table class="aura-table"><thead><tr>';
+                headers.forEach(header => {
+                    tableHtml += `<th>${applyInlineFormatting(header)}</th>`;
+                });
+                tableHtml += '</tr></thead><tbody>';
+
+                bodyRows.forEach(row => {
+                    tableHtml += '<tr>';
+                    for (let k = 0; k < headers.length; k++) {
+                        const cell = row[k] || '';
+                        tableHtml += `<td>${applyInlineFormatting(cell)}</td>`;
+                    }
+                    tableHtml += '</tr>';
+                });
+
+                tableHtml += '</tbody></table>';
+                htmlElements.push(tableHtml);
+                
+                i = tableLineIndex;
+                continue;
+
+            } else if (blockquoteMatch) {
+                closeList();
+                let bqContent = '';
+                let bqLineIndex = i;
+                while (bqLineIndex < lines.length && lines[bqLineIndex].match(/^\s*>/)) {
+                    bqContent += lines[bqLineIndex].replace(/^\s*>\s?/, '') + '\n';
+                    bqLineIndex++;
+                }
+                htmlElements.push(`<blockquote>${applyInlineFormatting(bqContent.trim())}</blockquote>`);
+                i = bqLineIndex;
+                continue;
+            }
+            
             const ulMatch = line.match(/^(\s*)(\*|-)\s+(.*)/);
             const olMatch = line.match(/^(\s*)(\d+\.)\s+(.*)/);
             const h1Match = line.match(/^#\s+(.*)/);
@@ -295,24 +352,23 @@ const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
                 closeList();
                 htmlElements.push('<hr />');
             } else if (isBlankLine) {
-                 // Allow blank lines *inside* list items (like after a block)
                 if (inList && htmlElements.length > 0 && !htmlElements[htmlElements.length - 1].endsWith('</p>')) {
-                    // This is a simple heuristic. A more complex parser would be needed for perfect multi-paragraph list items.
+                    // Logic for blank lines within lists.
                 } else {
                     closeList();
                 }
-                // Add a blank paragraph for spacing if it's not list-related
                 if(!inList) htmlElements.push('<p><br></p>');
 
             } else {
                 closeList();
                 htmlElements.push(`<p>${applyInlineFormatting(line)}</p>`);
             }
-        });
+
+            i++;
+        }
 
         closeList();
         
-        // Post-process to merge consecutive empty paragraphs
         return htmlElements.join('').replace(/(<p><br><\/p>){2,}/g, '<p><br></p>');
     }, [text]);
 
@@ -1677,16 +1733,16 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                                 </div>
                                                             )}
                                                             {hasText && (
-                                                                <div className="p-3 rounded-2xl bg-[#ecf2fe] text-black rounded-br-lg">
+                                                                <div className="p-3 rounded-2xl bg-[#9ED3FF] dark:bg-[#3B3939] text-black dark:text-dark-text rounded-br-lg">
                                                                 {textParts.map((part, i) => (
-                                                                    <div key={i} className="text-base md:text-lg" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
+                                                                    <div key={i} className="text-lg md:text-xl" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
                                                                 ))}
                                                                 </div>
                                                             )}
                                                         </>
                                                     )
                                                 ) : (
-                                                    <div className={`text-base md:text-lg ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
+                                                    <div className={`text-lg md:text-xl ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
                                                         {modelHasText ? <StreamingMarkdownRenderer text={(msg.parts[0] as any).text} animate={animate} onFinished={() => {
                                                             setFinishedTypingMessages(prev => new Set(prev).add(msg.id));
                                                         }}/> : <span className="opacity-0">.</span>}
@@ -1746,7 +1802,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                             initial={{ x: "100%" }} 
                             animate={{ x: "0%" }} 
                             exit={{ x: "100%" }} 
-                            transition={{ type: 'spring', stiffness: 400, damping: 35 }} 
+                            transition={{ type: 'spring', stiffness: 300, damping: 30 }} 
                             onClick={e => e.stopPropagation()}
                         >
                             <Header {...historyHeaderProps} />
@@ -1809,9 +1865,13 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                     line-height: 1.7;
                     word-wrap: break-word;
                 }
-                .prose-styles p, .prose-styles ul, .prose-styles ol, .prose-styles h1, .prose-styles h2, .prose-styles h3, .prose-styles h4, .prose-styles table {
+                .prose-styles p, .prose-styles ul, .prose-styles ol, .prose-styles table {
                     margin-top: 0.75em;
                     margin-bottom: 0.75em;
+                }
+                .prose-styles h1, .prose-styles h2, .prose-styles h3, .prose-styles h4 {
+                    margin-top: 1em;
+                    margin-bottom: 0.25em;
                 }
                 .prose-styles h1 { font-size: 1.8em; font-weight: bold; }
                 .prose-styles h2 { font-size: 1.5em; font-weight: bold; }
@@ -1848,6 +1908,17 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                 .prose-styles table.aura-table { width: 100%; border-collapse: collapse; margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; border: 1px solid rgba(128, 128, 128, 0.2); }
                 .prose-styles table.aura-table th, .prose-styles table.aura-table td { border: 1px solid rgba(128, 128, 128, 0.2); padding: 0.5rem; text-align: left; }
                 .prose-styles table.aura-table th { font-weight: 600; background-color: rgba(128, 128, 128, 0.05); }
+                .prose-styles blockquote {
+                    border-left: 4px solid rgba(128, 128, 128, 0.2);
+                    padding-left: 1rem;
+                    margin-left: 0;
+                    margin-right: 0;
+                    font-style: italic;
+                    color: #a0a0a0;
+                }
+                html.light .prose-styles blockquote {
+                    color: #606060;
+                }
 
                 @keyframes typing-blink {
                     0% { opacity: 1; }
