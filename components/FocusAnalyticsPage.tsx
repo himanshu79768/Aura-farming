@@ -407,11 +407,11 @@ const FocusAnalyticsPage: React.FC = () => {
                                      <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
                                         {(() => {
                                             const dayDataValues = Object.values(analyticsData.dayOfWeekData);
-                                            // FIX: Cast `dayDataValues` to `number[]` to satisfy `Math.max`'s expected argument type.
-                                            const maxCount = dayDataValues.length > 0 ? Math.max(...(dayDataValues as number[])) : 0;
+                                            // Ensure all values are numbers before passing to Math.max
+                                            const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues.map(Number)) : 0;
                                             return Object.entries(analyticsData.dayOfWeekData).map(([day, countValue], index) => {
-                                                // FIX: Convert `countValue` to a number before performing arithmetic operations.
-                                                const count = countValue as number;
+                                                // Ensure countValue is a number before using in calculations
+                                                const count = Number(countValue);
                                                 const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
                                                 return (
                                                     <div key={day} className="flex flex-col items-center flex-grow h-full justify-end">

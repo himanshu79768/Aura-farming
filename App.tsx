@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor, ChatMessage, ChatSession } from './types';
+import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor, ChatMessage, ChatSession, MyEvent } from './types';
 import HomePage from './components/HomePage';
 import FocusPage from './components/FocusPage';
 import QuotesPage from './components/QuotesPage';
@@ -270,6 +270,8 @@ interface AppContextType {
   focusHistory: FocusSession[];
   addFocusSession: (durationInSeconds: number, name?: string) => void;
   deleteMultipleFocusSessions: (ids: string[]) => Promise<boolean>;
+  myEvents: MyEvent[];
+  addMyEvent: (event: Omit<MyEvent, 'id' | 'createdAt'>) => Promise<string | null>;
   playFocusSound: (sound: string) => void;
   playUISound: (sound: SoundType) => void;
   vibrate: (style?: 'light' | 'medium' | 'heavy') => void;
@@ -354,6 +356,7 @@ const DEFAULT_USER_DATA: UserData = {
     mood: Mood.Calm,
     favoriteQuotes: {},
     auraChatSessions: [],
+    myEvents: {},
 };
 
 export default function App() {
@@ -374,6 +377,7 @@ export default function App() {
   const [favoriteQuotes, setFavoriteQuotes] = useState<string[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [focusHistory, setFocusHistory] = useState<FocusSession[]>([]);
+  const [myEvents, setMyEvents] = useState<MyEvent[]>([]);
   const [focusSearchQuery, setFocusSearchQuery] = useState('');
   const [isImmersive, setIsImmersive] = useLocalStorage('isImmersive', false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -456,7 +460,7 @@ export default function App() {
     const userRef = ref(db, 'users/' + dataPathUid);
     const unsubscribeUser = onValue(userRef, (snapshot) => {
         if (snapshot.exists()) {
-            const data = snapshot.val() as UserData & { journalEntries?: Record<string, any>, focusHistory?: Record<string, any> };
+            const data = snapshot.val() as UserData & { journalEntries?: Record<string, any>, focusHistory?: Record<string, any>, myEvents?: Record<string, any> };
             setUserProfile({ name: data.name || '', completedSessions: data.completedSessions || 0 });
             setSettings({
                 theme: data.theme || DEFAULT_SETTINGS.theme,
@@ -514,6 +518,11 @@ export default function App() {
                 ? Object.entries(data.focusHistory).map(([id, session]) => ({ id, ...session } as FocusSession)).sort((a,b) => b.createdAt - a.createdAt)
                 : [];
             setFocusHistory(focusHistoryArray);
+            
+            const myEventsArray = data.myEvents
+                ? Object.entries(data.myEvents).map(([id, event]) => ({ id, ...event } as MyEvent)).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0))
+                : [];
+            setMyEvents(myEventsArray);
 
         } else if (masterUid) {
             set(userRef, { ...DEFAULT_USER_DATA, name: 'User' });
@@ -672,6 +681,7 @@ export default function App() {
         setFavoriteQuotes([]);
         setJournalEntries([]);
         setFocusHistory([]);
+        setMyEvents([]);
         setAuraChatSessions([]);
         setShowIntro(false);
     }, [vibrate, setMasterUid]);
@@ -728,6 +738,22 @@ export default function App() {
             return false;
         }
     }, [currentUser, masterUid, showAlertModal, userProfile.completedSessions]);
+
+    const addMyEvent = useCallback(async (event: Omit<MyEvent, 'id' | 'createdAt'>): Promise<string | null> => {
+        const dataPathUid = masterUid || currentUser?.uid;
+        if (!dataPathUid) return null;
+        try {
+            const eventsRef = ref(db, `users/${dataPathUid}/myEvents`);
+            const newEventRef = push(eventsRef);
+            await set(newEventRef, { ...event, createdAt: serverTimestamp() });
+            playUISound('success');
+            return newEventRef.key;
+        } catch (error) {
+            console.error("Error adding event:", error);
+            showAlertModal({ title: "Save Failed", message: "Could not save your event." });
+            return null;
+        }
+    }, [currentUser, masterUid, showAlertModal, playUISound]);
 
   const resetTimer = useCallback((vibrateFeedback = true) => {
     if (vibrateFeedback) {
@@ -1008,7 +1034,7 @@ export default function App() {
   const appContextValue = useMemo(() => ({
     mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, deleteMultipleFocusSessions, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
+    focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
     timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
     focusSearchQuery, setFocusSearchQuery,
@@ -1024,7 +1050,7 @@ export default function App() {
   }), [
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, deleteMultipleFocusSessions, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
+    focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
     auraChatSessions, saveChatSession, deleteChatSessions,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, sessionName,

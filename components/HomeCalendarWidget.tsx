@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Bell, Timer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bell, Timer, Plus } from 'lucide-react';
 import { useAppContext } from '../App';
+import AddEventModal from './AddEventModal';
+import { MyEvent } from '../types';
 
 const formatDateKey = (d: Date) => d.toISOString().split('T')[0];
 
@@ -15,43 +17,73 @@ const getHolidays = (year: number): Record<string, { title: string; type: 'remin
     [`${year}-12-25`]: [{ title: 'Christmas Day', type: 'reminder', time: 'All Day' }],
 });
 
-const generateEvents = () => {
-    // FIX: Add explicit type to `allEvents` to match the usage with both 'reminder' and 'focus' types.
-    const allEvents: Record<string, { title: string; type: 'reminder' | 'focus'; time: string }[]> = getHolidays(new Date().getFullYear());
-    
-    const addDays = (date: Date, days: number) => {
-        const result = new Date(date);
-        result.setDate(result.getDate() + days);
-        return result;
-    };
-    
-    const today = new Date();
-
-    const upcoming1 = addDays(today, 3);
-    const key1 = formatDateKey(upcoming1);
-    allEvents[key1] = [...(allEvents[key1] || []), { title: 'Project brainstorming', type: 'focus', time: '10:00 AM' }];
-    
-    const upcoming2 = addDays(today, 5);
-    const key2 = formatDateKey(upcoming2);
-    allEvents[key2] = [...(allEvents[key2] || []), { title: 'Doctor\'s appointment', type: 'reminder', time: '02:30 PM' }];
-
-    return allEvents;
-};
-
-
 const EVENT_ICONS = {
     reminder: <Bell size={16} className="text-yellow-500" />,
     focus: <Timer size={16} className="text-blue-500" />
 };
 
-const HomeCalendarWidget: React.FC = () => {
-    const { vibrate, playUISound } = useAppContext();
+const swipeConfidenceThreshold = 10000;
+const swipePower = (offset: number, velocity: number) => Math.abs(offset) * velocity;
+
+const calendarVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    zIndex: 0,
+    x: direction < 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+};
+
+interface HomeCalendarWidgetProps {
+    onMonthChange: () => void;
+}
+
+const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }) => {
+    const { vibrate, playUISound, myEvents, addMyEvent } = useAppContext();
     const [viewDate, setViewDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [direction, setDirection] = useState(0);
+    const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
 
-    const allEvents = useMemo(() => generateEvents(), []);
+    const allEvents = useMemo(() => {
+        const holidays = getHolidays(viewDate.getFullYear());
+        const userEventsByDate: Record<string, any[]> = {};
+        
+        myEvents.forEach(event => {
+            const dateKey = event.date; // Already in YYYY-MM-DD
+            if (!userEventsByDate[dateKey]) {
+                userEventsByDate[dateKey] = [];
+            }
+            userEventsByDate[dateKey].push({
+                title: event.title,
+                type: event.type,
+                time: event.time,
+            });
+        });
 
-    const generateCalendarDays = (date: Date) => {
+        const combined = { ...holidays };
+        Object.keys(userEventsByDate).forEach(dateKey => {
+            if (combined[dateKey]) {
+                combined[dateKey] = [...combined[dateKey], ...userEventsByDate[dateKey]];
+            } else {
+                combined[dateKey] = userEventsByDate[dateKey];
+            }
+        });
+
+        return combined;
+    }, [viewDate, myEvents]);
+
+
+    const calendarDays = useMemo(() => {
+        const date = viewDate;
         const year = date.getFullYear();
         const month = date.getMonth();
         const firstDayOfMonth = new Date(year, month, 1);
@@ -67,42 +99,38 @@ const HomeCalendarWidget: React.FC = () => {
             days.push(new Date(year, month, i));
         }
         return days;
-    };
-
-    const calendarDays = useMemo(() => generateCalendarDays(viewDate), [viewDate]);
+    }, [viewDate]);
+    
     const todayDate = new Date();
     
     const eventsForSelectedDate = allEvents[formatDateKey(selectedDate)] || [];
-    
-    const upcomingEvents = useMemo(() => {
-        const events: { date: Date; events: { title: string; type: "reminder" | "focus"; time: string; }[] }[] = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        for (let i = 1; i <= 7; i++) {
-            const date = new Date(today);
-            date.setDate(date.getDate() + i);
-            const dateKey = formatDateKey(date);
-            if (allEvents[dateKey]) {
-                events.push({
-                    date: date,
-                    events: allEvents[dateKey]
-                });
-            }
-        }
-        return events;
-    }, [allEvents]);
+    eventsForSelectedDate.sort((a, b) => {
+        if (a.time === 'All Day') return -1;
+        if (b.time === 'All Day') return 1;
+        return a.time.localeCompare(b.time);
+    });
 
 
-    const handleMonthChange = (direction: -1 | 1) => {
+    const handleMonthChange = (dir: 1 | -1) => {
         vibrate();
         playUISound('tap');
-        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + direction, 1));
+        setDirection(dir);
+        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + dir, 1));
+        if (onMonthChange) {
+            onMonthChange();
+        }
     };
     
     const handleDateClick = (day: Date) => {
         vibrate();
         playUISound('tap');
         setSelectedDate(day);
+    };
+
+    const handleAddEventClick = () => {
+        vibrate();
+        playUISound('tap');
+        setIsAddEventModalOpen(true);
     };
 
     return (
@@ -112,35 +140,63 @@ const HomeCalendarWidget: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
         >
-            <div className="flex items-center justify-between px-2 mb-2">
-                <button onClick={() => handleMonthChange(-1)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeft size={20} /></button>
-                <h3 className="font-semibold text-center w-36">
-                    {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                </h3>
-                <button onClick={() => handleMonthChange(1)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronRight size={20} /></button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs text-light-text-secondary dark:text-dark-text-secondary mb-1">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => <div key={day}>{day}</div>)}
-            </div>
-            <div className="grid grid-cols-7 gap-1 place-items-center">
-                {calendarDays.map((day, index) => {
-                    if (!day) return <div key={`empty-${index}`} className="w-9 h-9"></div>;
-                    const isToday = day.toDateString() === todayDate.toDateString();
-                    const hasEvent = !!allEvents[formatDateKey(day)];
-                    const isSelected = selectedDate.toDateString() === day.toDateString();
-                    return (
-                        <button
-                            key={day.toISOString()}
-                            onClick={() => handleDateClick(day)}
-                            className={`relative w-9 h-9 flex items-center justify-center rounded-full transition-colors text-sm ${
-                                isSelected ? 'bg-light-primary/80 dark:bg-dark-primary/80 text-white font-semibold' : isToday ? 'bg-black/5 dark:bg-white/5' : 'hover:bg-black/5 dark:hover:bg-white/5'
-                            }`}
+            <div className="opacity-70">
+                <div className="flex items-center justify-between px-2 mb-2">
+                    <button onClick={() => handleMonthChange(-1)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeft size={20} /></button>
+                    <h3 className="font-semibold text-center w-36">
+                        {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h3>
+                    <button onClick={() => handleMonthChange(1)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronRight size={20} /></button>
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center text-xs text-light-text-secondary dark:text-dark-text-secondary mb-1">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => <div key={day}>{day}</div>)}
+                </div>
+                 <motion.div
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.1}
+                    onDragEnd={(e, { offset, velocity }) => {
+                        const swipe = swipePower(offset.x, velocity.x);
+                        if (swipe < -swipeConfidenceThreshold) {
+                            handleMonthChange(1);
+                        } else if (swipe > swipeConfidenceThreshold) {
+                            handleMonthChange(-1);
+                        }
+                    }}
+                    className="relative overflow-hidden h-[180px]"
+                >
+                    <AnimatePresence initial={false} custom={direction}>
+                        <motion.div
+                            key={viewDate.getMonth()}
+                            custom={direction}
+                            variants={calendarVariants}
+                            initial="enter"
+                            animate="center"
+                            exit="exit"
+                            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                            className="grid grid-cols-7 gap-0.5 place-items-center absolute w-full"
                         >
-                            <span>{day.getDate()}</span>
-                            {hasEvent && !isSelected && <div className="absolute bottom-1 w-1 h-1 bg-light-primary dark:bg-dark-primary rounded-full"></div>}
-                        </button>
-                    );
-                })}
+                            {calendarDays.map((day, index) => {
+                                if (!day) return <div key={`empty-${index}`} className="w-8 h-8"></div>;
+                                const isToday = day.toDateString() === todayDate.toDateString();
+                                const hasEvent = !!allEvents[formatDateKey(day)];
+                                const isSelected = selectedDate.toDateString() === day.toDateString();
+                                return (
+                                    <button
+                                        key={day.toISOString()}
+                                        onClick={() => handleDateClick(day)}
+                                        className={`relative w-8 h-8 flex items-center justify-center rounded-full transition-colors text-sm ${
+                                            isSelected ? 'bg-light-primary/80 dark:bg-dark-primary/80 text-white font-semibold' : isToday ? 'bg-black/5 dark:bg-white/5' : 'hover:bg-black/5 dark:hover:bg-white/5'
+                                        }`}
+                                    >
+                                        <span>{day.getDate()}</span>
+                                        {hasEvent && !isSelected && <div className="absolute bottom-1 w-1 h-1 bg-light-primary dark:bg-dark-primary rounded-full"></div>}
+                                    </button>
+                                );
+                            })}
+                        </motion.div>
+                    </AnimatePresence>
+                </motion.div>
             </div>
             
             <div className="mt-2 pt-2 border-t border-white/10 dark:border-white/20 min-h-[5rem]">
@@ -152,13 +208,19 @@ const HomeCalendarWidget: React.FC = () => {
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
                     >
-                        <h4 className="font-semibold text-sm mb-2 px-1">
-                            {selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-                        </h4>
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <h4 className="font-semibold text-sm">
+                                {selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                            </h4>
+                             <button onClick={handleAddEventClick} className="p-2 -mr-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                                <Plus size={18} />
+                            </button>
+                        </div>
+
                         {eventsForSelectedDate.length > 0 ? (
                             <div className="space-y-2">
                                 {eventsForSelectedDate.map(event => (
-                                    <div key={event.title} className="flex items-center gap-3 px-2 py-1.5 bg-black/5 dark:bg-white/5 rounded-md text-sm">
+                                    <div key={event.title + event.time} className="flex items-center gap-3 px-2 py-1.5 bg-black/5 dark:bg-white/5 rounded-md text-sm">
                                         {EVENT_ICONS[event.type]}
                                         <span className="flex-grow">{event.title}</span>
                                         <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-80">{event.time}</span>
@@ -170,31 +232,19 @@ const HomeCalendarWidget: React.FC = () => {
                         )}
                     </motion.div>
                 </AnimatePresence>
-
-                 {upcomingEvents.length > 0 && (
-                    <div className="mt-4 pt-2 border-t border-white/10 dark:border-white/20">
-                        <h4 className="font-semibold text-sm mb-2 px-1">Upcoming</h4>
-                        <div className="space-y-2">
-                            {upcomingEvents.slice(0, 2).map(({ date, events }) => (
-                                <div key={date.toISOString()}>
-                                    {events.map(event => (
-                                        <div key={event.title} className="flex items-center gap-3 px-2 py-1.5 bg-black/5 dark:bg-white/5 rounded-md text-sm">
-                                            <div className="flex flex-col items-center w-8">
-                                                <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{date.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                                                <span className="font-bold">{date.getDate()}</span>
-                                            </div>
-                                            <div className="w-px h-6 bg-black/10 dark:bg-white/10"></div>
-                                            {EVENT_ICONS[event.type]}
-                                            <span className="flex-grow">{event.title}</span>
-                                            <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-80">{event.time}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
+             <AddEventModal
+                isOpen={isAddEventModalOpen}
+                onClose={() => setIsAddEventModalOpen(false)}
+                date={selectedDate}
+                onSave={async (newEvent) => {
+                    await addMyEvent({
+                        ...newEvent,
+                        date: formatDateKey(selectedDate),
+                    });
+                    setIsAddEventModalOpen(false);
+                }}
+            />
         </motion.div>
     );
 };

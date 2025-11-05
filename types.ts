@@ -91,10 +91,20 @@ export interface ChatSession {
   timestamp: string; // ISO string
 }
 
+export interface MyEvent {
+  id: string;
+  date: string; // YYYY-MM-DD format
+  title: string;
+  time: string; // e.g., "14:30" or "All Day"
+  type: 'reminder' | 'focus';
+  createdAt?: any; // For Firebase serverTimestamp
+}
+
 export interface UserData extends Settings, UserProfile {
     mood: Mood;
     favoriteQuotes: Record<string, boolean>;
     auraChatSessions?: (ChatSession[] | ChatMessage[][]);
+    myEvents?: Record<string, MyEvent>;
 }
 
 

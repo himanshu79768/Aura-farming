@@ -108,8 +108,8 @@ const HomePage: React.FC = () => {
         </AnimatePresence>
 
         {/* Calendar Widget */}
-        <div className="w-full max-w-md">
-            <HomeCalendarWidget />
+        <div className="w-full max-w-md mt-6">
+            <HomeCalendarWidget onMonthChange={refreshContent} />
         </div>
       </div>
 
