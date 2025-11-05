@@ -1549,12 +1549,12 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 600, damping: 35 }}
             >
-                <button onClick={handleCopy} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Copy size={16}/>Copy</span></button>
-                <button onClick={() => handleShare(message)} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Share2 size={16}/>Share</span></button>
-                <button onClick={handleSelectText} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><TextSelect size={16}/>Select Text</span></button>
+                <button onClick={handleCopy} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Copy size={16}/>Copy</span></button>
+                <button onClick={() => handleShare(message)} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Share2 size={16}/>Share</span></button>
+                <button onClick={handleSelectText} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><TextSelect size={16}/>Select Text</span></button>
                 {isLastModelMessage && <button onClick={handleRegenerate} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Repeat size={16}/>Regenerate</span></button>}
                 <div className="h-px bg-black/10 dark:bg-white/10 my-1"/>
-                <button onClick={() => handleFeedback('like')} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsUp size={16}/>Like</span></button>
+                <button onClick={() => handleFeedback('like')} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsUp size={16}/>Like</span></button>
                 <button onClick={() => handleFeedback('dislike')} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsDown size={16}/>Dislike</span></button>
             </motion.div>
         );
@@ -1682,16 +1682,18 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                                     {attachmentParts.map((part, i) => {
                                                                         const { mimeType, name } = (part as any).inlineData;
                                                                         return (
-                                                                            <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full backdrop-blur-sm">
-                                                                                <div className="w-5 h-5 flex-shrink-0"><AttachmentIcon type={mimeType || ''} className="w-full h-full text-white" /></div>
-                                                                                <span className="text-sm text-white truncate max-w-[150px]">{name || 'Attachment'}</span>
+                                                                            <div key={i} className="flex items-center gap-3 p-3 bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 rounded-xl max-w-xs backdrop-blur-sm">
+                                                                                <div className="w-8 h-8 flex-shrink-0">
+                                                                                    <AttachmentIcon type={mimeType || ''} className="w-full h-full" />
+                                                                                </div>
+                                                                                <span className="text-sm text-light-text dark:text-dark-text truncate">{name || 'Attachment'}</span>
                                                                             </div>
                                                                         );
                                                                     })}
                                                                 </div>
                                                             )}
                                                             {hasText && (
-                                                                <div className="p-3 rounded-2xl bg-light-primary dark:bg-dark-primary text-white rounded-br-lg">
+                                                                <div className="p-3 rounded-2xl bg-[#ecf2fe] text-black dark:bg-dark-primary dark:text-white rounded-br-lg">
                                                                 {textParts.map((part, i) => (
                                                                     <div key={i} className="text-base md:text-lg" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
                                                                 ))}
