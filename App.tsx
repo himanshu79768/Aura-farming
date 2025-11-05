@@ -324,8 +324,8 @@ const pageVariants = { initial: { opacity: 0 }, in: { opacity: 1 }, out: { opaci
 const modalVariants = { initial: { x: '100%' }, in: { x: '0%' }, out: { x: '100%' } };
 const magicModalVariants = { initial: { opacity: 0, scale: 0.95 }, in: { opacity: 1, scale: 1 }, out: { opacity: 0, scale: 0.95 } };
 const pageTransition = { type: 'tween' as const, ease: [0.4, 0, 0.2, 1], duration: 0.25 };
-const modalTransition = { type: 'spring' as const, stiffness: 500, damping: 40 };
-const magicModalTransition = { type: 'spring' as const, stiffness: 500, damping: 40, delay: 0.1 };
+const modalTransition = { type: 'spring' as const, stiffness: 400, damping: 35 };
+const magicModalTransition = { type: 'spring' as const, stiffness: 400, damping: 35 };
 
 const moodFromColors: Record<Mood, string> = {
   [Mood.Calm]: 'from-blue-400/25',
@@ -808,7 +808,7 @@ export default function App() {
     
     const triggerMagicTransition = useCallback((origin: { x: number; y: number }, view: View, params?: any) => {
         setMagicTransition({ active: true, origin });
-        navigateTo(view, params);
+        setTimeout(() => navigateTo(view, params), 50); // Small delay to let the effect start
     }, [navigateTo]);
 
 

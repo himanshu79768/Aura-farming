@@ -29,7 +29,7 @@ const SegmentedControl = <T extends string>({ options, selectedValue, onChange, 
             className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${selectedValue !== value ? 'hover:bg-black/5 dark:hover:bg-white/5' : ''}`}
         >
           <span className="flex items-center justify-center gap-1.5">{label}</span>
-          {selectedValue === value && <motion.div layoutId={layoutId} className="absolute inset-0 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-md z-[-1]" />}
+          {selectedValue === value && <motion.div layoutId={layoutId} className="absolute inset-0 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-md z-[-1]" transition={{ type: 'spring', stiffness: 600, damping: 35 }} />}
         </button>
       ))}
     </div>
@@ -37,6 +37,23 @@ const SegmentedControl = <T extends string>({ options, selectedValue, onChange, 
 };
 
 const MemoizedSegmentedControl = React.memo(SegmentedControl) as typeof SegmentedControl;
+
+const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
+    const spring = { type: "spring" as const, stiffness: 700, damping: 30 };
+    return (
+         <div 
+            className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ${checked ? 'bg-light-primary dark:bg-dark-primary justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
+            onClick={onToggle}
+        >
+            <motion.div
+                className="w-4 h-4 bg-white rounded-full shadow-md"
+                layout
+                transition={spring}
+            />
+        </div>
+    );
+};
+
 
 const AuraAiSettingsPage: React.FC = () => {
     const { settings, setSettings, navigateTo, navigateBack, vibrate, playUISound } = useAppContext();
@@ -72,10 +89,7 @@ const AuraAiSettingsPage: React.FC = () => {
                                         <Mic size={16} />
                                         <h3 className="font-medium">Speak Responses</h3>
                                     </div>
-                                    <label htmlFor="speak-aura-ai-toggle" className="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" id="speak-aura-ai-toggle" className="sr-only peer" checked={settings.speakAuraAI} onChange={handleSpeakAuraAIChange} />
-                                        <div className="w-11 h-6 bg-black/10 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-primary dark:peer-checked:bg-dark-primary"></div>
-                                    </label>
+                                    <ToggleSwitch checked={settings.speakAuraAI ?? false} onToggle={handleSpeakAuraAIChange} />
                                 </div>
                                 <div className="h-px bg-black/10 dark:bg-white/10" />
                                 <div>

@@ -95,7 +95,6 @@ const FocusAnalyticsPage: React.FC = () => {
         const colorKey = settings.accentColor || 'blue';
         const accentHsl = ACCENT_COLORS[colorKey][isDark ? 'dark' : 'light'];
         // FIX: The HSL string components must be parsed to numbers before arithmetic operations.
-        // This robustly parses the HSL string to ensure h, s, and l are numbers.
         const hslValues = accentHsl.split(' ').map(v => parseFloat(v));
         const h = hslValues[0] || 0;
         const s = hslValues[1] || 0;
@@ -133,159 +132,145 @@ const FocusAnalyticsPage: React.FC = () => {
         
         // Key Metrics
         const totalSeconds = filteredHistory.reduce((acc, s) => acc + s.duration, 0);
-        const longestSession = Math.round(Math.max(...filteredHistory.map(s => s.duration)) / 60);
+        const longestSession = Math.round(Math.max(...filteredHistory.map(s => s.duration), 0) / 60);
 
-        // Most Productive Day
-        const dailyTotals = filteredHistory.reduce((acc, session) => {
-            const day = getDayKey(new Date(session.date));
-            acc[day] = (acc[day] || 0) + session.duration;
+        // Most Productive Day & Daily Trend
+        const dailyMinutes = filteredHistory.reduce<Record<string, number>>((acc, s) => {
+            const day = getDayKey(new Date(s.date));
+            acc[day] = (acc[day] || 0) + s.duration / 60;
             return acc;
-        }, {} as Record<string, number>);
-
-        let mostProductiveDay = { date: '', minutes: 0 };
-        if (Object.keys(dailyTotals).length > 0) {
-            const [date, duration] = Object.entries(dailyTotals).reduce((max, current) => current[1] > max[1] ? current : max);
-            mostProductiveDay = { date, minutes: Math.round(duration / 60) };
-        }
-
-        // Time of Day Data (Donut Chart)
-        const timeOfDayData: Record<string, number> = { 'Morning': 0, 'Afternoon': 0, 'Evening': 0, 'Night': 0 };
-        filteredHistory.forEach(s => {
-            const hour = new Date(s.date).getHours();
-            if (hour >= 5 && hour < 12) timeOfDayData['Morning'] += s.duration;
-            else if (hour >= 12 && hour < 17) timeOfDayData['Afternoon'] += s.duration;
-            else if (hour >= 17 && hour < 21) timeOfDayData['Evening'] += s.duration;
-            else timeOfDayData['Night'] += s.duration;
-        });
-
-        // Day of Week Data (Pie Chart)
-        const dayOfWeekData: Record<string, number> = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        filteredHistory.forEach(s => {
-            const dayIndex = new Date(s.date).getDay();
-            dayOfWeekData[days[dayIndex] as keyof typeof dayOfWeekData] += s.duration;
-        });
+        }, {});
         
-        // Session Length Data (Bar Chart)
-        const sessionLengthData: Record<string, number> = { '0-15m': 0, '15-30m': 0, '30-45m': 0, '45-60m': 0, '60+m': 0 };
-        filteredHistory.forEach(s => {
-            const mins = s.duration / 60;
-            if (mins <= 15) sessionLengthData['0-15m']++;
-            else if (mins <= 30) sessionLengthData['15-30m']++;
-            else if (mins <= 45) sessionLengthData['30-45m']++;
-            else if (mins <= 60) sessionLengthData['45-60m']++;
-            else sessionLengthData['60+m']++;
+        // FIX: Explicitly type array destructuring to resolve type inference issue where 'minutes' was 'unknown'.
+        const mostProductiveDay = Object.entries(dailyMinutes).reduce(
+            (max, [date, minutes]: [string, number]) => (minutes > max.minutes ? { date, minutes } : max),
+            { date: '', minutes: 0 }
+        );
+        mostProductiveDay.minutes = Math.round(mostProductiveDay.minutes);
+        
+        // FIX: Explicitly type array destructuring to resolve type inference issue where 'minutes' was 'unknown'.
+        const dailyTrendData = Object.entries(dailyMinutes).map(([date, minutes]: [string, number]) => ({ date, minutes: Math.round(minutes) })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        // Time of Day, Day of Week, Session Length
+        const timeOfDayData: Record<string, number> = { 'Morning (6-12)': 0, 'Afternoon (12-6)': 0, 'Evening (6-12)': 0, 'Night (12-6)': 0 };
+        const dayOfWeekData: Record<string, number> = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
+        const sessionLengthData: Record<string, number> = { '0-15m': 0, '15-30m': 0, '30-60m': 0, '60m+': 0 };
+
+        filteredHistory.forEach(session => {
+            const date = new Date(session.date);
+            const hour = date.getHours();
+            const day = date.getDay();
+            const minutes = session.duration / 60;
+
+            if (hour >= 6 && hour < 12) timeOfDayData['Morning (6-12)']++;
+            else if (hour >= 12 && hour < 18) timeOfDayData['Afternoon (12-6)']++;
+            else if (hour >= 18 && hour < 24) timeOfDayData['Evening (6-12)']++;
+            else timeOfDayData['Night (12-6)']++;
+            
+            dayOfWeekData[Object.keys(dayOfWeekData)[day]]++;
+
+            if (minutes <= 15) sessionLengthData['0-15m']++;
+            else if (minutes <= 30) sessionLengthData['15-30m']++;
+            else if (minutes <= 60) sessionLengthData['30-60m']++;
+            else sessionLengthData['60m+']++;
         });
 
-        // Daily Trend (Line Chart)
-        const dayDiff = Math.floor((new Date().getTime() - new Date(filteredHistory[filteredHistory.length - 1].date).getTime()) / (1000 * 60 * 60 * 24));
-        const daysToAnalyze: number = filter === 'all' ? Math.max(7, isNaN(dayDiff) ? 7 : dayDiff) : (filter === '7d' ? 7 : 30);
-        const trendDataByDate: Record<string, number> = {};
-        for (let i = daysToAnalyze - 1; i >= 0; i--) {
-            const d = new Date(); d.setDate(d.getDate() - i);
-            trendDataByDate[getDayKey(d)] = 0;
-        }
-        filteredHistory.forEach(s => {
-            const key = getDayKey(new Date(s.date));
-            if (trendDataByDate[key] !== undefined) trendDataByDate[key] += s.duration / 60;
-        });
-        const dailyTrendData = Object.entries(trendDataByDate).map(([date, minutes]) => ({ date, minutes: Math.round(minutes) }));
-
-        return {
-            totalSeconds,
-            longestSession,
-            mostProductiveDay,
-            timeOfDayData,
-            dayOfWeekData,
-            sessionLengthData,
-            dailyTrendData,
-        };
-    }, [filteredHistory, filter]);
+        return { totalSeconds, longestSession, mostProductiveDay, timeOfDayData, dayOfWeekData, sessionLengthData, dailyTrendData };
+    }, [filteredHistory]);
 
     return (
-        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
-            <Header title="Focus Analytics" showBackButton onBack={navigateBack} />
+        <div className="w-full h-full flex flex-col">
+            <Header title="Analytics" showBackButton onBack={navigateBack} />
             <OverscrollContainer className="flex-grow w-full overflow-y-auto">
-                <div className="w-full max-w-md md:max-w-4xl mx-auto p-4 pt-4 pb-24">
-                    <div className="flex justify-center mb-6">
-                        <div className="flex items-center bg-light-glass dark:bg-dark-glass p-1 rounded-full border border-white/10">
-                            {(['7d', '30d', 'all'] as FilterRange[]).map(f => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={`px-4 py-1.5 text-sm rounded-full transition-colors ${filter === f ? 'bg-light-bg-secondary dark:bg-dark-bg-secondary' : 'text-light-text-secondary dark:text-dark-text-secondary'}`}
-                                >
-                                    {f === 'all' ? 'All Time' : `Last ${f.replace('d', '')} Days`}
-                                </button>
-                            ))}
+                <div className="w-full max-w-md md:max-w-4xl mx-auto p-4">
+                    <div className="pt-8 pb-24">
+                        <div className="flex justify-between items-center mb-4 px-1">
+                            <div className="flex items-center bg-light-glass dark:bg-dark-glass p-1 rounded-full border border-white/10">
+                                {(['7d', '30d', 'all'] as FilterRange[]).map(f => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setFilter(f)}
+                                        className={`px-3 py-1 text-sm rounded-full transition-colors ${filter === f ? 'bg-light-bg-secondary dark:bg-dark-bg-secondary' : 'text-light-text-secondary dark:text-dark-text-secondary'}`}
+                                    >
+                                        {f === 'all' ? 'All Time' : `Last ${f.replace('d', '')} days`}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
+
+                        {analyticsData ? (
+                            <motion.div 
+                                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                                initial="hidden"
+                                animate="visible"
+                                variants={{
+                                    visible: { transition: { staggerChildren: 0.1 } }
+                                }}
+                            >
+                                <ChartCard title="Total Time" icon={<Clock size={16}/>}>
+                                    <p className="text-4xl font-bold">{Math.round(analyticsData.totalSeconds / 60)} <span className="text-xl font-medium text-light-text-secondary dark:text-dark-text-secondary">min</span></p>
+                                </ChartCard>
+                                <ChartCard title="Longest Session" icon={<Award size={16}/>}>
+                                    <p className="text-4xl font-bold">{analyticsData.longestSession} <span className="text-xl font-medium text-light-text-secondary dark:text-dark-text-secondary">min</span></p>
+                                </ChartCard>
+                                <ChartCard title="Most Productive Day" icon={<TrendingUp size={16}/>}>
+                                    <p className="text-2xl font-bold">{analyticsData.mostProductiveDay.minutes} <span className="text-base font-medium text-light-text-secondary dark:text-dark-text-secondary">min</span></p>
+                                    <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{new Date(analyticsData.mostProductiveDay.date).toLocaleDateString(undefined, { weekday: 'long' })}</p>
+                                </ChartCard>
+                                
+                                <ChartCard title="Sessions by Time of Day" icon={<PieChartIcon size={16}/>} className="md:col-span-1 lg:col-span-1">
+                                    <PieChart 
+                                        data={Object.entries(analyticsData.timeOfDayData).map(([label, value]) => ({ label, value }))} 
+                                        colors={chartColors}
+                                        hole={40}
+                                    />
+                                </ChartCard>
+                                 <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>} className="md:col-span-2 lg:col-span-2">
+                                     <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
+                                        {(() => {
+                                            // FIX: Cast Object.values to number[] to satisfy Math.max, and calculate maxCount once outside the loop for efficiency.
+                                            const maxCount = Math.max(...(Object.values(analyticsData.dayOfWeekData) as number[]));
+                                            // FIX: Explicitly type map parameters to ensure `count` is a number, resolving arithmetic operation error.
+                                            return Object.entries(analyticsData.dayOfWeekData).map(([day, count]: [string, number]) => {
+                                                const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                                                return (
+                                                    <div key={day} className="flex flex-col items-center flex-grow h-full justify-end">
+                                                        <div className="font-semibold text-light-text dark:text-dark-text">{count}</div>
+                                                        <motion.div
+                                                            className="w-full rounded-t-sm"
+                                                            style={{ backgroundColor: chartColors[0], height: `${height}%` }}
+                                                            initial={{ scaleY: 0, originY: 1 }}
+                                                            animate={{ scaleY: 1 }}
+                                                            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                                                        />
+                                                        <div className="mt-1">{day}</div>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                     </div>
+                                 </ChartCard>
+                                 <ChartCard title="Session Length Distribution" icon={<Timer size={16}/>} className="md:col-span-2 lg:col-span-3">
+                                     <PieChart 
+                                        data={Object.entries(analyticsData.sessionLengthData).map(([label, value]) => ({ label, value }))} 
+                                        colors={chartColors}
+                                    />
+                                 </ChartCard>
+                            </motion.div>
+                        ) : (
+                            <motion.div 
+                                className="text-center text-light-text-secondary dark:text-dark-text-secondary py-24"
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                            >
+                                <p>No focus data available for this period.</p>
+                            </motion.div>
+                        )}
                     </div>
-
-                    {!analyticsData ? (
-                        <div className="text-center text-light-text-secondary dark:text-dark-text-secondary h-full flex flex-col justify-center items-center px-4 -mt-16">
-                            <PieChartIcon className="w-12 h-12 mb-4" />
-                            <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">No focus data available.</h2>
-                            <p>Complete some sessions to see your analytics.</p>
-                        </div>
-                    ) : (
-                        <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <ChartCard title="Total Sessions" icon={<Timer size={16} />} className="md:col-span-1 h-36">
-                                <p className="text-4xl font-bold">{filteredHistory.length}</p>
-                            </ChartCard>
-                            <ChartCard title="Total Time" icon={<Clock size={16} />} className="md:col-span-1 h-36">
-                                <p className="text-4xl font-bold">{Math.floor(analyticsData.totalSeconds / 3600)}<span className="text-xl">h</span> {Math.floor((analyticsData.totalSeconds % 3600) / 60)}<span className="text-xl">m</span></p>
-                            </ChartCard>
-                            <ChartCard title="Longest Session" icon={<Award size={16} />} className="md:col-span-1 h-36">
-                                <p className="text-4xl font-bold">{analyticsData.longestSession}<span className="text-xl">m</span></p>
-                            </ChartCard>
-                             <ChartCard title="Peak Day" icon={<CalendarDays size={16} />} className="md:col-span-1 h-36">
-                                <p className="text-3xl font-bold">{analyticsData.mostProductiveDay.minutes}<span className="text-xl">m</span></p>
-                                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{new Date(analyticsData.mostProductiveDay.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
-                            </ChartCard>
-
-                            <ChartCard title="Focus by Time of Day" icon={<Coffee size={16} />} className="md:col-span-2">
-                                <PieChart
-                                    data={[
-                                        { label: 'Morning', value: analyticsData.timeOfDayData['Morning'] },
-                                        { label: 'Afternoon', value: analyticsData.timeOfDayData['Afternoon'] },
-                                        { label: 'Evening', value: analyticsData.timeOfDayData['Evening'] },
-                                        { label: 'Night', value: analyticsData.timeOfDayData['Night'] },
-                                    ]}
-                                    colors={chartColors}
-                                    hole={60}
-                                />
-                            </ChartCard>
-
-                            <ChartCard title="Focus by Day" icon={<PieChartIcon size={16} />} className="md:col-span-2">
-                                <PieChart data={Object.entries(analyticsData.dayOfWeekData).map(([label, value]) => ({ label, value }))} colors={chartColors} />
-                            </ChartCard>
-                            
-                             <ChartCard title="Session Length" icon={<TrendingUp size={16} />} className="md:col-span-4">
-                                <div className="space-y-3 text-xs">
-                                    {/* FIX: Explicitly type map arguments to ensure correct type inference for `count`. */}
-                                    {Object.entries(analyticsData.sessionLengthData).map(([label, count]: [string, number]) => (
-                                        <div key={label} className="flex items-center gap-2">
-                                            <span className="w-16 text-right shrink-0 text-light-text-secondary dark:text-dark-text-secondary">{label}</span>
-                                            <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-4">
-                                                <motion.div
-                                                    className="h-4 rounded-full bg-light-primary dark:bg-dark-primary flex items-center justify-end pr-2 text-white font-bold"
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${(count / Math.max(1, ...Object.values(analyticsData.sessionLengthData).map(Number))) * 100}%` }}
-                                                    transition={{ type: 'spring', stiffness: 100, damping: 15 }}
-                                                >
-                                                   {count > 0 && <span>{count}</span>}
-                                                </motion.div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ChartCard>
-                        </motion.div>
-                    )}
                 </div>
             </OverscrollContainer>
         </div>
     );
 };
 
+// FIX: Added default export.
 export default FocusAnalyticsPage;

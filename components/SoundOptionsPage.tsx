@@ -6,13 +6,36 @@ import Header from './Header';
 import { FocusMusic } from '../types';
 import { MUSIC_PRESETS } from '../constants';
 
+const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
+    const spring = { type: "spring" as const, stiffness: 700, damping: 30 };
+    return (
+         <div 
+            className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-200 ${checked ? 'bg-light-primary dark:bg-dark-primary justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
+            onClick={onToggle}
+        >
+            <motion.div
+                className="w-4 h-4 bg-white rounded-full shadow-md"
+                layout
+                transition={spring}
+            />
+        </div>
+    );
+};
+
 const SoundOptionsPage: React.FC = () => {
-    const { settings, setSettings, navigateBack, vibrate } = useAppContext();
+    const { settings, setSettings, navigateBack, vibrate, playUISound } = useAppContext();
 
     const handleMusicSelect = (music: FocusMusic) => {
         vibrate();
+        playUISound('tap');
         setSettings(s => ({...s, focusMusic: music}));
     }
+    
+    const handleSoundToggle = () => {
+        vibrate();
+        playUISound(settings.sound ? 'toggle_off' : 'toggle_on');
+        setSettings(s => ({ ...s, sound: !s.sound }));
+    };
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
@@ -22,10 +45,7 @@ const SoundOptionsPage: React.FC = () => {
                     <div className="space-y-4 pt-8 pb-24">
                         <div className="px-4 flex justify-between items-center">
                             <h3 className="font-semibold">Master Sound</h3>
-                            <label htmlFor="sound-toggle" className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="sound-toggle" className="sr-only peer" checked={settings.sound} onChange={() => setSettings(s => ({ ...s, sound: !s.sound }))} />
-                                <div className="w-11 h-6 bg-black/10 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-primary dark:peer-checked:bg-dark-primary"></div>
-                            </label>
+                            <ToggleSwitch checked={settings.sound} onToggle={handleSoundToggle} />
                         </div>
 
                         <motion.div

@@ -1539,7 +1539,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                 {isLastModelMessage && <button onClick={handleRegenerate} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Repeat size={16}/>Regenerate</span></button>}
                 <div className="h-px bg-black/10 dark:bg-white/10 my-1"/>
                 <button onClick={() => handleFeedback('like')} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsUp size={16}/>Like</span></button>
-                <button onClick={() => handleFeedback('dislike')} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsDown size={16}/>Dislike</span></button>
+                <button onClick={() => handleFeedback('dislike')} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsDown size={16}/>Dislike</span></button>
             </motion.div>
         );
     };
@@ -1677,7 +1677,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                                 </div>
                                                             )}
                                                             {hasText && (
-                                                                <div className="p-3 rounded-2xl bg-[#ecf2fe] text-black dark:bg-dark-primary dark:text-white rounded-br-lg">
+                                                                <div className="p-3 rounded-2xl bg-[#ecf2fe] text-black rounded-br-lg">
                                                                 {textParts.map((part, i) => (
                                                                     <div key={i} className="text-base md:text-lg" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
                                                                 ))}
@@ -1686,7 +1686,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                         </>
                                                     )
                                                 ) : (
-                                                    <div className={isLoading && isLastMessage ? 'typing-cursor' : ''}>
+                                                    <div className={`text-base md:text-lg ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
                                                         {modelHasText ? <StreamingMarkdownRenderer text={(msg.parts[0] as any).text} animate={animate} onFinished={() => {
                                                             setFinishedTypingMessages(prev => new Set(prev).add(msg.id));
                                                         }}/> : <span className="opacity-0">.</span>}
@@ -1746,7 +1746,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                             initial={{ x: "100%" }} 
                             animate={{ x: "0%" }} 
                             exit={{ x: "100%" }} 
-                            transition={{ type: 'spring', stiffness: 400, damping: 40 }} 
+                            transition={{ type: 'spring', stiffness: 400, damping: 35 }} 
                             onClick={e => e.stopPropagation()}
                         >
                             <Header {...historyHeaderProps} />

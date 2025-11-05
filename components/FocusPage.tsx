@@ -380,7 +380,7 @@ const FocusPage: React.FC = () => {
                 className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-light-text dark:text-dark-text' : 'text-light-text-secondary dark:text-dark-text-secondary'}`}
             >
             <span>{m}</span>
-            {modeIndex === index && <motion.div layoutId="focus-mode-selector" className="absolute inset-0 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-md z-[-1]" />}
+            {modeIndex === index && <motion.div layoutId="focus-mode-selector" className="absolute inset-0 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-md z-[-1]" transition={{ type: 'spring', stiffness: 600, damping: 35 }} />}
             </button>
         ))}
     </div>
