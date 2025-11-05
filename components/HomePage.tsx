@@ -4,6 +4,7 @@ import { RefreshCw, Sparkles, Wind } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { MORNING_GREETINGS, AFTERNOON_GREETINGS, EVENING_GREETINGS, DAILY_THOUGHTS } from '../constants';
+import HomeCalendarWidget from './HomeCalendarWidget';
 import { View } from '../types';
 
 const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
@@ -85,47 +86,55 @@ const HomePage: React.FC = () => {
   return (
     <div className="w-full h-full flex flex-col">
       <Header showCenteredMoodSelector={true} />
-      <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
+      
+      <div className="flex-grow w-full flex flex-col items-center justify-end text-center px-8 -mt-12 md:-mt-16 pb-4">
+        {/* Greeting Section */}
         <AnimatePresence mode="wait">
             <motion.div
               key={greeting + thought} // Change key to trigger animation on refresh
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              transition={{ type: "spring", stiffness: 100, damping: 20, duration: 0.8 }}
-              className="flex flex-col items-center"
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
+              className="flex flex-col items-center mb-2"
             >
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-light-text dark:from-dark-text to-light-text-secondary dark:to-dark-text-secondary">
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-light-text dark:from-dark-text to-light-text-secondary/80 dark:to-dark-text-secondary/80">
                 {greetingContent}
               </h1>
-              <p className="mt-4 max-w-md text-lg md:text-xl font-light text-light-text-secondary dark:text-dark-text-secondary">
+              <p className="mt-3 max-w-md text-base md:text-lg font-light text-light-text-secondary dark:text-dark-text-secondary">
                 {thought}
               </p>
             </motion.div>
         </AnimatePresence>
+
+        {/* Calendar Widget */}
+        <div className="w-full max-w-md">
+            <HomeCalendarWidget />
+        </div>
       </div>
 
-      <div className="flex items-center justify-center gap-4 pb-28">
+      {/* Bottom Buttons */}
+      <div className="flex-shrink-0 flex items-center justify-center gap-4 pb-28 md:pb-12">
          <motion.button
             ref={auraAiButtonRef}
             onClick={handleAuraAiClick}
             className="relative inline-flex items-center justify-center rounded-full group"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 600, damping: 30 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
           >
             <div className="absolute -inset-px bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-sm opacity-75 group-hover:opacity-100 transition duration-500"></div>
-            <div className="relative flex items-center gap-2 px-6 py-3 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
+            <div className="relative flex items-center gap-2 px-5 py-2.5 bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg text-sm md:text-base">
                 <Sparkles className="w-5 h-5 text-cyan-400" />
                 <span>Aura AI</span>
             </div>
         </motion.button>
         <motion.button 
             onClick={() => handleNavigate('breathing')}
-            className="flex items-center gap-2 px-6 py-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"
+            className="flex items-center gap-2 px-5 py-2.5 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg text-sm md:text-base"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 600, damping: 30 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
           >
             <Wind className="w-5 h-5 text-blue-400" />
             <span>Breathe</span>
@@ -135,8 +144,8 @@ const HomePage: React.FC = () => {
           className="p-3 bg-light-glass dark:bg-dark-glass rounded-full border border-white/20 dark:border-white/10 shadow-lg"
           aria-label="Refresh content"
           whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          transition={{ type: "spring", stiffness: 600, damping: 30 }}
+          whileTap={{ scale: 0.95 }} 
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
         >
           <RefreshCw className="w-5 h-5" />
         </motion.button>

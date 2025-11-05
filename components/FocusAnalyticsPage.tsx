@@ -405,12 +405,13 @@ const FocusAnalyticsPage: React.FC = () => {
                                 </ChartCard>
                                  <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>} className="md:col-span-2 lg:col-span-2">
                                      <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
-                                        {/* FIX: Handle potential type mismatch errors by ensuring values are numbers before calculation. */}
                                         {(() => {
                                             const dayDataValues = Object.values(analyticsData.dayOfWeekData);
-                                            const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues) : 0;
+                                            // FIX: Cast `dayDataValues` to `number[]` to satisfy `Math.max`'s expected argument type.
+                                            const maxCount = dayDataValues.length > 0 ? Math.max(...(dayDataValues as number[])) : 0;
                                             return Object.entries(analyticsData.dayOfWeekData).map(([day, countValue], index) => {
-                                                const count = Number(countValue);
+                                                // FIX: Convert `countValue` to a number before performing arithmetic operations.
+                                                const count = countValue as number;
                                                 const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
                                                 return (
                                                     <div key={day} className="flex flex-col items-center flex-grow h-full justify-end">
