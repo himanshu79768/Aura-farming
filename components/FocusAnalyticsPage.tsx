@@ -94,9 +94,12 @@ const FocusAnalyticsPage: React.FC = () => {
         const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         const colorKey = settings.accentColor || 'blue';
         const accentHsl = ACCENT_COLORS[colorKey][isDark ? 'dark' : 'light'];
-        // The HSL string components must be parsed to numbers before arithmetic operations.
-        // FIX: Destructure with default values to ensure h, s, and l are always numbers, preventing a TypeScript error.
-        const [h = 0, s = 0, l = 0] = accentHsl.split(' ').map(v => parseFloat(v));
+        // FIX: The HSL string components must be parsed to numbers before arithmetic operations.
+        // This robustly parses the HSL string to ensure h, s, and l are numbers.
+        const hslValues = accentHsl.split(' ').map(v => parseFloat(v));
+        const h = hslValues[0] || 0;
+        const s = hslValues[1] || 0;
+        const l = hslValues[2] || 0;
         return [
             `hsl(${h}, ${s}%, ${l}%)`,
             `hsl(${h}, ${s}%, ${l - 10}%)`,

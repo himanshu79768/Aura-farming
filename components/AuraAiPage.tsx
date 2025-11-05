@@ -14,6 +14,8 @@ import { generateImageForJournal } from '../services/geminiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
+const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
+
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'application/pdf',
@@ -708,7 +710,6 @@ const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
 
 const AuraAiPage: React.FC = () => {
     const { journalEntries, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound } = useAppContext();
-    const [isKeyReady, setIsKeyReady] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -752,20 +753,6 @@ const AuraAiPage: React.FC = () => {
     const isPlayingRef = useRef<boolean>(false);
     const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const nextStartTimeRef = useRef<number>(0);
-
-    useEffect(() => {
-        const checkKey = async () => {
-            if (await window.aistudio.hasSelectedApiKey()) {
-                setIsKeyReady(true);
-            }
-        };
-        checkKey();
-    }, []);
-
-    const handleSelectKey = async () => {
-        await window.aistudio.openSelectKey();
-        setIsKeyReady(true);
-    };
 
     const closeContextMenu = useCallback(() => {
         setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, message: null });
@@ -864,7 +851,7 @@ const AuraAiPage: React.FC = () => {
                 if (!sentence.trim()) return;
                 
                 try {
-                    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                    const ai = new GoogleGenAI({ apiKey: API_KEY });
                     const response = await ai.models.generateContent({
                         model: "gemini-2.5-flash-preview-tts",
                         contents: [{ parts: [{ text: sentence }] }],
@@ -1021,7 +1008,7 @@ const AuraAiPage: React.FC = () => {
         setAnimateLastMessage(true);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
             
             const currentDate = new Date().toLocaleDateString(undefined, {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -1143,9 +1130,8 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
 
         } catch (error) {
             console.error("Aura AI Error:", error);
-            if (error instanceof Error && error.message.includes("Requested entity was not found.")) {
-                showAlertModal({ title: "API Key Error", message: "The selected API key is invalid or has been revoked. Please select a valid key." });
-                setIsKeyReady(false);
+            if (error instanceof Error && (error.message.includes("API key not valid") || error.message.includes("provide an API key"))) {
+                showAlertModal({ title: "API Key Error", message: "The hardcoded API key is invalid. Please update it in the application code." });
             } else {
                 setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble connecting right now. Please try again later." }] }]);
             }
@@ -1747,35 +1733,6 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
             </div>
         </motion.div>
     );
-
-    const ApiKeyPrompt = (
-        <div className="w-full h-full flex flex-col">
-            <Header title="Aura AI" showBackButton onBack={handleBack} />
-            <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
-                <Sparkles size={48} className="text-cyan-400 mb-4" />
-                <h2 className="text-2xl font-bold mb-2">API Key Required</h2>
-                <p className="text-light-text-secondary dark:text-dark-text-secondary max-w-sm mb-6">
-                    To use Aura AI, you need to select an API key. Your key will be used to make requests to the Gemini API.
-                </p>
-                <motion.button
-                    onClick={handleSelectKey}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-light-accent dark:bg-dark-accent text-light-bg dark:text-dark-bg rounded-full font-semibold shadow-lg"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
-                    <Sparkles size={18} />
-                    Select API Key
-                </motion.button>
-                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-4">
-                    Billing information can be found at <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline">ai.google.dev/gemini-api/docs/billing</a>.
-                </p>
-            </div>
-        </div>
-    );
-
-    if (!isKeyReady) {
-        return ApiKeyPrompt;
-    }
 
     return (
         <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
