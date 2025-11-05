@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, BookOpen, ChevronDown, Repeat, TextSelect, ChevronRight, Trash2, Settings as SettingsIcon } from 'lucide-react';
@@ -636,7 +637,7 @@ const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClo
                     onClick={handleClose}
                 >
                     <motion.div
-                        className="relative w-full max-w-lg h-[70vh] md:h-[70vh] bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl flex flex-col overflow-hidden"
+                        className="relative w-full max-w-lg h-[60vh] md:h-[60vh] bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl flex flex-col overflow-hidden"
                         initial={{ y: "100%" }}
                         animate={{ y: "0%" }}
                         exit={{ y: "100%" }}
@@ -650,9 +651,8 @@ const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClo
                         <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
                             <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
                         </div>
-                        <div className="flex-shrink-0 p-4 pt-6 flex items-center justify-between border-b border-white/10">
+                        <div className="flex-shrink-0 p-4 pt-6 flex items-center justify-center border-b border-white/10">
                             <h2 className="text-xl font-bold">Add Journal Context</h2>
-                            <button onClick={handleClose} className="p-2 -mr-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><X size={20}/></button>
                         </div>
                         <div className="flex-shrink-0 p-4">
                             <SearchBar
@@ -1518,8 +1518,6 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
         )
     } : {
         title: "History",
-        showBackButton: true,
-        onBack: () => setIsHistoryOpen(false),
     };
 
     const formatTimeAgo = (isoString: string) => {
@@ -1735,14 +1733,14 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                             {hasText && (
                                                                 <div className="p-3 rounded-2xl bg-[#9ED3FF] dark:bg-[#3B3939] text-black dark:text-dark-text rounded-br-lg">
                                                                 {textParts.map((part, i) => (
-                                                                    <div key={i} className="text-xl" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
+                                                                    <div key={i} className="text-lg" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
                                                                 ))}
                                                                 </div>
                                                             )}
                                                         </>
                                                     )
                                                 ) : (
-                                                    <div className={`text-xl ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
+                                                    <div className={`text-lg ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
                                                         {modelHasText ? <StreamingMarkdownRenderer text={(msg.parts[0] as any).text} animate={animate} onFinished={() => {
                                                             setFinishedTypingMessages(prev => new Set(prev).add(msg.id));
                                                         }}/> : <span className="opacity-0">.</span>}
@@ -1797,7 +1795,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
             <AnimatePresence>
                 {isHistoryOpen && (
                     <motion.div
-                        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px]"
+                        className="fixed inset-0 z-40 bg-transparent backdrop-blur-[2px]"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -1810,7 +1808,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                         }}
                     >
                         <motion.div 
-                            className="absolute top-0 right-0 bottom-0 w-full max-w-sm bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-[2px] border-l border-white/10 flex flex-col"
+                            className="absolute top-0 right-0 bottom-0 w-full max-w-sm bg-light-bg-secondary dark:bg-dark-bg-secondary border-l border-white/10 flex flex-col"
                             initial={{ x: "100%" }} 
                             animate={{ x: "0%" }} 
                             exit={{ x: "100%" }} 
@@ -1818,7 +1816,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                             onClick={e => e.stopPropagation()}
                             drag="x"
                             dragConstraints={{ left: 0, right: 0 }}
-                            dragElastic={{ right: 0.5, left: 0 }}
+                            dragElastic={0}
                             onDragEnd={(event, info) => {
                                 if (info.offset.x > 100 && info.velocity.x > 200) { // Swipe right to close
                                     if (!isHistorySelectionMode) {
@@ -1870,7 +1868,10 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                 </div>
                             </OverscrollContainer>
                              {!isHistorySelectionMode && (
-                                <div className="p-4 flex-shrink-0">
+                                <div className="p-4 flex-shrink-0 border-t border-white/10">
+                                    <p className="text-xs text-center text-light-text-secondary dark:text-dark-text-secondary mb-3">
+                                        Only the last 10 chat sessions are stored.
+                                    </p>
                                     <button onClick={() => navigateTo('auraAiSettings')} className="w-full flex items-center justify-start gap-3 px-3 py-2 border border-black/10 dark:border-white/10 rounded-lg font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                                         <SettingsIcon size={18} /><span>AI Settings</span>
                                     </button>
@@ -1884,7 +1885,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                 className="flex-grow flex flex-col w-full min-h-0"
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={{ left: 0.5, right: 0 }}
+                dragElastic={0}
                 onDragEnd={(event, info) => {
                     if (info.offset.x < -100 && info.velocity.x < -200) { // Swipe left to open
                         if (!isHistoryOpen) {
