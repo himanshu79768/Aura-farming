@@ -1735,14 +1735,14 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                             {hasText && (
                                                                 <div className="p-3 rounded-2xl bg-[#9ED3FF] dark:bg-[#3B3939] text-black dark:text-dark-text rounded-br-lg">
                                                                 {textParts.map((part, i) => (
-                                                                    <div key={i} className="text-lg md:text-xl" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
+                                                                    <div key={i} className="text-xl" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
                                                                 ))}
                                                                 </div>
                                                             )}
                                                         </>
                                                     )
                                                 ) : (
-                                                    <div className={`text-lg md:text-xl ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
+                                                    <div className={`text-xl ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
                                                         {modelHasText ? <StreamingMarkdownRenderer text={(msg.parts[0] as any).text} animate={animate} onFinished={() => {
                                                             setFinishedTypingMessages(prev => new Set(prev).add(msg.id));
                                                         }}/> : <span className="opacity-0">.</span>}
@@ -1796,7 +1796,19 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
             <ContextMenu />
             <AnimatePresence>
                 {isHistoryOpen && (
-                    <motion.div className="fixed inset-0 z-40 bg-black/50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if(!isHistorySelectionMode) setIsHistoryOpen(false) }}>
+                    <motion.div
+                        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px]"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => { 
+                            if (!isHistorySelectionMode) {
+                                vibrate();
+                                playUISound('tap');
+                                setIsHistoryOpen(false);
+                            }
+                        }}
+                    >
                         <motion.div 
                             className="absolute top-0 right-0 bottom-0 w-full max-w-sm bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-[2px] border-l border-white/10 flex flex-col"
                             initial={{ x: "100%" }} 
@@ -1804,6 +1816,18 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                             exit={{ x: "100%" }} 
                             transition={{ type: 'spring', stiffness: 300, damping: 30 }} 
                             onClick={e => e.stopPropagation()}
+                            drag="x"
+                            dragConstraints={{ left: 0, right: 0 }}
+                            dragElastic={{ right: 0.5, left: 0 }}
+                            onDragEnd={(event, info) => {
+                                if (info.offset.x > 100 && info.velocity.x > 200) { // Swipe right to close
+                                    if (!isHistorySelectionMode) {
+                                        vibrate();
+                                        playUISound('tap');
+                                        setIsHistoryOpen(false);
+                                    }
+                                }
+                            }}
                         >
                             <Header {...historyHeaderProps} />
                             <OverscrollContainer className="flex-grow overflow-y-auto">
@@ -1856,7 +1880,21 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                     </motion.div>
                 )}
             </AnimatePresence>
-            <AnimatePresence>{chatState === 'initial' ? InitialView : ChatView}</AnimatePresence>
+            <motion.div
+                className="flex-grow flex flex-col w-full min-h-0"
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={{ left: 0.5, right: 0 }}
+                onDragEnd={(event, info) => {
+                    if (info.offset.x < -100 && info.velocity.x < -200) { // Swipe left to open
+                        if (!isHistoryOpen) {
+                            handleHistoryClick();
+                        }
+                    }
+                }}
+            >
+                <AnimatePresence>{chatState === 'initial' ? InitialView : ChatView}</AnimatePresence>
+            </motion.div>
             <JournalContextModal isOpen={isJournalContextModalOpen} onClose={() => setIsJournalContextModalOpen(false)} onAddContext={handleAddJournalContext} />
             <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
             <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
