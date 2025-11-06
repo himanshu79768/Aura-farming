@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette, Mic, Volume2 } from 'lucide-react';
+import { Sun, Moon, Sparkles, SlidersHorizontal, Bell, Zap, Droplet, Music, AppWindow, Star, Palette, Mic, Volume2, LayoutGrid } from 'lucide-react';
 import { Theme, Mood, FocusSound, AppIcon, HapticIntensity, AccentColor } from '../types';
 import { useAppContext } from '../App';
 import Header from './Header';
@@ -71,9 +71,21 @@ const SettingsPage: React.FC = () => {
     const handleMoodChange = useCallback((value: Mood) => setMood(value), [setMood]);
     const handleButtonSoundsChange = useCallback(() => {
         vibrate();
-        playUISound(settings.buttonSounds ? 'toggle_off' : 'toggle_on');
-        setSettings(s => ({ ...s, buttonSounds: !s.buttonSounds }));
+        playUISound((settings.buttonSounds ?? true) ? 'toggle_off' : 'toggle_on');
+        setSettings(s => ({ ...s, buttonSounds: !(s.buttonSounds ?? true) }));
     }, [setSettings, vibrate, playUISound, settings.buttonSounds]);
+    
+    const handleShowWidgetChange = useCallback(() => {
+        vibrate();
+        playUISound((settings.showHomeWidget ?? true) ? 'toggle_off' : 'toggle_on');
+        setSettings(s => ({ ...s, showHomeWidget: !(s.showHomeWidget ?? true) }));
+    }, [setSettings, vibrate, playUISound, settings.showHomeWidget]);
+
+    const handleTransparentWidgetChange = useCallback(() => {
+        vibrate();
+        playUISound((settings.transparentWidget ?? false) ? 'toggle_off' : 'toggle_on');
+        setSettings(s => ({ ...s, transparentWidget: !(s.transparentWidget ?? false) }));
+    }, [setSettings, vibrate, playUISound, settings.transparentWidget]);
 
 
     return (
@@ -200,6 +212,28 @@ const SettingsPage: React.FC = () => {
                                         onChange={handleHapticChange}
                                         layoutId="haptic-selector"
                                     />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Widgets Section */}
+                        <div className="space-y-4">
+                            <h2 className="font-semibold px-4">Widgets</h2>
+                            <div className="p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <LayoutGrid size={16} />
+                                        <h3 className="font-medium">Show on Home</h3>
+                                    </div>
+                                    <ToggleSwitch checked={settings.showHomeWidget ?? true} onToggle={handleShowWidgetChange} />
+                                </div>
+                                <div className="h-px bg-black/10 dark:bg-white/10" />
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <Droplet size={16} />
+                                        <h3 className="font-medium">Transparent Background</h3>
+                                    </div>
+                                    <ToggleSwitch checked={settings.transparentWidget ?? false} onToggle={handleTransparentWidgetChange} />
                                 </div>
                             </div>
                         </div>

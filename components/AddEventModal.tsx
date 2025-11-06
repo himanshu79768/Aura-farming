@@ -70,13 +70,13 @@ const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose, onSave, 
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-transparent backdrop-blur-[1.5px]"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                 >
                     <motion.div
-                        className="relative w-full max-w-sm p-6 bg-light-bg-secondary/90 dark:bg-dark-bg-secondary/90 rounded-2xl border border-white/10 shadow-3xl"
+                        className="relative w-full max-w-sm p-6 bg-light-bg-secondary/80 dark:bg-dark-bg-secondary/80 backdrop-blur-lg rounded-2xl border border-white/10 shadow-3xl"
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.9, opacity: 0 }}

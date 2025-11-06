@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Bell, Timer, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bell, Timer, Plus, Trash2 } from 'lucide-react';
 import { useAppContext } from '../App';
 import AddEventModal from './AddEventModal';
 import { MyEvent } from '../types';
@@ -22,9 +22,6 @@ const EVENT_ICONS = {
     focus: <Timer size={16} className="text-blue-500" />
 };
 
-const swipeConfidenceThreshold = 10000;
-const swipePower = (offset: number, velocity: number) => Math.abs(offset) * velocity;
-
 const calendarVariants = {
   enter: (direction: number) => ({
     x: direction > 0 ? '100%' : '-100%',
@@ -42,40 +39,36 @@ const calendarVariants = {
   }),
 };
 
+const swipeConfidenceThreshold = 10000;
+const swipePower = (offset: number, velocity: number) => {
+  return Math.abs(offset) * velocity;
+};
+
 interface HomeCalendarWidgetProps {
     onMonthChange: () => void;
 }
 
 const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }) => {
-    const { vibrate, playUISound, myEvents, addMyEvent } = useAppContext();
+    const { vibrate, playUISound, myEvents, addMyEvent, deleteMyEvent, showConfirmationModal } = useAppContext();
     const [viewDate, setViewDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [direction, setDirection] = useState(0);
     const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
 
-    const allEvents = useMemo(() => {
+    const allEventsByDate = useMemo(() => {
+        const combined: Record<string, (MyEvent & { isHoliday?: boolean })[]> = {};
         const holidays = getHolidays(viewDate.getFullYear());
-        const userEventsByDate: Record<string, any[]> = {};
-        
-        myEvents.forEach(event => {
-            const dateKey = event.date; // Already in YYYY-MM-DD
-            if (!userEventsByDate[dateKey]) {
-                userEventsByDate[dateKey] = [];
-            }
-            userEventsByDate[dateKey].push({
-                title: event.title,
-                type: event.type,
-                time: event.time,
-            });
+
+        Object.keys(holidays).forEach(dateKey => {
+            combined[dateKey] = holidays[dateKey].map(h => ({ ...h, id: `holiday-${dateKey}`, isHoliday: true, date: dateKey, createdAt: 0 }));
         });
 
-        const combined = { ...holidays };
-        Object.keys(userEventsByDate).forEach(dateKey => {
-            if (combined[dateKey]) {
-                combined[dateKey] = [...combined[dateKey], ...userEventsByDate[dateKey]];
-            } else {
-                combined[dateKey] = userEventsByDate[dateKey];
+        myEvents.forEach(event => {
+            const dateKey = event.date;
+            if (!combined[dateKey]) {
+                combined[dateKey] = [];
             }
+            combined[dateKey].push(event);
         });
 
         return combined;
@@ -103,12 +96,16 @@ const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }
     
     const todayDate = new Date();
     
-    const eventsForSelectedDate = allEvents[formatDateKey(selectedDate)] || [];
-    eventsForSelectedDate.sort((a, b) => {
-        if (a.time === 'All Day') return -1;
-        if (b.time === 'All Day') return 1;
-        return a.time.localeCompare(b.time);
-    });
+    const eventsForSelectedDate = useMemo(() => {
+        const dateKey = formatDateKey(selectedDate);
+        const events = allEventsByDate[dateKey] || [];
+        events.sort((a, b) => {
+            if (a.time === 'All Day') return -1;
+            if (b.time === 'All Day') return 1;
+            return a.time.localeCompare(b.time);
+        });
+        return events;
+    }, [allEventsByDate, selectedDate]);
 
 
     const handleMonthChange = (dir: 1 | -1) => {
@@ -133,25 +130,35 @@ const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }
         setIsAddEventModalOpen(true);
     };
 
+    const handleDeleteEvent = (eventId: string, eventTitle: string) => {
+        showConfirmationModal({
+            title: 'Delete Event?',
+            message: `Are you sure you want to delete "${eventTitle}"?`,
+            confirmText: 'Delete',
+            onConfirm: () => deleteMyEvent(eventId),
+        });
+    };
+
     return (
-        <motion.div 
-            className="w-full p-2"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+        <div 
+            className="w-full h-full p-2 flex flex-col"
         >
-            <div className="opacity-70">
+            <div className="opacity-90 flex-shrink-0">
                 <div className="flex items-center justify-between px-2 mb-2">
                     <button onClick={() => handleMonthChange(-1)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeft size={20} /></button>
-                    <h3 className="font-semibold text-center w-36">
-                        {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                    </h3>
+                     <div className="text-center">
+                         <h4 className="font-semibold text-sm">Calendar</h4>
+                         <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary -mt-0.5">
+                            {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                         </p>
+                    </div>
                     <button onClick={() => handleMonthChange(1)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronRight size={20} /></button>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-center text-xs text-light-text-secondary dark:text-dark-text-secondary mb-1">
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => <div key={day}>{day}</div>)}
                 </div>
                  <motion.div
+                    className="relative overflow-hidden h-[180px]"
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={0.1}
@@ -163,7 +170,6 @@ const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }
                             handleMonthChange(-1);
                         }
                     }}
-                    className="relative overflow-hidden h-[180px]"
                 >
                     <AnimatePresence initial={false} custom={direction}>
                         <motion.div
@@ -173,13 +179,13 @@ const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }
                             initial="enter"
                             animate="center"
                             exit="exit"
-                            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 45 }}
                             className="grid grid-cols-7 gap-0.5 place-items-center absolute w-full"
                         >
                             {calendarDays.map((day, index) => {
                                 if (!day) return <div key={`empty-${index}`} className="w-8 h-8"></div>;
                                 const isToday = day.toDateString() === todayDate.toDateString();
-                                const hasEvent = !!allEvents[formatDateKey(day)];
+                                const hasEvent = !!allEventsByDate[formatDateKey(day)];
                                 const isSelected = selectedDate.toDateString() === day.toDateString();
                                 return (
                                     <button
@@ -199,7 +205,7 @@ const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }
                 </motion.div>
             </div>
             
-            <div className="mt-2 pt-2 border-t border-white/10 dark:border-white/20 min-h-[5rem]">
+            <div className="mt-2 pt-2 border-t border-white/10 dark:border-white/20 min-h-[7rem] flex-grow overflow-y-auto">
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={selectedDate.toDateString()}
@@ -220,10 +226,15 @@ const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }
                         {eventsForSelectedDate.length > 0 ? (
                             <div className="space-y-2">
                                 {eventsForSelectedDate.map(event => (
-                                    <div key={event.title + event.time} className="flex items-center gap-3 px-2 py-1.5 bg-black/5 dark:bg-white/5 rounded-md text-sm">
+                                    <div key={event.id} className="group flex items-center gap-3 px-2 py-1.5 bg-black/5 dark:bg-white/5 rounded-md text-sm">
                                         {EVENT_ICONS[event.type]}
                                         <span className="flex-grow">{event.title}</span>
                                         <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-80">{event.time}</span>
+                                        {!event.isHoliday && (
+                                            <button onClick={() => handleDeleteEvent(event.id, event.title)} className="p-1 -mr-1 rounded-full text-red-500/50 hover:bg-red-500/10 hover:text-red-500/80 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -245,7 +256,7 @@ const HomeCalendarWidget: React.FC<HomeCalendarWidgetProps> = ({ onMonthChange }
                     setIsAddEventModalOpen(false);
                 }}
             />
-        </motion.div>
+        </div>
     );
 };
 

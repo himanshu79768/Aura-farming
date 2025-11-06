@@ -1,5 +1,7 @@
 import * as React from 'react';
 
+export type WidgetType = 'calendar' | 'countdown' | 'compact-calendar' | 'weather' | 'stats' | 'focus-analytics' | 'analog-clock' | 'digital-clock';
+
 export enum Theme {
   Light = 'light',
   Dark = 'dark',
@@ -66,6 +68,12 @@ export type AccentColor = 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yello
 export type AuraAiVoice = 'Zephyr' | 'Kore' | 'Puck' | 'Charon' | 'Fenrir';
 export type AuraAiTone = 'default' | 'funny' | 'professional';
 
+export interface CountdownEvent {
+  id: string;
+  name: string;
+  date: string; // YYYY-MM-DD format
+}
+
 export interface Settings {
   theme: Theme;
   sound: boolean;
@@ -84,6 +92,11 @@ export interface Settings {
   auraAiSpeed?: number;
   auraAiTone?: AuraAiTone;
   auraAiPersonalizationData?: string;
+  homeWidget?: WidgetType;
+  weatherCities?: { id: string; name: string; isGps?: boolean }[];
+  showHomeWidget?: boolean;
+  transparentWidget?: boolean;
+  countdownEvents?: CountdownEvent[];
 }
 
 export interface ChatSession {

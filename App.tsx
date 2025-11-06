@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor, ChatMessage, ChatSession, MyEvent } from './types';
+import { Theme, Mood, View, Settings, Quote, UserProfile, JournalEntry, FocusSession, UserData, Attachment, AccentColor, ChatMessage, ChatSession, MyEvent, WidgetType } from './types';
 import HomePage from './components/HomePage';
 import FocusPage from './components/FocusPage';
 import QuotesPage from './components/QuotesPage';
@@ -272,6 +272,7 @@ interface AppContextType {
   deleteMultipleFocusSessions: (ids: string[]) => Promise<boolean>;
   myEvents: MyEvent[];
   addMyEvent: (event: Omit<MyEvent, 'id' | 'createdAt'>) => Promise<string | null>;
+  deleteMyEvent: (id: string) => Promise<boolean>;
   playFocusSound: (sound: string) => void;
   playUISound: (sound: SoundType) => void;
   vibrate: (style?: 'light' | 'medium' | 'heavy') => void;
@@ -348,6 +349,11 @@ const DEFAULT_SETTINGS: Settings = {
     auraAiSpeed: 1,
     auraAiTone: 'default',
     auraAiPersonalizationData: '',
+    homeWidget: 'calendar',
+    weatherCities: [],
+    showHomeWidget: true,
+    transparentWidget: false,
+    countdownEvents: [],
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -480,6 +486,11 @@ export default function App() {
                 auraAiSpeed: data.auraAiSpeed ?? DEFAULT_SETTINGS.auraAiSpeed,
                 auraAiTone: data.auraAiTone || DEFAULT_SETTINGS.auraAiTone,
                 auraAiPersonalizationData: data.auraAiPersonalizationData || DEFAULT_SETTINGS.auraAiPersonalizationData,
+                homeWidget: data.homeWidget || DEFAULT_SETTINGS.homeWidget,
+                weatherCities: data.weatherCities || DEFAULT_SETTINGS.weatherCities,
+                showHomeWidget: data.showHomeWidget ?? DEFAULT_SETTINGS.showHomeWidget,
+                transparentWidget: data.transparentWidget ?? DEFAULT_SETTINGS.transparentWidget,
+                countdownEvents: data.countdownEvents || DEFAULT_SETTINGS.countdownEvents,
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
@@ -752,6 +763,22 @@ export default function App() {
             console.error("Error adding event:", error);
             showAlertModal({ title: "Save Failed", message: "Could not save your event." });
             return null;
+        }
+    }, [currentUser, masterUid, showAlertModal, playUISound]);
+
+    const deleteMyEvent = useCallback(async (id: string): Promise<boolean> => {
+        const dataPathUid = masterUid || currentUser?.uid;
+        if (!dataPathUid) return false;
+
+        try {
+            const eventRef = ref(db, `users/${dataPathUid}/myEvents/${id}`);
+            await remove(eventRef);
+            playUISound('delete');
+            return true;
+        } catch (error) {
+            console.error("Error deleting event:", error);
+            showAlertModal({ title: "Delete Failed", message: "Could not delete your event." });
+            return false;
         }
     }, [currentUser, masterUid, showAlertModal, playUISound]);
 
@@ -1034,7 +1061,7 @@ export default function App() {
   const appContextValue = useMemo(() => ({
     mood, setMood: handleSetMood, settings, setSettings: handleSetSettings, quotes, setQuotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
+    focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, deleteMyEvent, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
     timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
     focusSearchQuery, setFocusSearchQuery,
@@ -1050,7 +1077,7 @@ export default function App() {
   }), [
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
-    focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
+    focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, deleteMyEvent, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
     auraChatSessions, saveChatSession, deleteChatSessions,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
     selectTimerDuration, toggleTimer, resetTimer, sessionName,

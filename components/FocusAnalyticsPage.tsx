@@ -326,9 +326,11 @@ const FocusAnalyticsPage: React.FC = () => {
             (max, [date, minutes]) => (minutes > max[1] ? [date, minutes] : max),
             ['', 0]
         );
-        const mostProductiveDay = { date, minutes: Math.round(minutes) };
+        // FIX: Explicitly convert `minutes` to a number before passing to Math.round to fix type error.
+        const mostProductiveDay = { date, minutes: Math.round(Number(minutes)) };
         
-        const dailyTrendData = Object.entries(dailyMinutes).map(([date, minutes]) => ({ date, minutes: Math.round(minutes) })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        // FIX: Explicitly convert `minutes` to a number before passing to Math.round to fix type error.
+        const dailyTrendData = Object.entries(dailyMinutes).map(([date, minutes]) => ({ date, minutes: Math.round(Number(minutes)) })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         const timeOfDayData: Record<string, number> = { 'Morning (6-12)': 0, 'Afternoon (12-6)': 0, 'Evening (6-12)': 0, 'Night (12-6)': 0 };
         const dayOfWeekData: Record<string, number> = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
@@ -407,10 +409,8 @@ const FocusAnalyticsPage: React.FC = () => {
                                      <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
                                         {(() => {
                                             const dayDataValues = Object.values(analyticsData.dayOfWeekData);
-                                            // Ensure all values are numbers before passing to Math.max
-                                            const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues.map(Number)) : 0;
+                                            const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues.map(v => Number(v))) : 0;
                                             return Object.entries(analyticsData.dayOfWeekData).map(([day, countValue], index) => {
-                                                // Ensure countValue is a number before using in calculations
                                                 const count = Number(countValue);
                                                 const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
                                                 return (
