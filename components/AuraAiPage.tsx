@@ -15,7 +15,7 @@ import { generateImageForJournal } from '../services/geminiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
+const API_KEY = "AIzaSyBvrxqUclvU9Dni5VRmPHT7nNkcLDpvnjg";
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
