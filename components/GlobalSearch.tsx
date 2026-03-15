@@ -77,6 +77,15 @@ const GlobalSearch: React.FC = () => {
             .filter(a => a.title.toLowerCase().includes(lowerCaseQuery) || a.description?.toLowerCase().includes(lowerCaseQuery))
             .map((a, i) => ({ ...a, id: `action-${i}` }));
         
+        const auraAction: SearchResult = {
+            id: 'aura-ask',
+            type: 'action',
+            title: `Ask Aura AI: "${debouncedQuery}"`,
+            description: 'Get an AI-powered answer with Research Mode.',
+            icon: <Sparkles size={18} className="text-cyan-400" />,
+            action: () => navigateTo('auraAi', { initialQuery: debouncedQuery, research: true })
+        };
+        
         const journals = journalEntries
             .filter(j => j.title?.toLowerCase().includes(lowerCaseQuery) || j.content.toLowerCase().includes(lowerCaseQuery))
             .map(j => ({
@@ -110,8 +119,8 @@ const GlobalSearch: React.FC = () => {
                 action: () => navigateTo('quotes'), // Simple navigation to quotes page
             }));
 
-        return [...actions, ...journals, ...focusSessions, ...allQuotes];
-    }, [debouncedQuery, journalEntries, quotes, focusHistory, searchableActions, navigateTo]);
+        return [auraAction, ...actions, ...journals, ...focusSessions, ...allQuotes];
+    }, [debouncedQuery, journalEntries, quotes, focusHistory, searchableActions, navigateTo, auraAction]);
     
     const groupedResults = useMemo(() => {
         // Fix: Explicitly typing the accumulator and casting the initial value for `reduce` ensures correct type inference.
