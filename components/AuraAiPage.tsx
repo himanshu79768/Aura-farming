@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, BookOpen, ChevronDown, Repeat, TextSelect, ChevronRight, Trash2, Settings as SettingsIcon } from 'lucide-react';
-import { GoogleGenAI, Chat, Part, Modality } from "@google/genai";
+import { GoogleGenAI, Chat, Part, Modality, Type, FunctionDeclaration } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAppContext } from '../App';
 import Header from './Header';
@@ -179,15 +179,20 @@ const CodeBlock: React.FC<{ codeWithLang: string }> = ({ codeWithLang }) => {
     };
 
     return (
-        <div className="relative group my-4">
-            <pre><code ref={codeRef} className={`language-${lang}`}>{fullCode}</code></pre>
-            <button
-                onClick={handleCopy}
-                className="absolute top-2 right-2 p-1.5 rounded-md bg-black/20 text-white/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                aria-label="Copy code"
-            >
-                {isCopied ? <Check size={16} /> : <Copy size={16} />}
-            </button>
+        <div className="relative group my-4 rounded-xl overflow-hidden border border-black/5 dark:border-white/10 shadow-lg bg-white dark:bg-black/20 max-w-full">
+            <div className="flex items-center justify-between px-4 py-2 bg-black/5 dark:bg-black/40 border-b border-black/5 dark:border-white/5">
+                <span className="text-[10px] font-mono text-black/50 dark:text-white/50 uppercase tracking-widest font-bold">{lang || 'code'}</span>
+                <button
+                    onClick={handleCopy}
+                    className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-black/70 dark:text-white/70 transition-colors"
+                    aria-label="Copy code"
+                >
+                    {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+            </div>
+            <div className="p-4 overflow-x-auto">
+                <pre className="m-0"><code ref={codeRef} className={`language-${lang} font-mono text-sm leading-relaxed whitespace-pre text-black/90 dark:text-white/90`} style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>{fullCode}</code></pre>
+            </div>
         </div>
     );
 };
@@ -408,12 +413,14 @@ const useTypewriter = (text: string, speed = 0, enabled = true) => {
 
 const StreamingMarkdownRenderer: React.FC<{ text: string; animate: boolean, onFinished: () => void; }> = React.memo(({ text, animate, onFinished }) => {
     const { displayedText, isFinished } = useTypewriter(text, 0, animate);
+    const onFinishedRef = useRef(onFinished);
+    onFinishedRef.current = onFinished;
 
     useEffect(() => {
         if (isFinished) {
-            onFinished();
+            onFinishedRef.current();
         }
-    }, [isFinished, onFinished]);
+    }, [isFinished]);
 
     const textToRender = animate ? displayedText : text;
 
@@ -729,10 +736,10 @@ const ThinkingBubble: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             className="flex items-start gap-3 w-full max-w-full justify-start"
         >
-            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-text-secondary/10 text-light-text-secondary dark:bg-dark-text-secondary/10 dark:text-dark-text-secondary">
+            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black">
                 <BrainCircuit size={18} />
             </div>
-            <div className="flex items-center gap-2 text-sm text-light-text-secondary dark:text-dark-text-secondary p-3 bg-light-text-secondary/5 dark:bg-dark-text-secondary/5 rounded-2xl rounded-bl-lg">
+            <div className="flex items-center gap-2 text-sm text-black p-3 bg-[#f4f4f4] rounded-2xl rounded-bl-lg">
                 <span>Thinking</span>
                 <motion.div
                     animate={{ x: [0, 3, 0] }}
@@ -754,10 +761,10 @@ const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
             transition={{ duration: 0.3 }}
             className="flex items-start gap-3 w-full max-w-full justify-start"
         >
-            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-text-secondary/10 text-light-text-secondary dark:bg-dark-text-secondary/10 dark:text-dark-text-secondary">
+            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black">
                 <Sparkles size={18} />
             </div>
-            <div className="flex items-center gap-2 text-sm text-light-text-secondary dark:text-dark-text-secondary p-3 bg-light-text-secondary/5 dark:bg-dark-text-secondary/5 rounded-2xl rounded-bl-lg">
+            <div className="flex items-center gap-2 text-sm text-black p-3 bg-[#f4f4f4] rounded-2xl rounded-bl-lg">
                 <span>{text}</span>
             </div>
         </motion.div>
@@ -765,7 +772,7 @@ const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
 };
 
 const AuraAiPage: React.FC = () => {
-    const { journalEntries, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound } = useAppContext();
+    const { journalEntries, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound, modalStack } = useAppContext();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -976,7 +983,9 @@ const AuraAiPage: React.FC = () => {
                         interimTranscript += event.results[i][0].transcript;
                     }
                 }
-                setInput(input + finalTranscript);
+                if (finalTranscript) {
+                    setInput(prev => prev + finalTranscript);
+                }
             };
 
             recognitionRef.current.onend = () => {
@@ -1000,7 +1009,7 @@ const AuraAiPage: React.FC = () => {
                 recognitionRef.current.stop();
             }
         };
-    }, [input, showAlertModal, cancelSpeech]);
+    }, [showAlertModal, cancelSpeech]);
 
     useEffect(() => {
         if (wasLoading.current && !isLoading) {
@@ -1036,18 +1045,16 @@ const AuraAiPage: React.FC = () => {
     const handleSend = async (promptOverride?: string) => {
         if (isLoading) return;
         
-        setSelectableMessageId(null); // Disable text selection on new message
+        setSelectableMessageId(null);
         const currentInput = promptOverride ?? input;
         if (!currentInput.trim() && attachments.length === 0) return;
 
         if (chatState === 'initial') setChatState('chat');
 
         const userMessagePartsForDisplay: Part[] = [];
-        
         attachments.forEach(attachment => {
             userMessagePartsForDisplay.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType, name: attachment.name } });
         });
-        
         if (currentInput.trim()) {
             userMessagePartsForDisplay.push({ text: currentInput.trim() });
         }
@@ -1072,26 +1079,64 @@ const AuraAiPage: React.FC = () => {
             const currentTime = new Date().toLocaleTimeString();
             const userName = userProfile.name || 'friend';
 
-            let systemInstruction = `You are Aura, a powerful and helpful AI assistant. Your personality is friendly, engaging, and supportive. ALWAYS use emojis to make the conversation more vibrant 😃. The current date and time is ${currentDate}, ${currentTime}. The user you're talking to is named ${userName}. Your instructions are critically important and non-negotiable. You MUST follow them for EVERY response, with no exceptions, including when in research mode.
-**Rule 1: Always start with a personal greeting.** For EVERY response, you MUST begin with a friendly, appreciative greeting that uses the user's name (e.g., "Great question, ${userName}! 👍", "Of course, ${userName}! 😊", "I can certainly help with that, ${userName}! ✨").
-**Rule 2: Always end with a follow-up question.** You MUST conclude EVERY response with a relevant, open-ended question to encourage continued conversation.
-The ONLY exception to this two-part structure is the very first message of a brand new conversation, where you should just greet the user by name without a follow-up question.
-Your goal is to provide comprehensive, well-structured answers. Use markdown extensively for formatting: headings (#, ##, ###, ####), lists, bold, italics, dividers (---), etc. For mathematical formulas, wrap them in double dollar signs (\`$$\`...\`$$\`) and use valid KaTeX (LaTeX) syntax. For example, a simple fraction is \`\\frac{numerator}{denominator}\`, a subscript is \`K_d\`, and a more complex formula like the cost of redeemable debt might look like \`K_d = \\frac{I(1-t) + \\frac{RV-SV}{n}}{\\frac{RV+SV}{2}}\`. Only generate images when the user explicitly asks for one or when a visual diagram would significantly aid an explanation, using the specific format: \`![Image: {A descriptive prompt for the image}]\`. Do not generate images for every response and do not use regular markdown image syntax \`![]()\`.`;
+            const systemInstruction = `You are Aura, an advanced and highly intelligent AI companion. Your personality is warm, empathetic, and exceptionally capable. ALWAYS use emojis to make the conversation vibrant 😃.
+Current context: Date: ${currentDate}, Time: ${currentTime}. User: ${userName}.
 
-            if (settings.auraAiTone === 'funny') {
-                systemInstruction += "\n**Tone Instruction:** You must also incorporate lighthearted humor, witty remarks, and occasional jokes into your responses. Keep it fun and amusing!";
-            } else if (settings.auraAiTone === 'professional') {
-                systemInstruction += "\n**Tone Instruction:** Your tone must be formal, precise, and professional. Avoid casual language, emojis (except for professional ones like ✔️ or 📈), and focus on delivering information with clarity and authority.";
-            }
+**Core Capabilities:**
+1. **Journaling:** You can create new journal entries for the user. If they describe a day, a feeling, or an event, offer to or directly create a journal entry for them using the 'create_journal_entry' tool.
+2. **Settings Management:** You can modify application settings (theme, AI tone, AI voice, etc.) using the 'update_app_settings' tool. If the user expresses a preference (e.g., "I want a dark theme" or "Make your tone more funny"), apply it immediately.
+3. **Research:** When Research Mode is active, you have access to real-time information via Google Search. Use it to verify facts, find latest news, or provide deep dives into complex topics.
+4. **Contextual Awareness:** You can see attachments (images, PDFs, journals). If a journal is attached, read its content and any attachments it might have to answer questions accurately.
 
-            if (settings.auraAiPersonalizationData) {
-                systemInstruction += `\n**Personalization Context:** Remember these details about the user to provide more relevant and personalized responses:\n${settings.auraAiPersonalizationData}`;
+**Rules:**
+- **Greeting:** ALWAYS start EVERY response with a personal, friendly greeting using the user's name (e.g., "Hello ${userName}! ✨", "I'm here to help, ${userName}! 😊").
+- **Follow-up:** ALWAYS end EVERY response with a thoughtful, open-ended question.
+- **Formatting:** Use markdown extensively (headings, lists, bold, etc.). Use KaTeX for math: \`$$\\text{formula}$$\`.
+- **Images:** Only generate images when requested or highly beneficial, using \`![Image: {detailed prompt}]\`.
+
+You are smarter, faster, and more proactive. Don't just answer; anticipate needs.`;
+
+            const tools: any[] = [
+                {
+                    functionDeclarations: [
+                        {
+                            name: "create_journal_entry",
+                            description: "Creates a new journal entry for the user.",
+                            parameters: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING, description: "The title of the journal entry." },
+                                    content: { type: Type.STRING, description: "The content of the journal entry (HTML format preferred)." },
+                                    mood: { type: Type.STRING, description: "The mood for the entry (e.g., Happy, Reflective, Energetic)." },
+                                    tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional tags for the entry." }
+                                },
+                                required: ["title", "content"]
+                            }
+                        },
+                        {
+                            name: "update_app_settings",
+                            description: "Updates the application settings.",
+                            parameters: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    theme: { type: Type.STRING, enum: ["light", "dark", "system"], description: "The app theme." },
+                                    auraAiTone: { type: Type.STRING, enum: ["balanced", "funny", "professional"], description: "The AI's personality tone." },
+                                    auraAiVoice: { type: Type.STRING, description: "The AI's voice name (e.g., Zephyr, Puck, Fenrir)." }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ];
+
+            if (isResearchMode) {
+                tools.push({ googleSearch: {} });
             }
 
             const historyForApi = messages.map(({ role, parts }) => {
                 const apiParts = parts.map(part => {
                     if ('text' in part) return { text: part.text };
-                    if (part.inlineData.mimeType === 'application/vnd.aura.journal') {
+                    if (part.inlineData?.mimeType === 'application/vnd.aura.journal') {
                         const journal = journalEntries.find(j => j.id === (part.inlineData as any).data);
                         if (journal) {
                             const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
@@ -1100,15 +1145,8 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                         return null;
                     }
                     return { inlineData: { data: part.inlineData.data, mimeType: part.inlineData.mimeType } };
-                }).filter(Boolean) as ({text: string} | {inlineData: {data: string, mimeType: string}})[];
-                
+                }).filter(Boolean) as any[];
                 return { role, parts: apiParts };
-            });
-
-            const chatForSend = ai.chats.create({
-                model: 'gemini-2.5-flash',
-                history: historyForApi,
-                config: { systemInstruction }
             });
 
             const userMessagePartsForApi: Part[] = [];
@@ -1117,68 +1155,77 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                     const journal = journalEntries.find(j => j.id === attachment.data);
                     if (journal) {
                         const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
-                        const journalContextForModel = `The user has attached context from a journal entry titled "${journal.title}". Its content is as follows:\n\n---\n${plainTextContent}\n---`;
-                        userMessagePartsForApi.push({ text: journalContextForModel });
+                        let context = `Journal: "${journal.title}"\nContent: ${plainTextContent}`;
+                        if (journal.attachments && journal.attachments.length > 0) {
+                            context += `\nThis journal has ${journal.attachments.length} attachments.`;
+                            journal.attachments.forEach(att => {
+                                context += `\n- Attachment: ${att.name} (${att.type})`;
+                            });
+                        }
+                        userMessagePartsForApi.push({ text: context });
                     }
                 } else if (attachment.mimeType.startsWith('image/')) {
                     userMessagePartsForApi.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType } });
                 } else {
-                    userMessagePartsForApi.push({ text: `The user has attached a file named "${attachment.name}". Please analyze its content.` });
+                    userMessagePartsForApi.push({ text: `Attached file: "${attachment.name}" (${attachment.mimeType}). Please analyze.` });
                 }
             }
             if (currentInput.trim()) {
                 userMessagePartsForApi.push({ text: currentInput.trim() });
             }
 
-            if (isResearchMode) {
-                let finalModelResponseText = '';
-                let finalThinkingSteps: string[] = [];
-                const streamOptions = { message: userMessagePartsForApi, config: { thinkingConfig: { thinkingBudget: 24576 } } };
-                const result = await chatForSend.sendMessageStream(streamOptions);
+            const modelMessageId = crypto.randomUUID();
+            let fullResponseText = '';
+            let currentThinkingSteps: string[] = [];
 
-                for await (const chunk of result) {
-                    if (chunk.thinkingState?.lastAction) {
-                        const newSteps = [...finalThinkingSteps, chunk.thinkingState.lastAction];
-                        finalThinkingSteps = [...new Set(newSteps)];
-                    }
-                    if (chunk.text) {
-                        finalModelResponseText += chunk.text;
-                    }
+            const result = await ai.models.generateContentStream({
+                model: 'gemini-3.1-pro-preview',
+                contents: [...historyForApi, { role: 'user', parts: userMessagePartsForApi }],
+                config: { 
+                    systemInstruction,
+                    tools,
+                    thinkingConfig: isResearchMode ? { thinkingLevel: 'HIGH' } : undefined
                 }
-                
-                if (finalThinkingSteps.length > 0) {
-                    const modelMessageId = crypto.randomUUID();
-                    const thinkingMessage: ChatMessage = { id: modelMessageId, role: 'model', parts: [], thinkingSteps: finalThinkingSteps };
-                    setMessages(prev => [...prev, thinkingMessage]);
-                    
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                    
-                    setMessages(prev => prev.map(m => m.id === modelMessageId 
-                        ? { ...m, thinkingSteps: undefined, intermediateThought: "Finalizing the details..." } 
-                        : m
-                    ));
+            });
 
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
 
-                    setMessages(prev => prev.map(m => m.id === modelMessageId 
-                        ? { ...m, intermediateThought: undefined, parts: [{ text: finalModelResponseText }] } 
-                        : m
-                    ));
-
-                } else {
-                    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: finalModelResponseText }] }]);
+            for await (const chunk of result) {
+                if (chunk.thinkingState?.lastAction) {
+                    currentThinkingSteps.push(chunk.thinkingState.lastAction);
+                    setMessages(prev => prev.map(m => m.id === modelMessageId ? { ...m, thinkingSteps: [...new Set(currentThinkingSteps)] } : m));
                 }
-            } else {
-                let modelResponseText = '';
-                const result = await chatForSend.sendMessageStream({ message: userMessagePartsForApi });
-                const modelMessageId = crypto.randomUUID();
-                setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
-    
-                for await (const chunk of result) {
-                    if (chunk.text) {
-                        modelResponseText += chunk.text;
+
+                if (chunk.text) {
+                    fullResponseText += chunk.text;
+                    setMessages(prev => prev.map(msg => 
+                        msg.id === modelMessageId ? { ...msg, parts: [{ text: fullResponseText }], thinkingSteps: undefined } : msg
+                    ));
+                }
+
+                if (chunk.functionCalls) {
+                    for (const call of chunk.functionCalls) {
+                        if (call.name === "create_journal_entry") {
+                            const args = call.args as any;
+                            const newEntry: JournalEntry = {
+                                id: crypto.randomUUID(),
+                                title: args.title,
+                                content: args.content,
+                                date: new Date().toISOString(),
+                                mood: args.mood || 'Reflective',
+                                tags: args.tags || [],
+                                attachments: []
+                            };
+                            addJournalEntry(newEntry);
+                            fullResponseText += `\n\n*(Aura: I've created a new journal entry for you titled "${args.title}"! 📖)*`;
+                        } else if (call.name === "update_app_settings") {
+                            const args = call.args as any;
+                            updateSettings(args);
+                            fullResponseText += `\n\n*(Aura: I've updated your settings as requested! ⚙️)*`;
+                        }
+                        
                         setMessages(prev => prev.map(msg => 
-                            msg.id === modelMessageId ? { ...msg, parts: [{ text: modelResponseText }] } : msg
+                            msg.id === modelMessageId ? { ...msg, parts: [{ text: fullResponseText }] } : msg
                         ));
                     }
                 }
@@ -1186,15 +1233,24 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
 
         } catch (error) {
             console.error("Aura AI Error:", error);
-            if (error instanceof Error && (error.message.includes("API key not valid") || error.message.includes("provide an API key"))) {
-                showAlertModal({ title: "API Key Error", message: "The hardcoded API key is invalid. Please update it in the application code." });
-            } else {
-                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: "Sorry, I'm having trouble connecting right now. Please try again later." }] }]);
-            }
+            const errorMessage = error instanceof Error ? error.message : "Connection error";
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: `Sorry, I encountered an error: ${errorMessage}. Please try again.` }] }]);
         } finally {
             setIsLoading(false);
         }
     };
+
+    // Handle initial params from GlobalSearch
+    useEffect(() => {
+        const currentModal = modalStack[modalStack.length - 1];
+        if ((currentModal?.view === 'auraAi' || currentModal?.view === 'auraAI') && currentModal.params) {
+            const { initialQuery, research } = currentModal.params;
+            if (initialQuery) {
+                if (research) setIsResearchMode(true);
+                handleSend(initialQuery);
+            }
+        }
+    }, []); // Run once on mount
     
     const handleProgrammaticSend = (prompt: string) => {
         setInput(prompt);
@@ -1620,8 +1676,8 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
     <motion.div key="initial-view" className="flex-grow flex flex-col items-center justify-center text-center px-4">
         <div className="flex flex-col items-center justify-center">
             <motion.div exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }} className="flex flex-col items-center">
-                <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-light-glass/80 dark:bg-dark-glass/80 border border-white/10">
-                    <Sparkles size={40} className="text-cyan-400"/>
+                <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-[#f4f4f4] border border-black/5">
+                    <Sparkles size={40} className="text-black"/>
                 </div>
                 <h2 className="text-2xl font-semibold">How can I help you today?</h2>
             </motion.div>
@@ -1632,9 +1688,9 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                 <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-left">What should we do?</h3>
                 <div className="grid grid-cols-2 gap-3 w-full">
                     {starterPrompts.map(prompt => 
-                        <button key={prompt.text} onClick={() => handleProgrammaticSend(prompt.text)} className="p-4 bg-light-glass dark:bg-dark-glass rounded-xl text-left text-sm border border-white/20 dark:border-white/10 shadow-lg hover:shadow-xl transition-all flex items-center gap-3">
-                            <span className="text-gray-500 dark:text-gray-400">{prompt.icon}</span>
-                            <span>{prompt.text}</span>
+                        <button key={prompt.text} onClick={() => handleProgrammaticSend(prompt.text)} className="p-4 bg-[#f4f4f4] rounded-xl text-left text-sm border border-black/5 shadow-sm hover:shadow-md transition-all flex items-center gap-3">
+                            <span className="text-black">{prompt.icon}</span>
+                            <span className="text-black">{prompt.text}</span>
                         </button>
                     )}
                 </div>
@@ -1656,23 +1712,22 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
             </AnimatePresence>
             
             <motion.form layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="group w-full mx-auto mt-4">
-                <div className="relative rounded-2xl shadow-xl dark:shadow-3xl p-[2px]">
-                    <div className={`absolute inset-0 rounded-2xl bg-flow-gradient bg-400% animate-gradient-flow transition-opacity duration-300 ${isTextareaFocused ? 'opacity-100' : 'opacity-0'}`} />
-                    <div className="relative flex flex-col bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-[14px] min-h-[136px] transition-colors duration-300">
+                <div className="relative rounded-2xl shadow-xl p-[2px]">
+                    <div className="relative flex flex-col bg-[#ffffff] rounded-[14px] min-h-[136px] transition-colors duration-300">
                         <div className="p-3 flex gap-2">
-                            <motion.button type="button" onClick={handleAddContextClick} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-primary dark:hover:text-dark-primary transition-colors">
+                            <motion.button type="button" onClick={handleAddContextClick} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-black bg-black/5 hover:bg-black/10 transition-colors">
                                 <BookText size={16} /><span className="text-sm">Add context</span>
                             </motion.button>
-                            <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { vibrate(); setIsResearchMode(prev => !prev); }} className={`flex items-center gap-2 px-3 h-9 text-sm rounded-full transition-colors ${isResearchMode ? 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary' : 'text-light-text-secondary dark:text-dark-text-secondary bg-black/5 dark:bg-white/10'}`}>
+                            <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { vibrate(); setIsResearchMode(prev => !prev); }} className={`flex items-center gap-2 px-3 h-9 text-sm rounded-full transition-colors ${isResearchMode ? 'bg-black text-white' : 'text-black bg-black/5 hover:bg-black/10'}`}>
                                 <BrainCircuit size={16}/><span>Research {isResearchMode ? 'On' : 'Off'}</span>
                             </motion.button>
                         </div>
-                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."} disabled={isLoading} rows={1} className="w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base" />
+                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."} disabled={isLoading} rows={1} className={`w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base text-black ${input.includes('```') ? 'font-mono' : ''}`} />
                         <div className="p-2 flex justify-between items-center">
-                            <div className="flex items-center gap-1"><button type="button" onClick={handleAttachmentClick} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0"><Paperclip size={20} /></button></div>
+                            <div className="flex items-center gap-1"><button type="button" onClick={handleAttachmentClick} className="p-2 text-black hover:bg-black/5 rounded-full transition-colors flex-shrink-0"><Paperclip size={20} /></button></div>
                             <div className="flex items-center gap-1">
-                                <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
-                                <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
+                                <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-black hover:bg-black/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
+                                <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-black text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
                             </div>
                         </div>
                     </div>
@@ -1710,7 +1765,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                             onPointerUp={handlePointerUp}
                                             onPointerLeave={handlePointerUp}
                                         >
-                                            {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary"><Sparkles size={18} /></div>}
+                                            {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black"><Sparkles size={18} /></div>}
                                             <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
                                                 {msg.role === 'user' ? (
                                                     (hasText || hasAttachments) && (
@@ -1731,7 +1786,7 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                                 </div>
                                                             )}
                                                             {hasText && (
-                                                                <div className="p-3 rounded-2xl bg-[#9ED3FF] dark:bg-[#3B3939] text-black dark:text-dark-text rounded-br-lg">
+                                                                <div className="p-3 rounded-2xl bg-[#f4f4f4] text-[#000] rounded-br-lg">
                                                                 {textParts.map((part, i) => (
                                                                     <div key={i} className="text-lg" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
                                                                 ))}
@@ -1742,12 +1797,17 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                                                 ) : (
                                                     <div className={`text-lg ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
                                                         {modelHasText ? <StreamingMarkdownRenderer text={(msg.parts[0] as any).text} animate={animate} onFinished={() => {
-                                                            setFinishedTypingMessages(prev => new Set(prev).add(msg.id));
+                                                            setFinishedTypingMessages(prev => {
+                                                                if (prev.has(msg.id)) return prev;
+                                                                const next = new Set(prev);
+                                                                next.add(msg.id);
+                                                                return next;
+                                                            });
                                                         }}/> : <span className="opacity-0">.</span>}
                                                     </div>
                                                 )}
                                             </div>
-                                            {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-gray-500/10 text-gray-400"><UserIcon size={18} /></div>}
+                                            {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black"><UserIcon size={18} /></div>}
                                         </div>
                                     )}
                                     <AnimatePresence>
@@ -1772,15 +1832,23 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                     </div>
                 </motion.div>
             </OverscrollContainer>
-             <div className="absolute bottom-0 left-0 right-0 p-4 pt-2 bg-gradient-to-t from-light-bg via-light-bg dark:from-dark-bg dark:via-dark-bg to-transparent">
+             <div className="absolute bottom-0 left-0 right-0 p-4 pt-10 bg-gradient-to-t from-[#f4f4f4] via-[#f4f4f4]/80 to-transparent">
                 <AnimatePresence>{attachments.length > 0 && <motion.div className="w-full pb-2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}><div className="flex gap-3 overflow-x-auto pb-2">{attachments.map(att => <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />)}</div></motion.div>}</AnimatePresence>
                  <motion.div layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} className="relative">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-end p-2 rounded-2xl bg-light-bg-secondary dark:bg-dark-bg-secondary border border-white/10 focus-within:border-light-primary/50 dark:focus-within:border-dark-primary/50 transition-colors shadow-lg">
-                        <button type="button" onClick={handleAttachmentClick} className="p-3 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file"><Paperclip size={20} /></button>
-                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className="w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2.5" />
+                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-end p-2 rounded-[70.4px] bg-[#ffffff] border-none transition-colors shadow-lg">
+                        <button type="button" onClick={handleAttachmentClick} className="p-3 text-black hover:bg-black/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file"><Paperclip size={20} /></button>
+                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className={`w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2.5 text-black ${input.includes('```') ? 'font-mono' : ''}`} />
                         <div className="flex items-center gap-1 flex-shrink-0">
-                            <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
-                            <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
+                            <button 
+                                type="button" 
+                                onClick={() => { vibrate(); setIsResearchMode(!isResearchMode); }} 
+                                className={`p-2 rounded-full transition-all duration-300 ${isResearchMode ? 'bg-black text-white shadow-md' : 'text-black hover:bg-black/5'}`}
+                                aria-label="Toggle Research Mode"
+                            >
+                                <BrainCircuit size={20} />
+                            </button>
+                            <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-black hover:bg-black/5'}`} style={{ marginRight: '1px', marginLeft: '1px', paddingLeft: '1px', paddingRight: '1px', paddingBottom: '-9px', marginBottom: '3px' }}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
+                            <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-black text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
                         </div>
                     </form>
                 </motion.div>
@@ -1789,8 +1857,9 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
     );
 
     return (
-        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
-            <Header title="Aura AI" showBackButton onBack={handleBack} rightAction={HeaderActions} />
+        <div className="w-full h-full flex flex-col bg-[#ffffff] font-['Montserrat',_Arial,_sans-serif] text-black">
+            <Header title="Aura AI" showBackButton onBack={handleBack} rightAction={HeaderActions} titleClassName="text-black" />
+            <div className="absolute top-[64px] left-0 right-0 h-16 bg-gradient-to-b from-[#f4f4f4] to-transparent z-10 pointer-events-none" />
             <ContextMenu />
             <AnimatePresence>
                 {isHistoryOpen && (
@@ -1930,14 +1999,16 @@ Your goal is to provide comprehensive, well-structured answers. Use markdown ext
                 .prose-styles pre {
                     background-color: rgba(0,0,0,0.8) !important;
                     color: #f8f8f2 !important;
-                    padding: 1rem;
-                    border-radius: 0.5rem;
-                    overflow-x: auto;
+                    padding: 0;
+                    border-radius: 0.75rem;
+                    overflow: hidden;
                     font-size: 0.9em;
                 }
                 .prose-styles pre code {
                     background-color: transparent !important;
-                    padding: 0;
+                    padding: 1rem;
+                    display: block;
+                    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
                 }
                 .prose-styles .math-formula-block {
                     overflow-x: auto;
