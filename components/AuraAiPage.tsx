@@ -1179,7 +1179,7 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
             let currentThinkingSteps: string[] = [];
 
             const result = await ai.models.generateContentStream({
-                model: 'gemini-3.1-pro-preview',
+                model: 'gemini-2.5-flash',
                 contents: [...historyForApi, { role: 'user', parts: userMessagePartsForApi }],
                 config: { 
                     systemInstruction,
