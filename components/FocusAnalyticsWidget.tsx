@@ -4,7 +4,7 @@ import { useAppContext } from '../App';
 import { TrendingUp } from 'lucide-react';
 
 const FocusAnalyticsWidget: React.FC = () => {
-    const { focusHistory } = useAppContext();
+    const { focusHistory, settings } = useAppContext();
 
     const weeklyStats = useMemo(() => {
         const today = new Date();
@@ -31,10 +31,11 @@ const FocusAnalyticsWidget: React.FC = () => {
         days.forEach(d => { d.minutes = Math.round(d.minutes); });
 
         const totalMinutes = days.reduce((sum, day) => sum + day.minutes, 0);
-        const maxMinutes = Math.max(...days.map(d => d.minutes), 1); // Avoid division by zero
+        const targetMinutes = (settings.dailyTargetHours || 4) * 60;
+        const maxMinutes = Math.max(...days.map(d => d.minutes), targetMinutes, 1); // Avoid division by zero
 
-        return { days, totalMinutes, maxMinutes };
-    }, [focusHistory]);
+        return { days, totalMinutes, maxMinutes, targetMinutes };
+    }, [focusHistory, settings.dailyTargetHours]);
 
     return (
         <div className="w-full h-full p-6 flex flex-col justify-between bg-light-card dark:bg-dark-card text-light-card-foreground dark:text-dark-card-foreground">
@@ -45,19 +46,23 @@ const FocusAnalyticsWidget: React.FC = () => {
                 <p className="text-left text-xs text-light-muted-foreground dark:text-dark-muted-foreground">Your activity for the last 7 days</p>
             </div>
             
-            <div className="flex-grow flex flex-col items-center justify-center my-4">
-                 <div className="w-full h-full flex justify-around items-end gap-2 px-2">
+            <div className="flex-grow flex flex-col justify-end my-4 relative">
+                 {/* Target Line */}
+                 <div className="absolute w-full border-t border-dashed border-light-accent dark:border-dark-accent opacity-50 z-0" style={{ bottom: `calc(${(weeklyStats.targetMinutes / weeklyStats.maxMinutes) * 100}% + 20px)` }}>
+                 </div>
+                 <div className="w-full h-full flex justify-around items-end gap-2 px-2 z-10 pb-[20px]">
                     {weeklyStats.days.map((day, index) => {
                         const height = (day.minutes / weeklyStats.maxMinutes) * 100;
+                        const isTargetMet = day.minutes >= weeklyStats.targetMinutes;
                         return (
-                            <div key={index} className="flex flex-col items-center flex-grow h-full justify-end text-center">
+                            <div key={index} className="flex flex-col items-center flex-grow h-full justify-end text-center relative">
                                 <motion.div
-                                    className="w-full bg-light-primary/70 dark:bg-dark-primary/70 rounded-t-sm"
+                                    className={`w-full rounded-t-sm ${isTargetMet ? 'bg-green-500' : 'bg-light-primary/70 dark:bg-dark-primary/70'}`}
                                     initial={{ height: '0%' }}
                                     animate={{ height: `${height}%` }}
                                     transition={{ type: 'spring', stiffness: 200, damping: 20, delay: index * 0.05 }}
                                 />
-                                <span className="text-xs mt-1 text-light-muted-foreground dark:text-dark-muted-foreground">{day.label}</span>
+                                <span className="text-xs absolute -bottom-[20px] text-light-muted-foreground dark:text-dark-muted-foreground">{day.label}</span>
                             </div>
                         );
                     })}
