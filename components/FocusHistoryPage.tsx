@@ -96,7 +96,7 @@ const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked,
             </AnimatePresence>
             <div className="flex-grow overflow-hidden">
                 <p className="font-medium flex items-center gap-2">
-                    <span>{session.name || 'Focus Session'}</span>
+                    <span>{session.subject ? `${session.subject}: ` : ''}{session.name || 'Focus Session'}</span>
                     {isLinked && (
                         <BookOpen size={14} className="text-light-primary dark:text-dark-primary shrink-0" />
                     )}
@@ -147,7 +147,8 @@ const FocusHistoryPage: React.FC = () => {
         }
 
         return dateFiltered.filter(session => 
-            session.name?.toLowerCase().includes(focusSearchQuery.toLowerCase())
+            session.name?.toLowerCase().includes(focusSearchQuery.toLowerCase()) ||
+            session.subject?.toLowerCase().includes(focusSearchQuery.toLowerCase())
         );
     }, [focusHistory, filter, focusSearchQuery]);
 
@@ -272,7 +273,7 @@ const FocusHistoryPage: React.FC = () => {
             <Header {...headerProps} />
             <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 pt-2 flex-shrink-0">
                 <SearchBar
-                    placeholder="Search sessions..."
+                    placeholder="Search sessions or subjects..."
                     searchQuery={focusSearchQuery}
                     setSearchQuery={setFocusSearchQuery}
                 />
