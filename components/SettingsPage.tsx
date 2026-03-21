@@ -87,6 +87,13 @@ const SettingsPage: React.FC = () => {
         setSettings(s => ({ ...s, transparentWidget: !(s.transparentWidget ?? false) }));
     }, [setSettings, vibrate, playUISound, settings.transparentWidget]);
 
+    const handleDailyTargetChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val) && val > 0) {
+            setSettings(s => ({ ...s, dailyTargetHours: val }));
+        }
+    }, [setSettings]);
+
 
     return (
         <div className="w-full h-full flex flex-col">
@@ -169,6 +176,27 @@ const SettingsPage: React.FC = () => {
                                         max="100"
                                         value={settings.gradientIntensity ?? 75}
                                         onChange={handleGradientChange}
+                                        className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-light-primary dark:accent-dark-primary"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Focus Settings Section */}
+                        <div className="space-y-4">
+                            <h2 className="font-semibold px-4">Focus Settings</h2>
+                            <div className="p-4 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-white/10 space-y-4">
+                                <div>
+                                    <h3 className="font-medium mb-2 text-sm text-light-text-secondary dark:text-dark-text-secondary flex justify-between items-center">
+                                        <span>Daily Target Limit (Hours)</span>
+                                        <span>{settings.dailyTargetHours ?? 4} Hours</span>
+                                    </h3>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="24"
+                                        value={settings.dailyTargetHours ?? 4}
+                                        onChange={handleDailyTargetChange}
                                         className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-light-primary dark:accent-dark-primary"
                                     />
                                 </div>
