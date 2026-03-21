@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Sparkles, Wind, Gauge, Check, Plus, Calendar as CalendarIcon, CalendarDays, CloudSun, BarChart3, TrendingUp, Clock, Timer as TimerIcon } from 'lucide-react';
+import { RefreshCw, Sparkles, Wind, Gauge, Check, Plus, Calendar as CalendarIcon, CalendarDays, CloudSun, BarChart3, TrendingUp, Clock, Timer as TimerIcon, Target } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { MORNING_GREETINGS, AFTERNOON_GREETINGS, EVENING_GREETINGS, DAILY_THOUGHTS } from '../constants';
@@ -13,6 +13,8 @@ import StatsWidget from './StatsWidget';
 import FocusAnalyticsWidget from './FocusAnalyticsWidget';
 import AnalogClockWidget from './AnalogClockWidget';
 import DigitalClockWidget from './DigitalClockWidget';
+import DailyTargetWidget from './DailyTargetWidget';
+import SubjectAnalyticsWidget from './SubjectAnalyticsWidget';
 
 interface WidgetSelectionModalProps {
     isOpen: boolean;
@@ -25,9 +27,11 @@ const WIDGETS = [
     { id: 'calendar', name: 'Calendar', icon: <CalendarIcon size={32} /> },
     { id: 'analog-clock', name: 'Analog Clock', icon: <Clock size={32} /> },
     { id: 'stats', name: 'Focus Stats', icon: <BarChart3 size={32} /> },
+    { id: 'daily-target', name: 'Daily Target', icon: <Target size={32} /> },
     { id: 'weather', name: 'Weather', icon: <CloudSun size={32} /> },
     { id: 'digital-clock', name: 'Digital Clock', icon: <TimerIcon size={32} /> },
     { id: 'focus-analytics', name: 'Focus Analytics', icon: <TrendingUp size={32} /> },
+    { id: 'subject-analytics', name: 'Subject Analytics', icon: <BarChart3 size={32} /> },
     { id: 'compact-calendar', name: 'Compact Calendar', icon: <CalendarDays size={32} /> },
     { id: 'countdown', name: 'Days Countdown', icon: <Gauge size={32} /> },
 ] as const;
@@ -36,10 +40,12 @@ const WIDGETS = [
 const widgetCovers: Record<WidgetType, string> = {
     calendar: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%23a78bfa' /%3e%3crect x='10' y='10' width='80' height='80' rx='8' fill='white'/%3e%3crect x='10' y='10' width='80' height='20' rx='8' ry='8' fill='%23f87171'/%3e%3cg fill='%23a1a1aa'%3e%3crect x='20' y='40' width='10' height='10' rx='2'/%3e%3crect x='35' y='40' width='10' height='10' rx='2'/%3e%3crect x='50' y='40' width='10' height='10' rx='2'/%3e%3crect x='65' y='40' width='10' height='10' rx='2'/%3e%3crect x='80' y='40' width='10' height='10' rx='2'/%3e%3crect x='20' y='55' width='10' height='10' rx='2'/%3e%3crect x='35' y='55' width='10' height='10' rx='2'/%3e%3crect x='50' y='55' width='10' height='10' rx='2' fill='%2360a5fa' stroke='%233b82f6' stroke-width='1'/%3e%3crect x='65' y='55' width='10' height='10' rx='2'/%3e%3crect x='80' y='55' width='10' height='10' rx='2'/%3e%3crect x='20' y='70' width='10' height='10' rx='2'/%3e%3c/g%3e%3c/svg%3e")`,
     stats: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='hsl(142, 70%25, 70%25)' /%3e%3crect x='10' y='10' width='80' height='80' rx='8' fill='white'/%3e%3ctext x='50' y='45' font-family='sans-serif' font-size='24' font-weight='bold' text-anchor='middle' fill='%231a1a1a'%3e45%3c/text%3e%3ctext x='50' y='60' font-family='sans-serif' font-size='8' text-anchor='middle' fill='%23606060'%3eMINUTES%3c/text%3e%3crect x='20' y='70' width='60' height='8' rx='4' fill='%23f1f5f9' /%3e%3crect x='20' y='70' width='45' height='8' rx='4' fill='hsl(142, 60%25, 45%25)' /%3e%3c/svg%3e")`,
+    'daily-target': `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%23fbbf24' /%3e%3crect x='10' y='10' width='80' height='80' rx='8' fill='white'/%3e%3ccircle cx='50' cy='45' r='20' fill='none' stroke='%23f1f5f9' stroke-width='6'/%3e%3cpath d='M 50 25 A 20 20 0 0 1 70 45' fill='none' stroke='%23fbbf24' stroke-width='6' stroke-linecap='round'/%3e%3ctext x='50' y='75' font-family='sans-serif' font-size='10' font-weight='bold' text-anchor='middle' fill='%231a1a1a'%3eDaily Target%3c/text%3e%3c/svg%3e")`,
     weather: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='hsl(221, 90%25, 75%25)' /%3e%3crect x='10' y='10' width='80' height='80' rx='8' fill='white'/%3e%3ccircle cx='50' cy='40' r='15' fill='%23facc15' /%3e%3ctext x='50' y='75' font-family='sans-serif' font-size='16' font-weight='bold' text-anchor='middle' fill='%231a1a1a'%3eSunny%3c/text%3e%3c/svg%3e")`,
     countdown: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'%3e%3crect width='200' height='100' fill='%23f472b6' /%3e%3cdefs%3e%3clinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3e%3cstop offset='0%25' stop-color='rgba(0,0,0,0.2)'/%3e%3cstop offset='100%25' stop-color='rgba(0,0,0,0)'/%3e%3c/linearGradient%3e%3c/defs%3e%3ccircle cx='100' cy='50' r='40' fill='rgba(255,255,255,0.1)' stroke='rgba(255,255,255,0.3)' stroke-width='4' /%3e%3cpath d='M 100 10 A 40 40 0 0 1 140 50' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3e%3ccircle cx='100' cy='50' r='4' fill='white'/%3e%3crect width='200' height='100' fill='url(%23g)' /%3e%3c/svg%3e")`,
     'compact-calendar': `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'%3e%3crect width='200' height='100' fill='%2327272a'/%3e%3ctext x='15' y='25' font-family='sans-serif' font-size='10' font-weight='bold' fill='%23ef4444'%3eFRIDAY%3c/text%3e%3ctext x='15' y='65' font-family='sans-serif' font-size='40' font-weight='200' fill='white'%3e26%3c/text%3e%3ctext x='15' y='85' font-family='sans-serif' font-size='10' fill='%23a1a1aa'%3eNo events today%3c/text%3e%3ctext x='110' y='25' font-family='sans-serif' font-size='10' font-weight='bold' fill='%23ef4444'%3eJULY%3c/text%3e%3ccircle cx='155' cy='60' r='8' fill='%23ef4444' /%3e%3ctext x='150' y='64' font-family='sans-serif' font-size='10' fill='white'%3e26%3c/text%3e%3c/svg%3e")`,
     'focus-analytics': `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='hsl(262, 85%25, 80%25)' /%3e%3crect x='10' y='10' width='80' height='80' rx='8' fill='white'/%3e%3crect x='20' y='60' width='10' height='20' rx='2' fill='%23c084fc'/%3e%3crect x='35' y='45' width='10' height='35' rx='2' fill='%23c084fc'/%3e%3crect x='50' y='50' width='10' height='30' rx='2' fill='%23c084fc'/%3e%3crect x='65' y='30' width='10' height='50' rx='2' fill='%23c084fc'/%3e%3ctext x='50' y='30' font-family='sans-serif' font-size='10' font-weight='bold' text-anchor='middle' fill='%231a1a1a'%3eWeekly Focus%3c/text%3e%3c/svg%3e")`,
+    'subject-analytics': `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='hsl(340, 85%25, 80%25)' /%3e%3crect x='10' y='10' width='80' height='80' rx='8' fill='white'/%3e%3crect x='20' y='60' width='60' height='10' rx='2' fill='%23f472b6'/%3e%3crect x='20' y='45' width='40' height='10' rx='2' fill='%23f472b6'/%3e%3crect x='20' y='30' width='20' height='10' rx='2' fill='%23f472b6'/%3e%3c/svg%3e")`,
     'analog-clock': `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%2360a5fa' /%3e%3ccircle cx='50' cy='50' r='40' fill='white' stroke='%23e5e7eb' stroke-width='2'/%3e%3cline x1='50' y1='50' x2='50' y2='30' stroke='%231a1a1a' stroke-width='3' stroke-linecap='round'/%3e%3cline x1='50' y1='50' x2='70' y2='50' stroke='%231a1a1a' stroke-width='2' stroke-linecap='round'/%3e%3ccircle cx='50' cy='50' r='3' fill='%231a1a1a'/%3e%3c/svg%3e")`,
     'digital-clock': `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'%3e%3crect width='200' height='100' fill='%234ade80' /%3e%3ctext x='100' y='60' font-family='monospace' font-size='40' font-weight='bold' text-anchor='middle' fill='white'%3e10:10%3c/text%3e%3ctext x='100' y='80' font-family='sans-serif' font-size='12' text-anchor='middle' fill='white' opacity='0.8'%3eTuesday, July 23%3c/text%3e%3c/svg%3e")`,
 };
@@ -156,6 +162,10 @@ const HomePage: React.FC = () => {
               return <WeatherWidget />;
           case 'stats':
               return <StatsWidget />;
+          case 'daily-target':
+              return <DailyTargetWidget />;
+          case 'subject-analytics':
+              return <SubjectAnalyticsWidget />;
           case 'focus-analytics':
               return <FocusAnalyticsWidget />;
           case 'countdown':
