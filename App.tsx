@@ -268,7 +268,7 @@ interface AppContextType {
   deleteMultipleJournalEntries: (ids: string[]) => Promise<boolean>;
   duplicateJournalEntry: (id: string) => Promise<boolean>;
   focusHistory: FocusSession[];
-  addFocusSession: (durationInSeconds: number, name?: string) => void;
+  addFocusSession: (durationInSeconds: number, name?: string, subject?: string) => void;
   deleteMultipleFocusSessions: (ids: string[]) => Promise<boolean>;
   myEvents: MyEvent[];
   addMyEvent: (event: Omit<MyEvent, 'id' | 'createdAt'>) => Promise<string | null>;
@@ -292,6 +292,8 @@ interface AppContextType {
   setIsPillDragging: (isDragging: boolean) => void;
   sessionName: string;
   setSessionName: (name: string) => void;
+  sessionSubject: string;
+  setSessionSubject: (subject: string) => void;
   focusSearchQuery: string;
   setFocusSearchQuery: (query: string) => void;
   logoutUser: () => void;
@@ -354,6 +356,9 @@ const DEFAULT_SETTINGS: Settings = {
     showHomeWidget: true,
     transparentWidget: false,
     countdownEvents: [],
+    dailyTargetHours: 4,
+    subjects: ['Accounts', 'Law', 'Economics', 'Maths', 'LR', 'Stats'],
+    recentTopics: [],
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -396,6 +401,7 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState(timerState.duration);
   const [isTimerFinished, setIsTimerFinished] = useState(false);
   const [sessionName, setSessionName] = useState('');
+  const [sessionSubject, setSessionSubject] = useState('');
 
   const [isPillDragging, setIsPillDragging] = useState(false);
   const constraintsRef = useRef(null);
@@ -491,6 +497,9 @@ export default function App() {
                 showHomeWidget: data.showHomeWidget ?? DEFAULT_SETTINGS.showHomeWidget,
                 transparentWidget: data.transparentWidget ?? DEFAULT_SETTINGS.transparentWidget,
                 countdownEvents: data.countdownEvents || DEFAULT_SETTINGS.countdownEvents,
+                dailyTargetHours: data.dailyTargetHours ?? DEFAULT_SETTINGS.dailyTargetHours,
+                subjects: data.subjects || DEFAULT_SETTINGS.subjects,
+                recentTopics: data.recentTopics || DEFAULT_SETTINGS.recentTopics,
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
@@ -501,13 +510,16 @@ export default function App() {
                     if (!session) return null;
 
                     if (Array.isArray(session)) { // Old format: ChatMessage[]
-                        return { messages: session.filter(Boolean), timestamp: new Date(0).toISOString() };
+                        const messages = session.filter(Boolean);
+                        return { id: messages[0]?.id || crypto.randomUUID(), messages, timestamp: new Date(0).toISOString() };
                     }
 
                     if (session && typeof session === 'object' && Array.isArray(session.messages)) {
                         // New format: ChatSession
+                        const messages = session.messages.filter(Boolean);
                         return {
-                            messages: session.messages.filter(Boolean),
+                            id: session.id || messages[0]?.id || crypto.randomUUID(),
+                            messages,
                             timestamp: session.timestamp || new Date(0).toISOString(),
                         };
                     }
@@ -583,11 +595,17 @@ export default function App() {
         if (!dataPathUid) return;
 
         setAuraChatSessions(prevSessions => {
-            const isAlreadySaved = prevSessions.some(session => JSON.stringify(session.messages) === JSON.stringify(messagesToSave));
-            if (isAlreadySaved) return prevSessions;
-
-            const newSession: ChatSession = { messages: messagesToSave, timestamp: new Date().toISOString() };
-            const newSessions = [newSession, ...prevSessions].slice(0, 10);
+            const sessionId = messagesToSave[0].id;
+            const existingSessionIndex = prevSessions.findIndex(session => session.id === sessionId || (session.messages && session.messages.length > 0 && session.messages[0].id === sessionId));
+            
+            let newSessions = [...prevSessions];
+            if (existingSessionIndex >= 0) {
+                newSessions[existingSessionIndex] = { ...newSessions[existingSessionIndex], messages: messagesToSave, timestamp: new Date().toISOString() };
+            } else {
+                const newSession: ChatSession = { id: sessionId, messages: messagesToSave, timestamp: new Date().toISOString() };
+                newSessions = [newSession, ...prevSessions].slice(0, 10);
+            }
+            
             update(ref(db, `users/${dataPathUid}`), { auraChatSessions: newSessions });
             return newSessions;
         });
@@ -713,19 +731,51 @@ export default function App() {
 
   const playFocusSound = useCallback((sound: string) => settings.sound && console.log(`Playing sound: ${sound}`), [settings.sound]);
 
-  const addFocusSession = useCallback((durationInSeconds: number, name?: string) => {
+  const addFocusSession = useCallback((durationInSeconds: number, name?: string, subject?: string) => {
     playFocusSound(settings.focusSound);
     vibrate('heavy');
     playUISound('success');
     const dataPathUid = masterUid || currentUser?.uid;
     if (!dataPathUid) return;
     const historyRef = ref(db, `users/${dataPathUid}/focusHistory`);
-    const newSessionRef = push(historyRef);
-    set(newSessionRef, {
-      date: new Date().toISOString(), duration: durationInSeconds, name: name || '', createdAt: serverTimestamp()
-    });
-    updateUserData({ completedSessions: (userProfile.completedSessions || 0) + 1 });
-  }, [currentUser, masterUid, playFocusSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate]);
+
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - durationInSeconds * 1000);
+
+    // Save recent topic
+    if (name && !settings.recentTopics?.includes(name)) {
+        const newRecentTopics = [name, ...(settings.recentTopics || [])].slice(0, 10);
+        updateUserData({ recentTopics: newRecentTopics });
+    }
+
+    // Check if start and end are on different days (local time)
+    if (startTime.getDate() !== endTime.getDate() || startTime.getMonth() !== endTime.getMonth() || startTime.getFullYear() !== endTime.getFullYear()) {
+      // Midnight split
+      const midnight = new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate(), 0, 0, 0, 0);
+      const duration1 = Math.floor((midnight.getTime() - startTime.getTime()) / 1000);
+      const duration2 = Math.floor((endTime.getTime() - midnight.getTime()) / 1000);
+
+      if (duration1 > 0) {
+        const newSessionRef1 = push(historyRef);
+        set(newSessionRef1, {
+          date: startTime.toISOString(), duration: duration1, name: name || '', subject: subject || '', createdAt: serverTimestamp()
+        });
+      }
+      if (duration2 > 0) {
+        const newSessionRef2 = push(historyRef);
+        set(newSessionRef2, {
+          date: endTime.toISOString(), duration: duration2, name: name || '', subject: subject || '', createdAt: serverTimestamp()
+        });
+      }
+      updateUserData({ completedSessions: (userProfile.completedSessions || 0) + (duration1 > 0 ? 1 : 0) + (duration2 > 0 ? 1 : 0) });
+    } else {
+      const newSessionRef = push(historyRef);
+      set(newSessionRef, {
+        date: endTime.toISOString(), duration: durationInSeconds, name: name || '', subject: subject || '', createdAt: serverTimestamp()
+      });
+      updateUserData({ completedSessions: (userProfile.completedSessions || 0) + 1 });
+    }
+  }, [currentUser, masterUid, playFocusSound, settings.focusSound, updateUserData, userProfile.completedSessions, vibrate, settings.recentTopics, setSettings]);
 
     const deleteMultipleFocusSessions = useCallback(async (ids: string[]): Promise<boolean> => {
         const dataPathUid = masterUid || currentUser?.uid;
@@ -812,7 +862,7 @@ export default function App() {
 
         if (timerState.duration >= MIN_DURATION_SECONDS) {
             setIsTimerFinished(true);
-            addFocusSession(timerState.duration, sessionName);
+            addFocusSession(timerState.duration, sessionName, sessionSubject);
         } else {
             resetTimer(false); // don't vibrate, just reset
             showAlertModal({ title: "Session Not Recorded", message: "Focus sessions must be at least 5 minutes to be recorded." });
@@ -1063,7 +1113,7 @@ export default function App() {
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
     focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, deleteMyEvent, playFocusSound, playUISound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, canGoBack: modalStack.length > 0, canGoForward: forwardStack.length > 0,
     timeLeft, timerDuration: timerState.duration, isTimerActive: timerState.isActive, isTimerFinished,
-    selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName,
+    selectTimerDuration, toggleTimer, resetTimer, setIsPillDragging, sessionName, setSessionName, sessionSubject, setSessionSubject,
     focusSearchQuery, setFocusSearchQuery,
     logoutUser, loginUserByName,
     showConfirmationModal, showAlertModal,
@@ -1080,7 +1130,7 @@ export default function App() {
     focusHistory, addFocusSession, deleteMultipleFocusSessions, myEvents, addMyEvent, deleteMyEvent, playFocusSound, vibrate, navigateTo, navigateBack, navigateForward, navigateToStackIndex, modalStack, forwardStack,
     auraChatSessions, saveChatSession, deleteChatSessions,
     timeLeft, timerState.duration, timerState.isActive, isTimerFinished,
-    selectTimerDuration, toggleTimer, resetTimer, sessionName,
+    selectTimerDuration, toggleTimer, resetTimer, sessionName, sessionSubject,
     focusSearchQuery,
     logoutUser, loginUserByName,
     showConfirmationModal, showAlertModal,
