@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-export type WidgetType = 'calendar' | 'countdown' | 'compact-calendar' | 'weather' | 'stats' | 'focus-analytics' | 'analog-clock' | 'digital-clock';
+export type WidgetType = 'calendar' | 'countdown' | 'compact-calendar' | 'weather' | 'stats' | 'focus-analytics' | 'analog-clock' | 'digital-clock' | 'daily-target' | 'subject-analytics';
 
 export enum Theme {
   Light = 'light',
@@ -47,6 +47,7 @@ export interface FocusSession {
   date: string;
   duration: number; // in seconds
   name?: string;
+  subject?: string;
   createdAt?: any; // For Firestore serverTimestamp
 }
 
@@ -66,7 +67,7 @@ export type FocusMusic = 'None' | 'Rain Drops' | 'Cafe Murmur' | 'Forest Creek' 
 export type AccentColor = 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'cyan' | 'indigo';
 
 export type AuraAiVoice = 'Zephyr' | 'Kore' | 'Puck' | 'Charon' | 'Fenrir';
-export type AuraAiTone = 'default' | 'funny' | 'professional';
+export type AuraAiTone = 'default' | 'funny' | 'professional' | 'adult';
 
 export interface CountdownEvent {
   id: string;
@@ -97,9 +98,13 @@ export interface Settings {
   showHomeWidget?: boolean;
   transparentWidget?: boolean;
   countdownEvents?: CountdownEvent[];
+  dailyTargetHours?: number;
+  subjects?: string[];
+  recentTopics?: string[];
 }
 
 export interface ChatSession {
+  id?: string;
   messages: ChatMessage[];
   timestamp: string; // ISO string
 }
