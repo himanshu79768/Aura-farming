@@ -36,7 +36,7 @@ const formatTotalTime = (totalSeconds: number) => {
 
 
 const StatsWidget: React.FC = () => {
-    const { focusHistory } = useAppContext();
+    const { focusHistory, settings } = useAppContext();
     const [[page, direction], setPage] = useState([0, 0]);
 
     const stats = useMemo(() => {
@@ -57,6 +57,7 @@ const StatsWidget: React.FC = () => {
 
     const statPages = [
         { icon: <BarChart3 size={18} />, title: "Today's Focus", value: stats.todaysMinutes, unit: 'minutes' },
+        { icon: <Award size={18} />, title: 'Daily Target', value: `${Math.round(stats.todaysMinutes / 60)}h ${stats.todaysMinutes % 60}m`, unit: `/ ${settings.dailyTargetHours || 4}h` },
         { icon: <Clock size={18} />, title: 'Total Time', value: formatTotalTime(stats.totalSeconds), unit: '' },
         { icon: <BarChart3 size={18} />, title: 'Total Sessions', value: stats.totalSessions, unit: 'sessions' },
         { icon: <Award size={18} />, title: 'Longest Session', value: stats.maxSessionMinutes, unit: 'minutes' },
