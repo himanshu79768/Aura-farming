@@ -1,16 +1,22 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenAI } from "@google/genai";
-import { TrendingUp, Award, CalendarDays, PieChart as PieChartIcon, Clock, Coffee, Sun, Moon, Sunrise, Sunset, Timer, Sparkles, Send, X, User as UserIcon } from 'lucide-react';
+import { TrendingUp, Award, CalendarDays, PieChart as PieChartIcon, Clock, Coffee, Sun, Moon, Sunrise, Sunset, Timer, Sparkles, Send, X, User as UserIcon, BookOpen } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
+import SearchBar from './SearchBar';
 import { ACCENT_COLORS } from '../constants';
 import OverscrollContainer from './OverscrollContainer';
 import { AccentColor, ChatMessage, FocusSession } from '../types';
 
 const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
 
-const getDayKey = (date: Date) => date.toISOString().split('T')[0];
+const getDayKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 type FilterRange = '7d' | '30d' | 'all';
 
@@ -283,7 +289,7 @@ interface AnalyticsData {
 }
 
 const FocusAnalyticsPage: React.FC = () => {
-    const { focusHistory, navigateBack, focusSearchQuery, settings, vibrate } = useAppContext();
+    const { focusHistory, navigateBack, focusSearchQuery, setFocusSearchQuery, settings, vibrate } = useAppContext();
     const [filter, setFilter] = useState<FilterRange>('7d');
     const [isAiSheetOpen, setIsAiSheetOpen] = useState(false);
 
@@ -296,7 +302,10 @@ const FocusAnalyticsPage: React.FC = () => {
 
     const filteredHistory = useMemo(() => {
         const searchFilteredHistory = focusSearchQuery.trim()
-            ? focusHistory.filter(session => session.name?.toLowerCase().includes(focusSearchQuery.toLowerCase()))
+            ? focusHistory.filter(session => 
+                session.name?.toLowerCase().includes(focusSearchQuery.toLowerCase()) || 
+                session.subject?.toLowerCase().includes(focusSearchQuery.toLowerCase())
+              )
             : focusHistory;
 
         if (filter === 'all') return searchFilteredHistory;
@@ -335,6 +344,7 @@ const FocusAnalyticsPage: React.FC = () => {
         const timeOfDayData: Record<string, number> = { 'Morning (6-12)': 0, 'Afternoon (12-6)': 0, 'Evening (6-12)': 0, 'Night (12-6)': 0 };
         const dayOfWeekData: Record<string, number> = { 'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0 };
         const sessionLengthData: Record<string, number> = { '0-15m': 0, '15-30m': 0, '30-60m': 0, '60m+': 0 };
+        const subjectData: Record<string, number> = {};
 
         filteredHistory.forEach(session => {
             const date = new Date(session.date);
@@ -353,17 +363,27 @@ const FocusAnalyticsPage: React.FC = () => {
             else if (minutes <= 30) sessionLengthData['15-30m']++;
             else if (minutes <= 60) sessionLengthData['30-60m']++;
             else sessionLengthData['60m+']++;
+
+            const subject = session.subject || 'Uncategorized';
+            subjectData[subject] = (subjectData[subject] || 0) + minutes;
         });
 
-        return { totalSeconds, longestSession, mostProductiveDay, timeOfDayData, dayOfWeekData, sessionLengthData, dailyTrendData };
+        return { totalSeconds, longestSession, mostProductiveDay, timeOfDayData, dayOfWeekData, sessionLengthData, dailyTrendData, subjectData };
     }, [filteredHistory]);
 
     return (
         <div className="w-full h-full flex flex-col">
             <Header title="Analytics" showBackButton onBack={navigateBack} />
+            <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4 pt-2 flex-shrink-0">
+                <SearchBar
+                    placeholder="Search sessions or subjects..."
+                    searchQuery={focusSearchQuery}
+                    setSearchQuery={setFocusSearchQuery}
+                />
+            </div>
             <OverscrollContainer className="flex-grow w-full overflow-y-auto">
                 <div className="w-full max-w-md md:max-w-4xl mx-auto p-4">
-                    <div className="pt-8 pb-24">
+                    <div className="pt-2 pb-24">
                         <div className="flex justify-between items-center mb-4 px-1">
                             <div className="flex items-center bg-light-glass dark:bg-dark-glass p-1 rounded-full border border-white/10">
                                 {(['7d', '30d', 'all'] as FilterRange[]).map(f => (
@@ -406,7 +426,7 @@ const FocusAnalyticsPage: React.FC = () => {
                                     />
                                 </ChartCard>
                                  <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>} className="md:col-span-2 lg:col-span-2">
-                                     <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
+                                     <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary pb-[20px]">
                                         {(() => {
                                             const dayDataValues = Object.values(analyticsData.dayOfWeekData);
                                             const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues.map(v => Number(v))) : 0;
@@ -414,8 +434,8 @@ const FocusAnalyticsPage: React.FC = () => {
                                                 const count = Number(countValue);
                                                 const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
                                                 return (
-                                                    <div key={day} className="flex flex-col items-center flex-grow h-full justify-end">
-                                                        <div className="font-semibold text-light-text dark:text-dark-text">{count}</div>
+                                                    <div key={day} className="flex flex-col items-center flex-grow h-full justify-end relative">
+                                                        <div className="font-semibold text-light-text dark:text-dark-text absolute -top-5">{count}</div>
                                                         <motion.div
                                                             className="w-full rounded-t-sm"
                                                             style={{ backgroundColor: chartColors[index % chartColors.length], height: `${height}%` }}
@@ -423,7 +443,7 @@ const FocusAnalyticsPage: React.FC = () => {
                                                             animate={{ scaleY: 1 }}
                                                             transition={{ type: 'spring', stiffness: 200, damping: 20 }}
                                                         />
-                                                        <div className="mt-1">{day}</div>
+                                                        <div className="absolute -bottom-[20px]">{day}</div>
                                                     </div>
                                                 );
                                             });
@@ -433,6 +453,51 @@ const FocusAnalyticsPage: React.FC = () => {
                                  <ChartCard title="Session Length Distribution" icon={<Timer size={16}/>} className="md:col-span-2 lg:col-span-3">
                                      <PieChart 
                                         data={Object.entries(analyticsData.sessionLengthData).map(([label, value]) => ({ label, value }))} 
+                                        colors={chartColors}
+                                    />
+                                 </ChartCard>
+                                 <ChartCard title="Daily Target Progress" icon={<Award size={16}/>} className="md:col-span-2 lg:col-span-3">
+                                     <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary relative pb-[20px]">
+                                        {(() => {
+                                            const targetMinutes = (settings.dailyTargetHours || 4) * 60;
+                                            const trendData = analyticsData.dailyTrendData.slice(-7); // Show last 7 days
+                                            const maxMinutes = Math.max(...trendData.map(d => d.minutes), targetMinutes);
+                                            
+                                            return (
+                                                <>
+                                                    {/* Target Line */}
+                                                    <div className="absolute w-full border-t border-dashed border-light-accent dark:border-dark-accent opacity-50 z-0" style={{ bottom: `calc(${(targetMinutes / maxMinutes) * 100}% + 20px)` }}>
+                                                        <span className="absolute -top-5 right-0 text-xs text-light-accent dark:text-dark-accent">{settings.dailyTargetHours || 4}h Target</span>
+                                                    </div>
+                                                    
+                                                    {trendData.map((data, index) => {
+                                                        const height = maxMinutes > 0 ? (data.minutes / maxMinutes) * 100 : 0;
+                                                        const isTargetMet = data.minutes >= targetMinutes;
+                                                        const dateObj = new Date(data.date);
+                                                        const dayStr = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
+                                                        
+                                                        return (
+                                                            <div key={data.date} className="flex flex-col items-center flex-grow h-full justify-end z-10 relative">
+                                                                <div className="font-semibold text-light-text dark:text-dark-text absolute -top-5">{Math.round(data.minutes / 60)}h {data.minutes % 60}m</div>
+                                                                <motion.div
+                                                                    className={`w-full rounded-t-sm ${isTargetMet ? 'bg-green-500' : 'bg-light-primary dark:bg-dark-primary'}`}
+                                                                    style={{ height: `${height}%` }}
+                                                                    initial={{ scaleY: 0, originY: 1 }}
+                                                                    animate={{ scaleY: 1 }}
+                                                                    transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                                                                />
+                                                                <div className="absolute -bottom-[20px]">{dayStr}</div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </>
+                                            );
+                                        })()}
+                                     </div>
+                                 </ChartCard>
+                                 <ChartCard title="Time by Subject" icon={<BookOpen size={16}/>} className="md:col-span-2 lg:col-span-3">
+                                     <PieChart 
+                                        data={Object.entries(analyticsData.subjectData).map(([label, value]) => ({ label, value }))} 
                                         colors={chartColors}
                                     />
                                  </ChartCard>
