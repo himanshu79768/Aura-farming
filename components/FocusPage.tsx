@@ -200,25 +200,25 @@ const FocusPage: React.FC = () => {
       settings, vibrate, mood,
       timeLeft, timerDuration, isTimerActive, isTimerFinished,
       selectTimerDuration, toggleTimer, resetTimer: resetTimerContext,
-      sessionName, setSessionName, navigateTo, addFocusSession, showAlertModal
+      sessionName, setSessionName, sessionSubject, setSessionSubject, navigateTo, addFocusSession, showAlertModal, setSettings
   } = useAppContext();
 
     // Auto-save on unmount
-    const timerStateRef = useRef({ isTimerActive, timeLeft, timerDuration, sessionName, mode, pomodoroState, isTimerFinished });
+    const timerStateRef = useRef({ isTimerActive, timeLeft, timerDuration, sessionName, sessionSubject, mode, pomodoroState, isTimerFinished });
     useEffect(() => {
-        timerStateRef.current = { isTimerActive, timeLeft, timerDuration, sessionName, mode, pomodoroState, isTimerFinished };
+        timerStateRef.current = { isTimerActive, timeLeft, timerDuration, sessionName, sessionSubject, mode, pomodoroState, isTimerFinished };
     });
 
     useEffect(() => {
         return () => {
-            const { isTimerActive, timeLeft, timerDuration, sessionName, mode, pomodoroState, isTimerFinished } = timerStateRef.current;
+            const { isTimerActive, timeLeft, timerDuration, sessionName, sessionSubject, mode, pomodoroState, isTimerFinished } = timerStateRef.current;
             const isPaused = !isTimerActive && timeLeft < timerDuration && timeLeft > 0 && !isTimerFinished;
 
             if (isPaused) {
                 const elapsed = timerDuration - timeLeft;
                 if (elapsed >= 300) { // 5 minutes minimum
                     const name = sessionName || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
-                    addFocusSession(elapsed, name);
+                    addFocusSession(elapsed, name, sessionSubject);
                 }
             }
         };
@@ -337,7 +337,8 @@ const FocusPage: React.FC = () => {
 
       if (elapsed >= MIN_DURATION_SECONDS) {
         const name = sessionName || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
-        addFocusSession(elapsed, name);
+        addFocusSession(elapsed, name, sessionSubject);
+        
         showAlertModal({ title: "Session Saved", message: `You've saved a ${Math.round(elapsed / 60)} minute session.`, type: 'success' });
       } else if (elapsed > 1) { // It was a session but too short
         showAlertModal({ title: "Session Not Saved", message: "Focus sessions must be at least 5 minutes to be recorded." });
@@ -404,8 +405,34 @@ const FocusPage: React.FC = () => {
                     <TimerRing progress={progress} mood={mood} isShining={showShine} />
                     <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
                 </div>
-                <div className="w-full max-w-xs my-6">
-                    <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session (e.g., Chapter 1)" disabled={isTimerActive} className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary disabled:opacity-50"/>
+                <div className="w-full max-w-xs my-6 flex flex-col gap-3">
+                    <select 
+                        value={sessionSubject} 
+                        onChange={(e) => setSessionSubject(e.target.value)} 
+                        disabled={isTimerActive} 
+                        className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center disabled:opacity-50 appearance-none"
+                    >
+                        <option value="">Select Subject (Optional)</option>
+                        {(settings.subjects || ['Accounts', 'Law', 'Economics', 'Maths', 'LR', 'Stats']).map(sub => (
+                            <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                    </select>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            value={sessionName} 
+                            onChange={(e) => setSessionName(e.target.value)} 
+                            placeholder="Topic (e.g., Chapter 1)" 
+                            disabled={isTimerActive} 
+                            list="recent-topics"
+                            className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary disabled:opacity-50"
+                        />
+                        <datalist id="recent-topics">
+                            {(settings.recentTopics || []).map(topic => (
+                                <option key={topic} value={topic} />
+                            ))}
+                        </datalist>
+                    </div>
                 </div>
                 <div className="flex space-x-2 mb-8 items-center justify-center h-10">
                     <AnimatePresence mode="wait">
@@ -480,8 +507,34 @@ const FocusPage: React.FC = () => {
                     <TimerRing progress={progress} mood={mood} isShining={showShine} />
                     <div className="absolute text-5xl font-mono tracking-tighter pointer-events-none">{formatTime(timeLeft)}</div>
                 </div>
-                <div className="w-full max-w-xs my-6">
-                    <input type="text" value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Name your session..." disabled={isTimerActive} className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-full border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary disabled:opacity-50"/>
+                <div className="w-full max-w-xs my-6 flex flex-col gap-3">
+                    <select 
+                        value={sessionSubject} 
+                        onChange={(e) => setSessionSubject(e.target.value)} 
+                        disabled={isTimerActive} 
+                        className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center disabled:opacity-50 appearance-none"
+                    >
+                        <option value="">Select Subject (Optional)</option>
+                        {(settings.subjects || ['Accounts', 'Law', 'Economics', 'Maths', 'LR', 'Stats']).map(sub => (
+                            <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                    </select>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            value={sessionName} 
+                            onChange={(e) => setSessionName(e.target.value)} 
+                            placeholder="Topic (e.g., Chapter 1)" 
+                            disabled={isTimerActive} 
+                            list="recent-topics"
+                            className="w-full px-4 py-3 bg-light-glass/80 dark:bg-dark-glass/80 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-all text-center placeholder:text-light-text-secondary dark:placeholder:text-dark-text-secondary disabled:opacity-50"
+                        />
+                        <datalist id="recent-topics">
+                            {(settings.recentTopics || []).map(topic => (
+                                <option key={topic} value={topic} />
+                            ))}
+                        </datalist>
+                    </div>
                 </div>
                 <div className="h-10 mb-8" />
                 <div className="relative flex items-center space-x-6">
