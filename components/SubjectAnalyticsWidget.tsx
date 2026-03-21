@@ -43,7 +43,7 @@ return (
     <div className="w-full h-full p-6 flex flex-col justify-between 
         bg-light-card dark:bg-dark-card 
         text-light-card-foreground dark:text-dark-card-foreground 
-        rounded-[18px]">
+        rounded-2xl">
         
         <div>
             <h3 className="font-semibold text-left text-base flex items-center gap-2">
@@ -53,6 +53,9 @@ return (
                 Last 7 days
             </p>
         </div>
+
+    </div>
+)
 
     </div>
 )
