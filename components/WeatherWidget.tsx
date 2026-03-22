@@ -194,7 +194,7 @@ const WeatherWidget: React.FC = () => {
     const displayItems = [...weatherCities, { id: 'add', name: 'Add' }];
 
     return (
-        <div className="w-full h-full flex flex-col justify-between bg-light-card dark:bg-dark-card text-light-card-foreground dark:text-dark-card-foreground">
+        <div className="w-full h-full flex flex-col justify-between text-light-card-foreground dark:text-dark-card-foreground">
             <AnimatePresence>
                 {isEditMode ? (
                     <motion.div key="edit-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-10 bg-light-card dark:bg-dark-card p-4 flex flex-col">
