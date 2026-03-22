@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Quote, Mood, AuraData, AITask } from '../types';
 
-const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
+const API_KEY = "AIzaSyDQa5cGHDW9foJQDu6NHXF7qZ9wkMfAr34";
 
 export const fetchQuotes = async (): Promise<Quote[]> => {
   try {
