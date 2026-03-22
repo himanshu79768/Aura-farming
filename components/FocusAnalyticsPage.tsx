@@ -9,7 +9,7 @@ import { ACCENT_COLORS } from '../constants';
 import OverscrollContainer from './OverscrollContainer';
 import { AccentColor, ChatMessage, FocusSession } from '../types';
 
-const API_KEY = "AIzaSyA49vGVlbtSfVov5eCgQ4ZtHRIdeRI1d9s";
+const API_KEY = "AIzaSyDQa5cGHDW9foJQDu6NHXF7qZ9wkMfAr34";
 
 const getDayKey = (date: Date) => {
     const year = date.getFullYear();
