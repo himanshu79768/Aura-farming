@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, BookOpen, ChevronDown, Repeat, TextSelect, ChevronRight, Trash2, Settings as SettingsIcon } from 'lucide-react';
-import { GoogleGenAI, Chat, Part, Modality, Type, FunctionDeclaration, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Chat, Part, Modality, Type, FunctionDeclaration } from "@google/genai";
 import * as pdfjsLib from 'pdfjs-dist';
-import { useAppContext } from '../AppContext';
+import { useAppContext } from '../App';
 import Header from './Header';
 import { ChatMessage, JournalEntry, ChatSession } from '../types';
 import AttachmentTypeModal from './AttachmentTypeModal';
@@ -736,7 +736,7 @@ const ThinkingBubble: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             className="flex items-start gap-3 w-full max-w-full justify-start"
         >
-            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-[#ffffff] text-black">
+            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black">
                 <BrainCircuit size={18} />
             </div>
             <div className="flex items-center gap-2 text-sm text-black p-3 bg-[#f4f4f4] rounded-2xl rounded-bl-lg">
@@ -761,7 +761,7 @@ const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
             transition={{ duration: 0.3 }}
             className="flex items-start gap-3 w-full max-w-full justify-start"
         >
-            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-[#ffffff] text-black">
+            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black">
                 <Sparkles size={18} />
             </div>
             <div className="flex items-center gap-2 text-sm text-black p-3 bg-[#f4f4f4] rounded-2xl rounded-bl-lg">
@@ -772,7 +772,7 @@ const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
 };
 
 const AuraAiPage: React.FC = () => {
-    const { journalEntries, addJournalEntry, setSettings, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound, modalStack } = useAppContext();
+    const { journalEntries, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound, modalStack } = useAppContext();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -958,28 +958,12 @@ const AuraAiPage: React.FC = () => {
     messagesRef.current = messages;
     
     useEffect(() => {
-        const handleBeforeUnload = () => {
-            if (messagesRef.current.length > 0) {
-                saveChatSession(messagesRef.current);
-            }
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
         return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
             if (messagesRef.current.length > 0) {
                 saveChatSession(messagesRef.current);
             }
         };
     }, [saveChatSession]);
-
-    // Save session when messages change (debounced)
-    useEffect(() => {
-        if (messages.length === 0) return;
-        const timeoutId = setTimeout(() => {
-            saveChatSession(messages);
-        }, 2000);
-        return () => clearTimeout(timeoutId);
-    }, [messages, saveChatSession]);
 
     // Speech Recognition & TTS cleanup
     useEffect(() => {
@@ -1069,8 +1053,7 @@ const AuraAiPage: React.FC = () => {
 
         const userMessagePartsForDisplay: Part[] = [];
         attachments.forEach(attachment => {
-            const data = attachment.data.includes(',') ? attachment.data.split(',')[1] : attachment.data;
-            userMessagePartsForDisplay.push({ inlineData: { data, mimeType: attachment.mimeType, name: attachment.name } as any });
+            userMessagePartsForDisplay.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType, name: attachment.name } });
         });
         if (currentInput.trim()) {
             userMessagePartsForDisplay.push({ text: currentInput.trim() });
@@ -1095,17 +1078,8 @@ const AuraAiPage: React.FC = () => {
             });
             const currentTime = new Date().toLocaleTimeString();
             const userName = userProfile.name || 'friend';
-            
-            let toneInstruction = "Your personality is warm, empathetic, and exceptionally capable.";
-            if (settings.auraAiTone === 'funny') {
-                toneInstruction = "Your personality is hilarious, witty, and exceptionally capable. Use humor and jokes often.";
-            } else if (settings.auraAiTone === 'professional') {
-                toneInstruction = "Your personality is formal, concise, and exceptionally capable. Be direct and professional.";
-            } else if (settings.auraAiTone === 'adult') {
-                toneInstruction = "Your personality is mature, direct, unfiltered, and exceptionally capable. You may use strong language and discuss adult topics freely.";
-            }
 
-            const systemInstruction = `You are Aura, an advanced and highly intelligent AI companion. ${toneInstruction} ALWAYS use emojis to make the conversation vibrant 😃.
+            const systemInstruction = `You are Aura, an advanced and highly intelligent AI companion. Your personality is warm, empathetic, and exceptionally capable. ALWAYS use emojis to make the conversation vibrant 😃.
 Current context: Date: ${currentDate}, Time: ${currentTime}. User: ${userName}.
 
 **Core Capabilities:**
@@ -1146,7 +1120,7 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
                                 type: Type.OBJECT,
                                 properties: {
                                     theme: { type: Type.STRING, enum: ["light", "dark", "system"], description: "The app theme." },
-                                    auraAiTone: { type: Type.STRING, enum: ["default", "funny", "professional", "adult"], description: "The AI's personality tone." },
+                                    auraAiTone: { type: Type.STRING, enum: ["balanced", "funny", "professional"], description: "The AI's personality tone." },
                                     auraAiVoice: { type: Type.STRING, description: "The AI's voice name (e.g., Zephyr, Puck, Fenrir)." }
                                 }
                             }
@@ -1205,18 +1179,23 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
             let currentThinkingSteps: string[] = [];
 
             const result = await ai.models.generateContentStream({
-                model: isResearchMode ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+                model: 'gemini-2.5-flash',
                 contents: [...historyForApi, { role: 'user', parts: userMessagePartsForApi }],
                 config: { 
                     systemInstruction,
                     tools,
-                    thinkingConfig: isResearchMode ? { thinkingLevel: ThinkingLevel.HIGH } : undefined
+                    thinkingConfig: isResearchMode ? { thinkingLevel: 'HIGH' } : undefined
                 }
             });
 
             setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
 
             for await (const chunk of result) {
+                if (chunk.thinkingState?.lastAction) {
+                    currentThinkingSteps.push(chunk.thinkingState.lastAction);
+                    setMessages(prev => prev.map(m => m.id === modelMessageId ? { ...m, thinkingSteps: [...new Set(currentThinkingSteps)] } : m));
+                }
+
                 if (chunk.text) {
                     fullResponseText += chunk.text;
                     setMessages(prev => prev.map(msg => 
@@ -1228,18 +1207,20 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
                     for (const call of chunk.functionCalls) {
                         if (call.name === "create_journal_entry") {
                             const args = call.args as any;
-                            addJournalEntry({
+                            const newEntry: JournalEntry = {
+                                id: crypto.randomUUID(),
                                 title: args.title,
                                 content: args.content,
                                 date: new Date().toISOString(),
                                 mood: args.mood || 'Reflective',
                                 tags: args.tags || [],
                                 attachments: []
-                            });
+                            };
+                            addJournalEntry(newEntry);
                             fullResponseText += `\n\n*(Aura: I've created a new journal entry for you titled "${args.title}"! 📖)*`;
                         } else if (call.name === "update_app_settings") {
                             const args = call.args as any;
-                            setSettings(prev => ({ ...prev, ...args }));
+                            updateSettings(args);
                             fullResponseText += `\n\n*(Aura: I've updated your settings as requested! ⚙️)*`;
                         }
                         
@@ -1695,7 +1676,7 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
     <motion.div key="initial-view" className="flex-grow flex flex-col items-center justify-center text-center px-4">
         <div className="flex flex-col items-center justify-center">
             <motion.div exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }} className="flex flex-col items-center">
-                <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-[#ffffff] border border-black/5">
+                <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-[#f4f4f4] border border-black/5">
                     <Sparkles size={40} className="text-black"/>
                 </div>
                 <h2 className="text-2xl font-semibold">How can I help you today?</h2>
@@ -1784,7 +1765,7 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
                                             onPointerUp={handlePointerUp}
                                             onPointerLeave={handlePointerUp}
                                         >
-                                            {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-[#ffffff] text-black"><Sparkles size={18} /></div>}
+                                            {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black"><Sparkles size={18} /></div>}
                                             <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
                                                 {msg.role === 'user' ? (
                                                     (hasText || hasAttachments) && (
@@ -1826,7 +1807,7 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
                                                     </div>
                                                 )}
                                             </div>
-                                            {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-[#f4f4f4] text-black"><UserIcon size={18} /></div>}
+                                            {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black"><UserIcon size={18} /></div>}
                                         </div>
                                     )}
                                     <AnimatePresence>
@@ -1851,23 +1832,23 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
                     </div>
                 </motion.div>
             </OverscrollContainer>
-             <div className="absolute bottom-0 left-0 right-0 p-4 pl-[13.4px] pt-10 bg-gradient-to-t from-[#f4f4f4] via-[#f4f4f4]/80 to-transparent">
+             <div className="absolute bottom-0 left-0 right-0 p-4 pt-10 bg-gradient-to-t from-[#f4f4f4] via-[#f4f4f4]/80 to-transparent">
                 <AnimatePresence>{attachments.length > 0 && <motion.div className="w-full pb-2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}><div className="flex gap-3 overflow-x-auto pb-2">{attachments.map(att => <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />)}</div></motion.div>}</AnimatePresence>
                  <motion.div layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} className="relative">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-end p-2 rounded-[57.4px] bg-[#ffffff] border-none transition-colors shadow-lg">
+                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-end p-2 rounded-[70.4px] bg-[#ffffff] border-none transition-colors shadow-lg">
                         <button type="button" onClick={handleAttachmentClick} className="p-3 text-black hover:bg-black/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file"><Paperclip size={20} /></button>
                         <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className={`w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2.5 text-black ${input.includes('```') ? 'font-mono' : ''}`} />
                         <div className="flex items-center gap-1 flex-shrink-0">
                             <button 
                                 type="button" 
                                 onClick={() => { vibrate(); setIsResearchMode(!isResearchMode); }} 
-                                className={`p-2 mb-[5px] rounded-full transition-all duration-300 ${isResearchMode ? 'bg-black text-white shadow-md' : 'text-black hover:bg-black/5'}`}
+                                className={`p-2 rounded-full transition-all duration-300 ${isResearchMode ? 'bg-black text-white shadow-md' : 'text-black hover:bg-black/5'}`}
                                 aria-label="Toggle Research Mode"
                             >
                                 <BrainCircuit size={20} />
                             </button>
-                            <button type="button" onClick={handleMicClick} className={`p-2 mb-[5px] rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-black hover:bg-black/5'}`} style={{ marginRight: '1px', marginLeft: '1px', paddingLeft: '1px', paddingRight: '1px', paddingBottom: '-9px' }}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
-                            <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 mb-[5px] flex items-center justify-center bg-black text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
+                            <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-black hover:bg-black/5'}`} style={{ marginRight: '1px', marginLeft: '1px', paddingLeft: '1px', paddingRight: '1px', paddingBottom: '-9px', marginBottom: '3px' }}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
+                            <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-black text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
                         </div>
                     </form>
                 </motion.div>
@@ -1877,8 +1858,8 @@ You are smarter, faster, and more proactive. Don't just answer; anticipate needs
 
     return (
         <div className="w-full h-full flex flex-col bg-[#ffffff] font-['Montserrat',_Arial,_sans-serif] text-black">
-            <Header title="Aura AI" showBackButton onBack={handleBack} rightAction={HeaderActions} titleClassName="text-black" className="bg-[#ffffff]" />
-            <div className="absolute top-[64px] left-0 right-0 h-16 bg-gradient-to-b from-[#ffffff] to-transparent z-10 pointer-events-none" />
+            <Header title="Aura AI" showBackButton onBack={handleBack} rightAction={HeaderActions} titleClassName="text-black" />
+            <div className="absolute top-[64px] left-0 right-0 h-16 bg-gradient-to-b from-[#f4f4f4] to-transparent z-10 pointer-events-none" />
             <ContextMenu />
             <AnimatePresence>
                 {isHistoryOpen && (
