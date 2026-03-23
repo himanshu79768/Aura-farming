@@ -1149,6 +1149,7 @@ export default function App() {
     toggleSearch,
     isAiLoading, setIsAiLoading,
     triggerMagicTransition,
+    syllabus: settings.syllabus,
   }), [
     mood, handleSetMood, settings, handleSetSettings, quotes, favoriteQuotes, toggleFavorite,
     userProfile, updateUserName, journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, deleteMultipleJournalEntries, duplicateJournalEntry,
@@ -1165,6 +1166,7 @@ export default function App() {
     isImmersive, toggleImmersive,
     toggleSearch,
     triggerMagicTransition,
+    settings.syllabus,
   ]);
   
   if (isLoading) {
