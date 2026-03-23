@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon, Trash2, Check } from 'lucide-react';
-import { useAppContext } from '../App';
+import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon, Trash2, Check, Filter } from 'lucide-react';
+import { useAppContext } from '../AppContext';
 import { JournalEntry } from '../types';
 import Header from './Header';
 import SearchBar from './SearchBar';
@@ -17,6 +17,18 @@ interface JournalListItemProps {
 }
 
 const JournalListItem: React.FC<JournalListItemProps> = React.memo(({ entry, isSelected, isSelectionMode, onClick, onPointerDown, onPointerUpOrLeave }) => {
+    const { settings } = useAppContext();
+    
+    const getSubjectColor = (title: string) => {
+        if (!title) return 'bg-gray-500/20 text-gray-500';
+        const upperTitle = title.toUpperCase();
+        if (upperTitle.includes('ACCOUNTING')) return 'bg-blue-500/20 text-blue-500';
+        if (upperTitle.includes('LAWS')) return 'bg-slate-500/20 text-slate-500';
+        if (upperTitle.includes('APTITUDE')) return 'bg-yellow-500/20 text-yellow-500';
+        if (upperTitle.includes('ECONOMICS')) return 'bg-red-500/20 text-red-500';
+        return 'bg-light-accent/20 text-light-accent dark:text-dark-accent';
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -55,9 +67,16 @@ const JournalListItem: React.FC<JournalListItemProps> = React.memo(({ entry, isS
                         <LinkIcon size={14} className="text-light-text-secondary dark:text-dark-text-secondary shrink-0" />
                     )}
                 </div>
-                <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
-                    {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}
-                </p>
+                <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                        {new Date(entry.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </p>
+                    {entry.subject && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getSubjectColor(entry.subject)}`}>
+                            {entry.subject}
+                        </span>
+                    )}
+                </div>
             </div>
         </motion.div>
     );
@@ -72,6 +91,7 @@ const JournalPage: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [sortBy, setSortBy] = useState<'date' | 'subject'>('date');
     
     const longPressTimerRef = useRef<number>();
     const isLongPress = useRef(false);
@@ -119,16 +139,29 @@ const JournalPage: React.FC = () => {
         });
     }, [journalEntries, searchQuery, selectedDate, focusHistory]);
     
-    const groupedEntries = filteredEntries.reduce<Record<string, JournalEntry[]>>((acc, entry) => {
-        const date = new Date(entry.date).toLocaleDateString(undefined, {
-            year: 'numeric', month: 'long', day: 'numeric'
-        });
-        if (!acc[date]) {
-            acc[date] = [];
+    const groupedEntries = useMemo(() => {
+        if (sortBy === 'subject') {
+            return filteredEntries.reduce<Record<string, JournalEntry[]>>((acc, entry) => {
+                const subject = entry.subject || 'No Subject';
+                if (!acc[subject]) {
+                    acc[subject] = [];
+                }
+                acc[subject].push(entry);
+                return acc;
+            }, {});
         }
-        acc[date].push(entry);
-        return acc;
-    }, {});
+
+        return filteredEntries.reduce<Record<string, JournalEntry[]>>((acc, entry) => {
+            const date = new Date(entry.date).toLocaleDateString(undefined, {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+            if (!acc[date]) {
+                acc[date] = [];
+            }
+            acc[date].push(entry);
+            return acc;
+        }, {});
+    }, [filteredEntries, sortBy]);
 
     const generateCalendarDays = (date: Date) => {
         const year = date.getFullYear();
@@ -241,6 +274,15 @@ const JournalPage: React.FC = () => {
         )
     } : {
         title: "Journal",
+        leftAction: (
+            <motion.button 
+                onClick={() => setSortBy(prev => prev === 'date' ? 'subject' : 'date')}
+                className={`p-2 rounded-full transition-colors ${sortBy === 'subject' ? 'bg-light-primary/20 dark:bg-dark-primary/20 text-light-primary dark:text-dark-primary' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                whileTap={{ scale: 0.9 }}
+            >
+                <Filter size={20} />
+            </motion.button>
+        ),
         rightAction: (
             <motion.button 
                 onClick={handleToggleCalendar}
