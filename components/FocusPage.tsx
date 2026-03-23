@@ -137,15 +137,15 @@ const FocusPage: React.FC = () => {
               const isLongBreakTime = pomodoroState.round % SESSIONS_BEFORE_LONG_BREAK === 0;
               if (isLongBreakTime) {
                   setPomodoroState(s => ({ ...s, phase: 'longBreak' }));
-                  selectTimerDuration(POMODORO_DURATIONS.longBreak / 60, true);
+                  selectTimerDuration(POMODORO_DURATIONS.longBreak / 60, false);
               } else {
                   setPomodoroState(s => ({ ...s, phase: 'shortBreak' }));
-                  selectTimerDuration(POMODORO_DURATIONS.shortBreak / 60, true);
+                  selectTimerDuration(POMODORO_DURATIONS.shortBreak / 60, false);
               }
           } else {
               const newRound = pomodoroState.phase === 'longBreak' ? 1 : pomodoroState.round + 1;
               setPomodoroState({ round: newRound, phase: 'focus' });
-              selectTimerDuration(POMODORO_DURATIONS.focus / 60, true);
+              selectTimerDuration(POMODORO_DURATIONS.focus / 60, false);
           }
       }
       const timer = setTimeout(startNextPhase, 5000);
@@ -291,7 +291,7 @@ const FocusPage: React.FC = () => {
                               setModeIndex(index); 
                               if (modes[index] === 'pomodoro') {
                                   setPomodoroState({ round: 1, phase: 'focus' });
-                                  selectTimerDuration(POMODORO_DURATIONS.focus / 60, true);
+                                  selectTimerDuration(POMODORO_DURATIONS.focus / 60, false);
                               } else {
                                   resetTimer(); 
                               }
