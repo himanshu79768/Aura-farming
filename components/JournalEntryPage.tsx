@@ -1,2068 +1,2420 @@
-
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, User as UserIcon, Copy, Share2, ThumbsUp, ThumbsDown, Check, Mic, Paperclip, SquarePen, MicOff, X, Image as ImageIcon, FileText, Clock, BookText, BrainCircuit, Wind, CheckCircle, MessageSquare, BookOpen, ChevronDown, Repeat, TextSelect, ChevronRight, Trash2, Settings as SettingsIcon } from 'lucide-react';
-import { GoogleGenAI, Chat, Part, Modality, Type, FunctionDeclaration } from "@google/genai";
-import * as pdfjsLib from 'pdfjs-dist';
-import { useAppContext } from '../App';
+import { 
+    Trash2, Loader, Link as LinkIcon, Paperclip, 
+    LoaderCircle, FileImage, FileText, FileQuestion, MoreHorizontal, Search, Copy, Repeat, ArrowLeftRight,
+    Lock, Undo, Redo, ChevronsRight, Check, Heading2, List, ListOrdered, Minus, Table,
+    Bold, Italic, Underline, Strikethrough, Highlighter, Palette as PaletteIcon, TextSelect,
+    Sparkles, Wand2, BookText, BrainCircuit, MessageSquare, ArrowLeft, Pilcrow, CaseUpper,
+    ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, Rows3, Columns3, Trash,
+    Image as ImageIcon, UploadCloud
+} from 'lucide-react';
+import { useAppContext } from '../AppContext';
+import { JournalEntry, Attachment, AITask } from '../types';
 import Header from './Header';
-import { ChatMessage, JournalEntry, ChatSession } from '../types';
-import AttachmentTypeModal from './AttachmentTypeModal';
+import PdfViewer from './PdfViewer';
+import { processJournalWithAI, generateImageForJournal } from '../services/geminiService';
 import OverscrollContainer from './OverscrollContainer';
-import SearchBar from './SearchBar';
-import { generateImageForJournal } from '../services/geminiService';
 
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
-const API_KEY = "AIzaSyDQa5cGHDW9foJQDu6NHXF7qZ9wkMfAr34";
-
-const ALLOWED_MIME_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'application/pdf',
-  'application/msword', // .doc
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-  'application/vnd.ms-powerpoint', // .ppt
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+const FONT_COLORS = [
+  { name: 'Default', value: 'inherit', isDefault: true },
+  { name: 'Red', value: '#ef4444' }, // red-500
+  { name: 'Orange', value: '#f97316' }, // orange-500
+  { name: 'Green', value: '#16a34a' }, // green-600
+  { name: 'Blue', value: '#2563eb' }, // blue-600
+  { name: 'Purple', value: '#7e22ce' }, // purple-700
 ];
 
-const dataURLToUint8Array = (dataURL: string) => {
-    const base64 = dataURL.split(',')[1];
-    if (!base64) return new Uint8Array(0);
-    try {
-        const binary_string = window.atob(base64);
-        const len = binary_string.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binary_string.charCodeAt(i);
-        }
-        return bytes;
-    } catch (e) {
-        console.error("Failed to decode base64 string:", e);
-        return new Uint8Array(0);
-    }
-};
+const HIGHLIGHT_COLORS = [
+  { name: 'None', value: 'transparent', isNone: true },
+  { name: 'Yellow', value: '#fef08a' }, // yellow-200
+  { name: 'Pink', value: '#fbcfe8' }, // pink-200
+  { name: 'Blue', value: '#bfdbfe' }, // blue-200
+  { name: 'Green', value: '#a7f3d0' }, // emerald-200
+  { name: 'Purple', value: '#e9d5ff' }, // purple-200
+];
 
-const markdownToPlainText = (markdown: string): string => {
-    let text = markdown;
+interface JournalEntryPageProps {
+    entry?: JournalEntry;
+}
 
-    // KaTeX formulas - attempt to simplify
-    text = text.replace(/\$\$(.*?)\$\$/gs, (match, formula) => {
-        return formula
-            .replace(/\\frac\{(.*?)\}\{(.*?)\}/g, '($1) / ($2)')
-            .replace(/\\text\{(.*?)\}/g, '$1')
-            .replace(/\\/g, '')
-            .replace(/\{/g, '(')
-            .replace(/\}/g, ')')
-            .replace(/_/g, '_') // Keep subscript character for context
-            .replace(/\s+/g, ' ')
-            .trim();
+const compressImage = (file: File, options: { quality?: number; maxWidth?: number; maxHeight?: number }): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const { quality = 0.85, maxWidth = 1920, maxHeight = 1920 } = options;
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new window.Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let { width, height } = img;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    return reject(new Error('Could not get canvas context'));
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob) {
+                            const fileName = file.name || `image-${Date.now()}.jpg`;
+                            const newFile = new File([blob], fileName.replace(/\.[^/.]+$/, ".jpg"), {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            });
+                            resolve(newFile);
+                        } else {
+                            reject(new Error('Canvas to Blob conversion failed'));
+                        }
+                    },
+                    'image/jpeg',
+                    quality
+                );
+            };
+            img.onerror = (error) => reject(error);
+        };
+        reader.onerror = (error) => reject(error);
     });
-
-    // Image generation syntax
-    text = text.replace(/!\[Image:\s*([\s\S]*?)\]/g, '[Generated Image: $1]');
-
-    // Headings
-    text = text.replace(/^#+\s+/gm, '');
-
-    // Bold, Italic, Strikethrough, Underline from custom markdown
-    text = text.replace(/\*\*(.*?)\*\*/g, '$1');
-    text = text.replace(/__(.*?)__/g, '$1');
-    text = text.replace(/\*(.*?)\*/g, '$1');
-    text = text.replace(/~~(.*?)~~/g, '$1');
-
-    // Links
-    text = text.replace(/\[(.*?)\]\(.*?\)/g, '$1');
-
-    // Lists
-    text = text.replace(/^\s*[-*]\s+/gm, '• ');
-    
-    // Ordered Lists
-    const olItems = text.match(/^\s*\d+\.\s+/gm);
-    if (olItems) {
-        let counter = 1;
-        text = text.replace(/^\s*\d+\.\s+/gm, () => `  ${counter++}. `);
-    }
-
-
-    // Horizontal Rule
-    text = text.replace(/^---$/gm, '------------------');
-
-    // Code blocks
-    text = text.replace(/```(\w*\n)?([\s\S]+?)```/g, '$2');
-    // Inline code
-    text = text.replace(/`(.*?)`/g, '$1');
-
-    return text.trim();
 };
 
+const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
 
-const ImageGenerator: React.FC<{ prompt: string }> = ({ prompt }) => {
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+const AttachmentIcon = ({ type }: { type: string }) => {
+    if (type.startsWith('image/')) return <FileImage size={24} className="text-purple-400 shrink-0" />;
+    if (type === 'application/pdf') return <FileText size={24} className="text-red-400 shrink-0" />;
+    return <FileQuestion size={24} className="text-gray-400 shrink-0" />;
+};
+
+const ImageResizer = ({ targetElement, onResizeEnd, editorRef, isLocked }: { targetElement: HTMLImageElement, onResizeEnd: () => void, editorRef: React.RefObject<HTMLDivElement>, isLocked: boolean }) => {
+    const resizeDataRef = useRef<{ startX: number, startWidth: number } | null>(null);
+    const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
 
     useEffect(() => {
-        let isMounted = true;
-        const generate = async () => {
-            if (!prompt) {
-                setError("Empty prompt.");
-                setIsLoading(false);
-                return;
-            }
-            try {
-                const base64Data = await generateImageForJournal(prompt);
-                if (isMounted) {
-                    if (base64Data) {
-                        setImageUrl(`data:image/png;base64,${base64Data}`);
-                    } else {
-                        setError("Failed to generate image.");
-                    }
-                    setIsLoading(false);
-                }
-            } catch (err) {
-                if (isMounted) {
-                    console.error("Image generation error:", err);
-                    setError("An error occurred during generation.");
-                    setIsLoading(false);
-                }
-            }
+        const scroller = editorRef.current?.parentElement;
+        const positioningContainer = scroller?.parentElement;
+
+        const updatePosition = () => {
+            if (!targetElement || !scroller || !positioningContainer) return;
+
+            const rect = targetElement.getBoundingClientRect();
+            const containerRect = positioningContainer.getBoundingClientRect();
+
+            setPosition({
+                top: rect.top - containerRect.top + scroller.scrollTop,
+                left: rect.left - containerRect.left,
+                width: rect.width,
+                height: rect.height,
+            });
         };
 
-        generate();
+        const observer = new ResizeObserver(updatePosition);
+        observer.observe(targetElement);
+        
+        updatePosition();
+        scroller?.addEventListener('scroll', updatePosition);
+        window.addEventListener('resize', updatePosition);
 
-        return () => { isMounted = false; };
-    }, [prompt]);
+        return () => {
+            observer.disconnect();
+            scroller?.removeEventListener('scroll', updatePosition);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [targetElement, editorRef]);
 
-    if (isLoading) {
-        return (
-            <div className="my-2 p-4 rounded-lg bg-black/5 dark:bg-white/5 animate-pulse flex flex-col items-center justify-center h-48 border border-white/10">
-                <ImageIcon size={32} className="text-light-text-secondary dark:text-dark-text-secondary" />
-                <p className="text-sm text-center text-light-text-secondary dark:text-dark-text-secondary mt-2">Generating image for:</p>
-                <p className="text-sm text-center text-light-text-secondary dark:text-dark-text-secondary font-medium italic">"{decodeURIComponent(prompt)}"</p>
-            </div>
-        );
-    }
-
-    if (error) {
-        return <p className="text-red-500 text-sm my-2">Error generating image: {error}</p>;
-    }
-
-    if (imageUrl) {
-        const decodedPrompt = decodeURIComponent(prompt);
-        return (
-             <figure className="my-2">
-                <img src={imageUrl} alt={decodedPrompt} className="max-w-full rounded-lg border border-white/10" />
-                <figcaption className="text-sm text-center text-light-text-secondary dark:text-dark-text-secondary mt-2 italic">
-                    {decodedPrompt}
-                </figcaption>
-            </figure>
-        );
-    }
-
-    return null;
-};
-
-const CodeBlock: React.FC<{ codeWithLang: string }> = ({ codeWithLang }) => {
-    const [isCopied, setIsCopied] = useState(false);
-    const codeRef = useRef<HTMLElement>(null);
-
-    const fullCode = codeWithLang.replace(/^```(\w*\n)?|```$/g, '');
-    const lang = codeWithLang.match(/^```(\w*)/)?.[1] || '';
-
-    const handleCopy = () => {
-        if (codeRef.current) {
-            navigator.clipboard.writeText(codeRef.current.innerText);
-            setIsCopied(true);
-            setTimeout(() => setIsCopied(false), 2000);
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        const scroller = editorRef.current?.parentElement;
+        if (scroller) {
+            scroller.style.overflowY = 'hidden';
         }
+        if (editorRef.current) {
+            editorRef.current.contentEditable = 'false';
+        }
+
+        const rect = targetElement.getBoundingClientRect();
+        resizeDataRef.current = {
+            startX: e.clientX,
+            startWidth: rect.width,
+        };
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+        if (!resizeDataRef.current) return;
+        
+        const { startX, startWidth } = resizeDataRef.current;
+        const dx = e.clientX - startX;
+        
+        let newWidth = startWidth + dx;
+
+        const maxWidth = editorRef.current?.clientWidth || startWidth;
+        newWidth = Math.max(80, Math.min(newWidth, maxWidth)); // min 80px, max parent width
+
+        targetElement.style.width = `${newWidth}px`;
+        targetElement.style.height = 'auto';
+    };
+
+    const handlePointerUp = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        resizeDataRef.current = null;
+        
+        const scroller = editorRef.current?.parentElement;
+        if (scroller) {
+            scroller.style.overflowY = 'auto';
+        }
+
+        if (editorRef.current && !isLocked) {
+            editorRef.current.contentEditable = 'true';
+        }
+
+        onResizeEnd();
     };
 
     return (
-        <div className="relative group my-4 rounded-xl overflow-hidden border border-black/5 dark:border-white/10 shadow-lg bg-white dark:bg-black/20 max-w-full">
-            <div className="flex items-center justify-between px-4 py-2 bg-black/5 dark:bg-black/40 border-b border-black/5 dark:border-white/5">
-                <span className="text-[10px] font-mono text-black/50 dark:text-white/50 uppercase tracking-widest font-bold">{lang || 'code'}</span>
-                <button
-                    onClick={handleCopy}
-                    className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-black/70 dark:text-white/70 transition-colors"
-                    aria-label="Copy code"
-                >
-                    {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                </button>
-            </div>
-            <div className="p-4 overflow-x-auto">
-                <pre className="m-0"><code ref={codeRef} className={`language-${lang} font-mono text-sm leading-relaxed whitespace-pre text-black/90 dark:text-white/90`} style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>{fullCode}</code></pre>
-            </div>
+        <div 
+            className="absolute border-2 border-dashed border-light-primary dark:border-dark-primary pointer-events-none"
+            style={{ ...position, transform: 'translateZ(0)' }}
+        >
+            <div
+                className="image-resizer-handle cursor-nwse-resize"
+                style={{ bottom: '-6px', right: '-6px' }}
+                onPointerDown={handlePointerDown}
+            />
         </div>
     );
 };
 
-const GeneratingTableIndicator: React.FC = () => (
-    <div className="my-2 p-4 rounded-lg bg-black/5 dark:bg-white/5 animate-pulse flex items-center justify-center gap-2 border border-white/10">
-        <div className="w-5 h-5 border-2 border-dashed rounded-md border-light-text-secondary dark:border-dark-text-secondary animate-spin"></div>
-        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Generating table...</p>
-    </div>
-);
+const JournalAttachmentMenu = ({ onSelect, menuRef, position }: {
+  onSelect: (acceptType: string) => void;
+  menuRef: React.RefObject<HTMLDivElement>;
+  position: { top: number, right: number };
+}) => {
+  const attachmentOptions = [
+    { label: 'Photo', icon: ImageIcon, accept: 'image/jpeg, image/png' },
+    { label: 'Files', icon: FileText, accept: 'application/pdf, .ppt, .pptx, application/vnd.ms-powerpoint, application/vnd.openxmlformats-officedocument.presentationml.presentation, .doc, .docx, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
+  ];
 
-const RegularMarkdown: React.FC<{ text: string }> = React.memo(({ text }) => {
-    const html = useMemo(() => {
-        const applyInlineFormatting = (str: string) => {
-            let formattedStr = str
-                .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 0.5rem; margin: 0.5rem 0;" />')
-                .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/__(.*?)__/g, '<u>$1</u>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/~~(.*?)~~/g, '<s>$1</s>')
-                .replace(/`(.*?)`/g, '<code>$1</code>')
-                .replace(/\^(.*?)\^/g, '<sup>$1</sup>')
-                .replace(/~(.*?)~/g, '<sub>$1</sub>');
-            
-            if ((window as any).katex) {
-                formattedStr = formattedStr.replace(/\$\$(.*?)\$\$/gs, (match, formula) => {
-                    try {
-                        return (window as any).katex.renderToString(formula.trim(), {
-                            displayMode: true,
-                            throwOnError: false,
-                        });
-                    } catch (e) {
-                        console.error("KaTeX rendering error:", e);
-                        return `<div class="math-formula-block">${formula.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
-                    }
-                });
-            } else {
-                formattedStr = formattedStr.replace(/\$\$(.*?)\$\$/gs, '<div class="math-formula-block">$1</div>');
-            }
-            return formattedStr;
-        };
-        
-        const lines = text.split('\n');
-        const htmlElements: string[] = [];
-        let inList: 'ul' | 'ol' | null = null;
-        let i = 0;
-
-        const closeList = () => {
-            if (inList) {
-                htmlElements.push(`</${inList}>`);
-                inList = null;
-            }
-        };
-
-        while (i < lines.length) {
-            const line = lines[i];
-
-            const tableHeaderMatch = line.match(/^\s*\|(.+)\|?\s*$/);
-            const tableSeparatorMatch = (i + 1 < lines.length) && lines[i+1]?.match(/^\s*\|?(\s*:?-+:?\s*\|?)+\s*$/);
-            const blockquoteMatch = line.match(/^\s*>\s?(.*)/);
-
-            if (tableHeaderMatch && tableSeparatorMatch) {
-                closeList();
-                const tableRows: string[] = [];
-                let tableLineIndex = i;
-                
-                while (tableLineIndex < lines.length && (lines[tableLineIndex].match(/^\s*\|/) || lines[tableLineIndex].match(/^\s*\|?(\s*:?-+:?\s*\|?)+\s*$/))) {
-                    tableRows.push(lines[tableLineIndex]);
-                    tableLineIndex++;
-                }
-
-                const parseRow = (rowLine: string) => {
-                    const content = rowLine.trim().replace(/^\||\|$/g, '');
-                    return content.split('|').map(cell => cell.trim());
-                }
-
-                const headers = parseRow(tableRows[0]);
-                const bodyRows = tableRows.slice(2).map(parseRow);
-
-                let tableHtml = '<table class="aura-table"><thead><tr>';
-                headers.forEach(header => {
-                    tableHtml += `<th>${applyInlineFormatting(header)}</th>`;
-                });
-                tableHtml += '</tr></thead><tbody>';
-
-                bodyRows.forEach(row => {
-                    tableHtml += '<tr>';
-                    for (let k = 0; k < headers.length; k++) {
-                        const cell = row[k] || '';
-                        tableHtml += `<td>${applyInlineFormatting(cell)}</td>`;
-                    }
-                    tableHtml += '</tr>';
-                });
-
-                tableHtml += '</tbody></table>';
-                htmlElements.push(tableHtml);
-                
-                i = tableLineIndex;
-                continue;
-
-            } else if (blockquoteMatch) {
-                closeList();
-                let bqContent = '';
-                let bqLineIndex = i;
-                while (bqLineIndex < lines.length && lines[bqLineIndex].match(/^\s*>/)) {
-                    bqContent += lines[bqLineIndex].replace(/^\s*>\s?/, '') + '\n';
-                    bqLineIndex++;
-                }
-                htmlElements.push(`<blockquote>${applyInlineFormatting(bqContent.trim())}</blockquote>`);
-                i = bqLineIndex;
-                continue;
-            }
-            
-            const ulMatch = line.match(/^(\s*)(\*|-)\s+(.*)/);
-            const olMatch = line.match(/^(\s*)(\d+\.)\s+(.*)/);
-            const h1Match = line.match(/^#\s+(.*)/);
-            const h2Match = line.match(/^##\s+(.*)/);
-            const h3Match = line.match(/^###\s+(.*)/);
-            const h4Match = line.match(/^####\s+(.*)/);
-            const hrMatch = line.trim().match(/^(-{3,}|\*{3,}|_{3,})$/);
-            const isBlankLine = line.trim() === '';
-
-            if (ulMatch) {
-                if (inList !== 'ul') {
-                    closeList();
-                    htmlElements.push('<ul>');
-                    inList = 'ul';
-                }
-                let listItemContent = ulMatch[3];
-                const todoUncheckedMatch = listItemContent.match(/^\[ \]\s+(.*)/);
-                if (todoUncheckedMatch) {
-                    listItemContent = `<label style="display: flex; align-items: start; gap: 0.5em; cursor: default;"><input type="checkbox" disabled style="margin-top: 0.25em;" /><span>${applyInlineFormatting(todoUncheckedMatch[1])}</span></label>`;
-                } else {
-                    const todoCheckedMatch = listItemContent.match(/^\[x\]\s+(.*)/i);
-                    if (todoCheckedMatch) {
-                        listItemContent = `<label style="display: flex; align-items: start; gap: 0.5em; cursor: default;"><input type="checkbox" checked disabled style="margin-top: 0.25em;" /><span style="text-decoration: line-through; opacity: 0.7;">${applyInlineFormatting(todoCheckedMatch[1])}</span></label>`;
-                    } else {
-                        listItemContent = applyInlineFormatting(listItemContent);
-                    }
-                }
-                htmlElements.push(`<li>${listItemContent}</li>`);
-            } else if (olMatch) {
-                if (inList !== 'ol') {
-                    closeList();
-                    htmlElements.push('<ol>');
-                    inList = 'ol';
-                }
-                htmlElements.push(`<li>${applyInlineFormatting(olMatch[3])}</li>`);
-            } else if (h1Match) {
-                closeList();
-                htmlElements.push(`<h1>${applyInlineFormatting(h1Match[1])}</h1>`);
-            } else if (h2Match) {
-                closeList();
-                htmlElements.push(`<h2>${applyInlineFormatting(h2Match[1])}</h2>`);
-            } else if (h3Match) {
-                closeList();
-                htmlElements.push(`<h3>${applyInlineFormatting(h3Match[1])}</h3>`);
-            } else if (h4Match) {
-                closeList();
-                htmlElements.push(`<h4>${applyInlineFormatting(h4Match[1])}</h4>`);
-            } else if (hrMatch) {
-                closeList();
-                htmlElements.push('<hr />');
-            } else if (isBlankLine) {
-                if (inList && htmlElements.length > 0 && !htmlElements[htmlElements.length - 1].endsWith('</p>')) {
-                    // Logic for blank lines within lists.
-                } else {
-                    closeList();
-                }
-                if(!inList) htmlElements.push('<p><br></p>');
-
-            } else {
-                closeList();
-                htmlElements.push(`<p>${applyInlineFormatting(line)}</p>`);
-            }
-
-            i++;
-        }
-
-        closeList();
-        
-        return htmlElements.join('').replace(/(<p><br><\/p>){2,}/g, '<p><br></p>');
-    }, [text]);
-
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
-});
-
-
-const useTypewriter = (text: string, speed = 0, enabled = true) => {
-    const [displayedText, setDisplayedText] = useState('');
-    const isFinished = !enabled || displayedText.length === text.length;
-
-    useEffect(() => {
-        if (!enabled) {
-            setDisplayedText(text);
-        } else {
-            // Reset if it's a completely new message (text doesn't start with old text)
-            if (!text.startsWith(displayedText)) {
-                setDisplayedText('');
-            }
-        }
-    }, [text, enabled]);
-
-    useEffect(() => {
-        if (!enabled || isFinished) return;
-
-        const timer = setTimeout(() => {
-            const charsToAdd = 5; // Increased speed
-            setDisplayedText(text.slice(0, Math.min(text.length, displayedText.length + charsToAdd)));
-        }, speed);
-
-        return () => clearTimeout(timer);
-    }, [displayedText, text, speed, enabled, isFinished]);
-
-    return { displayedText, isFinished };
-};
-
-const StreamingMarkdownRenderer: React.FC<{ text: string; animate: boolean, onFinished: () => void; }> = React.memo(({ text, animate, onFinished }) => {
-    const { displayedText, isFinished } = useTypewriter(text, 0, animate);
-    const onFinishedRef = useRef(onFinished);
-    onFinishedRef.current = onFinished;
-
-    useEffect(() => {
-        if (isFinished) {
-            onFinishedRef.current();
-        }
-    }, [isFinished]);
-
-    const textToRender = animate ? displayedText : text;
-
-    const content = useMemo(() => {
-        const regex = /(```[\s\S]*?```|!\[Image:[\s\S]*?\]|^(?:\|.*\|[^\r\n]*\r?\n?)+)/gm;
-        
-        if (!animate) {
-            const parts = text.split(regex).filter(Boolean);
-            return parts.map((part, index) => {
-                if (part.startsWith('```')) return <CodeBlock key={index} codeWithLang={part} />;
-                if (part.startsWith('![Image:')) {
-                    const match = part.match(/!\[Image:\s*(?:\{)?([\s\S]*?)(?:\})?\]/);
-                    if (match?.[1]) return <ImageGenerator key={index} prompt={match[1]} />;
-                }
-                return <RegularMarkdown key={index} text={part} />;
-            });
-        }
-
-        const fullParts = text.split(regex).filter(Boolean);
-        let traversedLength = 0;
-
-        return fullParts.map((part, index) => {
-            const partStart = traversedLength;
-            const partEnd = partStart + part.length;
-            traversedLength = partEnd;
-            
-            const isSpecialBlock = part.startsWith('```') || part.startsWith('![Image:') || part.trim().startsWith('|');
-
-            if (isSpecialBlock) {
-                const isTable = part.trim().startsWith('|');
-
-                if (textToRender.length >= partEnd) {
-                    if (part.startsWith('```')) return <CodeBlock key={index} codeWithLang={part} />;
-                    if (part.startsWith('![Image:')) {
-                        const match = part.match(/!\[Image:\s*(?:\{)?([\s\S]*?)(?:\})?\]/);
-                        if (match?.[1]) return <ImageGenerator key={index} prompt={match[1]} />;
-                    }
-                    if (isTable) {
-                         return <RegularMarkdown key={index} text={part} />;
-                    }
-                } else if (isTable && textToRender.length > partStart) {
-                    return <GeneratingTableIndicator key={index} />;
-                }
-                return null; // Don't render incomplete special blocks
-            } else {
-                const visibleLength = Math.max(0, textToRender.length - partStart);
-                const visiblePart = part.substring(0, visibleLength);
-                return <RegularMarkdown key={index} text={visiblePart} />;
-            }
-        });
-    }, [text, textToRender, animate]);
-
-    return <div className="prose-styles">{content}</div>;
-});
-
-const WordIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className={className}>
-      <defs>
-        <linearGradient id="wordGradient" x1="9" x2="33.506" y1="364.445" y2="364.445" gradientTransform="translate(0 -339.89)" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#66c0ff" />
-          <stop offset=".26" stopColor="#0094f0" />
-        </linearGradient>
-      </defs>
-      <path fill="#283593" d="M9,33.595l14.911-18.706L41,26v13.306C41,41.346,39.346,43,37.306,43H15.332 C11.835,43,9,40.164,9,36.667C9,36.667,9,33.595,9,33.595z"></path>
-      <path fill="url(#wordGradient)" d="M9,20.208c0-2.624,2.126-4.75,4.749-4.75h21.857L41,12.778v13.527 C41,28.346,39.346,30,37.306,30H15.332C11.835,30,9,32.836,9,36.333L9,20.208L9,20.208z"></path>
-      <path fill="#1e88e5" fillOpacity=".6" d="M9,20.208c0-2.624,2.126-4.75,4.749-4.75h21.857L41,12.778v13.527 C41,28.346,39.346,30,37.306,30H15.332C11.835,30,9,32.836,9,36.333L9,20.208L9,20.208z"></path>
-      <path fill="#00e5ff" d="M9,10.333C9,6.836,11.835,4,15.332,4h21.975C39.346,4,41,5.654,41,7.694v5.611 C41,15.346,39.346,17,37.306,17H15.332C11.835,17,9,19.836,9,23.333C9,23.333,9,10.333,9,10.333z"></path>
-      <path fill="#1565c0" d="M7.5,23h10c1.933,0,3.5,1.567,3.5,3.5v10c0,1.933-1.567,3.5-3.5,3.5h-10C5.567,40,4,38.433,4,36.5 v-10C4,24.567,5.567,23,7.5,23z"></path>
-      <path fill="#fff" d="M18.327,26.643l-2.092,9.713l-2.501,0.002L12.5,30.529l-1.293,5.829H8.683l-2.01-9.713h2.062 l1.24,6.41l1.232-6.41h2.528l1.291,6.41l1.21-6.41L18.327,26.643L18.327,26.643z"></path>
-    </svg>
-);
-
-const PdfIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" aria-label="PDF" role="img" viewBox="0 0 512 512" className={className}>
-      <rect width="512" height="512" rx="15%" fill="#c80a0a" />
-      <path fill="#ffffff" d="M413 302c-9-10-29-15-56-15-16 0-33 2-53 5a252 252 0 0 1-52-69c10-30 17-59 17-81 0-17-6-44-30-44-7 0-13 4-17 10-10 18-6 58 13 100a898 898 0 0 1-50 117c-53 22-88 46-91 65-2 9 4 24 25 24 31 0 65-45 91-91a626 626 0 0 1 92-24c38 33 71 38 87 38 32 0 35-23 24-35zM227 111c8-12 26-8 26 16 0 16-5 42-15 72-18-42-18-75-11-88zM100 391c3-16 33-38 80-57-26 44-52 72-68 72-10 0-13-9-12-15zm197-98a574 574 0 0 0-83 22 453 453 0 0 0 36-84 327 327 0 0 0 47 62zm13 4c32-5 59-4 71-2 29 6 19 41-13 33-23-5-42-18-58-31z"/>
-    </svg>
-);
-
-const PptIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" className={className}>
-        <defs>
-            <linearGradient id="a" x1="4.494" y1="-1748.086" x2="13.832" y2="-1731.914" gradientTransform="translate(0 1756)" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#ca4c28" />
-            <stop offset="0.5" stopColor="#c5401e" />
-            <stop offset="1" stopColor="#b62f14" />
-            </linearGradient>
-        </defs>
-        <path d="M18.93,17.3,16.977,3h-.146A12.9,12.9,0,0,0,3.953,15.854V16Z" fill="#ed6c47" />
-        <path d="M17.123,3h-.146V16l6.511,2.6L30,16v-.146A12.9,12.9,0,0,0,17.123,3Z" fill="#ff8f6b" />
-        <path d="M30,16v.143A12.905,12.905,0,0,1,17.12,29h-.287A12.907,12.907,0,0,1,3.953,16.143V16Z" fill="#d35230" />
-        <path d="M3.194,8.85H15.132a1.193,1.193,0,0,1,1.194,1.191V21.959a1.193,1.193,0,0,1-1.194,1.191H3.194A1.192,1.192,0,0,1,2,21.959V10.041A1.192,1.192,0,0,1,3.194,8.85Z" fill="url(#a)" />
-        <path d="M9.293,12.028a3.287,3.287,0,0,1,2.174.636,2.27,2.27,0,0,1,.756,1.841,2.555,2.555,0,0,1-.373,1.376,2.49,2.49,0,0,1-1.059.935A3.607,3.607,0,0,1,9.2,17.15H7.687v2.8H6.141V12.028ZM7.686,15.94H9.017a1.735,1.735,0,0,0,1.177-.351,1.3,1.3,0,0,0,.4-1.025q0-1.309-1.525-1.31H7.686V15.94Z" fill="#fff" />
-    </svg>
-);
-
-const AttachmentIcon: React.FC<{ type: string; className?: string }> = ({ type, className }) => {
-    if (type.startsWith('image/')) return <ImageIcon className={className} />;
-    if (type === 'application/pdf') return <PdfIcon className={className} />;
-    if (type.includes('word')) return <WordIcon className={className} />;
-    if (type.includes('presentation') || type.includes('powerpoint')) return <PptIcon className={className} />;
-    if (type === 'application/vnd.aura.journal') return <BookText className={className} />;
-    return <FileText className={className} />;
-};
-
-type LocalAttachment = { id: string; data: string; mimeType: string; name: string };
-
-const AttachmentPreview: React.FC<{ attachment: LocalAttachment; onRemove: () => void; }> = ({ attachment, onRemove }) => {
-    const isImage = attachment.mimeType.startsWith('image/');
-    return (
-        <motion.div
-            layout
-            className="relative flex-shrink-0 mt-2 mr-2"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        >
-            <div className="w-32 h-32 rounded-xl border border-white/10 bg-light-bg-secondary dark:bg-dark-bg">
-                {isImage ? (
-                    <img src={attachment.data} alt={attachment.name} className="w-full h-full object-contain rounded-xl" />
-                ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-center p-2">
-                        <div className="w-14 h-14">
-                            <AttachmentIcon type={attachment.mimeType} className="w-full h-full" />
-                        </div>
-                        <p className="text-xs mt-2 leading-tight break-words w-full line-clamp-3">{attachment.name}</p>
-                    </div>
+  return (
+    <motion.div
+        ref={menuRef}
+        style={{ top: position.top, right: position.right }}
+        className="absolute z-40 w-48 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-sm rounded-xl border border-white/10 shadow-3xl p-2 origin-bottom"
+        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+    >
+        {attachmentOptions.map((option, index) => (
+            <React.Fragment key={option.label}>
+                <button
+                    onClick={() => onSelect(option.accept)}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                >
+                    <option.icon size={20} />
+                    <span className="font-medium">{option.label}</span>
+                </button>
+                {index < attachmentOptions.length - 1 && (
+                    <div className="h-px bg-black/10 dark:bg-white/10 mx-2"></div>
                 )}
-            </div>
-            <button onClick={onRemove} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center border-2 border-light-bg-secondary dark:border-dark-bg-secondary shadow-md">
-                <X size={14} />
-            </button>
-        </motion.div>
-    );
+            </React.Fragment>
+        ))}
+    </motion.div>
+  );
 };
 
-// --- Audio Helper Functions ---
-function decode(base64: string): Uint8Array {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
 
-async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
+    const { 
+        settings, navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry, vibrate, 
+        showConfirmationModal, navigateTo, showAlertModal, userProfile, setIsAiLoading, syllabus
+    } = useAppContext();
 
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
-  }
-  return buffer;
-}
+    const [currentEntry, setCurrentEntry] = useState<JournalEntry | undefined>(entry);
+    const [title, setTitle] = useState(entry?.title || '');
+    const [subject, setSubject] = useState(entry?.subject || '');
+    const [content, setContent] = useState('');
+    const [linkedSessionIds, setLinkedSessionIds] = useState<string[]>([]);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    
+    const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
+    const [fontStyle, setFontStyle] = useState<'default' | 'serif' | 'mono'>(entry?.fontStyle || 'default');
+    const [isSmallText, setIsSmallText] = useState(entry?.isSmallText || false);
+    const [isFullWidth, setIsFullWidth] = useState(entry?.isFullWidth || false);
+    const [isLocked, setIsLocked] = useState(entry?.isLocked || false);
+    const [wordCount, setWordCount] = useState(0);
+    const [lastModified, setLastModified] = useState<Date>(entry ? new Date(entry.date) : new Date());
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
+    
+    const [history, setHistory] = useState<string[]>(['']);
+    const [historyIndex, setHistoryIndex] = useState(0);
+    const canUndo = historyIndex > 0;
+    const canRedo = historyIndex < history.length - 1;
 
-
-interface JournalContextModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onAddContext: (selectedJournals: JournalEntry[]) => void;
-}
-
-const JournalContextModal: React.FC<JournalContextModalProps> = ({ isOpen, onClose, onAddContext }) => {
-    const { journalEntries, vibrate, playUISound } = useAppContext();
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-
-    const filteredJournals = useMemo(() => {
-        if (!searchQuery.trim()) {
-            return journalEntries;
-        }
-        const lowerCaseQuery = searchQuery.toLowerCase();
-        return journalEntries.filter(entry =>
-            entry.title?.toLowerCase().includes(lowerCaseQuery) ||
-            entry.content.toLowerCase().includes(lowerCaseQuery)
-        );
-    }, [journalEntries, searchQuery]);
-
-    const handleToggle = (id: string) => {
-        vibrate();
-        setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
-    };
-
-    const handleAddContext = () => {
-        playUISound('success');
-        const selectedJournals = journalEntries.filter(j => selectedIds.includes(j.id));
-        onAddContext(selectedJournals);
-        onClose();
-        // Reset state for next time
-        setSelectedIds([]);
-        setSearchQuery('');
-    };
+    const [searchMatches, setSearchMatches] = useState<HTMLElement[]>([]);
+    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
     
-    const handleClose = () => {
-        playUISound('tap');
-        onClose();
-    }
+    const [isImageSourceMenuOpen, setIsImageSourceMenuOpen] = useState(false);
+    const [imageSourceMenuPosition, setImageSourceMenuPosition] = useState({ top: 0, left: 0 });
 
-    return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    className="fixed inset-0 z-50 flex items-end justify-center p-2 bg-black/50"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={handleClose}
-                >
-                    <motion.div
-                        className="relative w-full max-w-lg h-[60vh] md:h-[60vh] bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl flex flex-col overflow-hidden"
-                        initial={{ y: "100%" }}
-                        animate={{ y: "0%" }}
-                        exit={{ y: "100%" }}
-                        transition={{ type: 'spring', stiffness: 350, damping: 35 }}
-                        drag="y"
-                        dragConstraints={{ top: 0 }}
-                        onDragEnd={(_, info) => { if (info.offset.y > 100) handleClose(); }}
-                        dragElastic={{ top: 0, bottom: 0.5 }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
-                            <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
-                        </div>
-                        <div className="flex-shrink-0 p-4 pt-6 flex items-center justify-center border-b border-white/10">
-                            <h2 className="text-xl font-bold">Add Journal Context</h2>
-                        </div>
-                        <div className="flex-shrink-0 p-4">
-                            <SearchBar
-                                searchQuery={searchQuery}
-                                setSearchQuery={setSearchQuery}
-                                placeholder="Search journals..."
-                            />
-                        </div>
+    const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
+    const [attachmentMenuPosition, setAttachmentMenuPosition] = useState({ top: 0, right: 0 });
 
-                        <OverscrollContainer className="flex-grow overflow-y-auto">
-                            <div className="p-4 pt-0 space-y-2">
-                                {filteredJournals.length > 0 ? filteredJournals.map(entry => (
-                                    <motion.button
-                                        key={entry.id}
-                                        onClick={() => handleToggle(entry.id)}
-                                        className={`w-full flex items-center gap-4 text-left p-3 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 ${selectedIds.includes(entry.id) ? 'selected-journal-item' : 'border-transparent'}`}
-                                    >
-                                        <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md border-2 transition-all ${selectedIds.includes(entry.id) ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-400'}`}>
-                                            {selectedIds.includes(entry.id) && <Check size={16} className="text-white"/>}
-                                        </div>
-                                        <div className="overflow-hidden">
-                                            <p className="font-semibold truncate">{entry.title || "Untitled Entry"}</p>
-                                            <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
-                                                {new Date(entry.date).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                    </motion.button>
-                                )) : (
-                                    <div className="text-center py-16 text-light-text-secondary dark:text-dark-text-secondary">
-                                        <BookOpen size={32} className="mx-auto mb-2" />
-                                        <p>No journals found.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </OverscrollContainer>
-                        
-                        <div className="flex-shrink-0 p-4 border-t border-white/10 flex justify-center">
-                            <motion.button
-                                onClick={handleAddContext}
-                                disabled={selectedIds.length === 0}
-                                className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold bg-flow-gradient bg-400% animate-gradient-flow text-white rounded-full shadow-lg disabled:opacity-50"
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                Add Context ({selectedIds.length})
-                            </motion.button>
-                        </div>
-                         <style>{`
-                            .dark\\:bg-dark-primary {
-                                background-color: hsl(var(--accent-dark));
-                            }
-                            .bg-light-primary {
-                                background-color: hsl(var(--accent-light));
-                            }
-                            .selected-journal-item {
-                                background-color: hsla(var(--accent-light), 0.1);
-                                border-color: hsla(var(--accent-light), 0.3);
-                            }
-                            html.dark .selected-journal-item {
-                                background-color: hsla(var(--accent-dark), 0.1);
-                                border-color: hsla(var(--accent-dark), 0.3);
-                            }
-                         `}</style>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    );
-};
-
-const ThinkingBubble: React.FC = () => {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-start gap-3 w-full max-w-full justify-start"
-        >
-            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black">
-                <BrainCircuit size={18} />
-            </div>
-            <div className="flex items-center gap-2 text-sm text-black p-3 bg-[#f4f4f4] rounded-2xl rounded-bl-lg">
-                <span>Thinking</span>
-                <motion.div
-                    animate={{ x: [0, 3, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                    <ChevronRight size={16} />
-                </motion.div>
-            </div>
-        </motion.div>
-    );
-};
-
-const ThoughtBubble: React.FC<{ text: string }> = ({ text }) => {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-start gap-3 w-full max-w-full justify-start"
-        >
-            <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black">
-                <Sparkles size={18} />
-            </div>
-            <div className="flex items-center gap-2 text-sm text-black p-3 bg-[#f4f4f4] rounded-2xl rounded-bl-lg">
-                <span>{text}</span>
-            </div>
-        </motion.div>
-    );
-};
-
-const AuraAiPage: React.FC = () => {
-    const { journalEntries, navigateTo, navigateBack, vibrate, showAlertModal, auraChatSessions, saveChatSession, deleteChatSessions, settings, userProfile, showConfirmationModal, playUISound, modalStack } = useAppContext();
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [input, setInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
-    const [isListening, setIsListening] = useState(false);
-    const [showAttachmentModal, setShowAttachmentModal] = useState(false);
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [chatState, setChatState] = useState<'initial' | 'chat'>(messages.length > 0 ? 'chat' : 'initial');
-    const [isJournalContextModalOpen, setIsJournalContextModalOpen] = useState(false);
-    const [isTextareaFocused, setIsTextareaFocused] = useState(false);
+    const [isFormattingMenuOpen, setIsFormattingMenuOpen] = useState(false);
+    const [formattingMenuPosition, setFormattingMenuPosition] = useState({ top: 0, left: 0 });
+    const [activePalette, setActivePalette] = useState<'font' | 'highlight' | null>(null);
+    const [activeFormats, setActiveFormats] = useState({
+        bold: false,
+        italic: false,
+        underline: false,
+        strikethrough: false,
+    });
+    const [isMouseOverMenu, setIsMouseOverMenu] = useState(false);
     const [isDesktop, setIsDesktop] = useState(false);
-    const [isResearchMode, setIsResearchMode] = useState(false);
-    const [contextMenu, setContextMenu] = useState<{
+
+    // AI State
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+    const [aiCustomPrompt, setAiCustomPrompt] = useState('');
+    const [currentAiTask, setCurrentAiTask] = useState<AITask | null>(null);
+    
+    // Table Editing State
+    const [tablePopup, setTablePopup] = useState<{
         isOpen: boolean;
-        position: { x: number; y: number };
-        message: ChatMessage | null;
-    }>({ isOpen: false, position: { x: 0, y: 0 }, message: null });
-    const [selectableMessageId, setSelectableMessageId] = useState<string | null>(null);
-    const [animateLastMessage, setAnimateLastMessage] = useState(false);
-    const [finishedTypingMessages, setFinishedTypingMessages] = useState<Set<string>>(new Set());
-    
-    // History Selection State
-    const [isHistorySelectionMode, setIsHistorySelectionMode] = useState(false);
-    const [selectedHistoryIndices, setSelectedHistoryIndices] = useState<number[]>([]);
-    const historyLongPressTimer = useRef<number>();
-    const isHistoryLongPress = useRef(false);
+        position: { top: number; left: number };
+        selection: {
+            table: HTMLTableElement;
+            type: 'row' | 'column';
+            index: number;
+        } | null;
+    }>({ isOpen: false, position: { top: 0, left: 0 }, selection: null });
+    const longPressTimerRef = useRef<number | null>(null);
 
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const [selectedImageContainer, setSelectedImageContainer] = useState<HTMLImageElement | null>(null);
+    const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+    // Toolbar state
+    const [isToolbarVisible, setIsToolbarVisible] = useState(false);
+
+
+    const editorRef = useRef<HTMLDivElement>(null);
+    const positioningContainerRef = useRef<HTMLDivElement>(null);
+    const hasSetInitialContent = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const recognitionRef = useRef<any>(null);
-    const wasLoading = useRef(false);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const inlineImageInputRef = useRef<HTMLInputElement>(null);
+    const imageSourceMenuRef = useRef<HTMLDivElement>(null);
+    const attachmentButtonRef = useRef<HTMLButtonElement>(null);
+    const attachmentMenuRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const contentChangeDebounceRef = useRef<number | null>(null);
+    const formattingMenuRef = useRef<HTMLDivElement>(null);
+    const paletteRef = useRef<HTMLDivElement>(null);
+    const tablePopupRef = useRef<HTMLDivElement>(null);
+    const savedRangeRef = useRef<Range | null>(null);
     
-    const longPressTimer = useRef<number>();
-    const pointerStartPos = useRef({ x: 0, y: 0 });
-    const DRAG_THRESHOLD = 10;
-    const contextMenuRef = useRef<HTMLDivElement>(null);
-
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const audioQueueRef = useRef<AudioBuffer[]>([]);
-    const isPlayingRef = useRef<boolean>(false);
-    const audioSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-    const nextStartTimeRef = useRef<number>(0);
-
-    const closeContextMenu = useCallback(() => {
-        setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, message: null });
-    }, []);
-
+    const saveDebounceTimeoutRef = useRef<number | null>(null);
+    const handleSaveRef = useRef<() => void>();
+    const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+    useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
+    
     useEffect(() => {
-        if (!contextMenu.isOpen) return;
-    
-        const handleClickOutside = (e: PointerEvent) => {
-            if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-                closeContextMenu();
-            }
-        };
-    
-        const handleScroll = () => closeContextMenu();
-    
-        // Add listener after a short delay to prevent the same event from closing it.
-        const timerId = setTimeout(() => {
-            document.addEventListener('pointerdown', handleClickOutside);
-            scrollRef.current?.addEventListener('scroll', handleScroll);
-        }, 0);
-    
-        return () => {
-            clearTimeout(timerId);
-            document.removeEventListener('pointerdown', handleClickOutside);
-            scrollRef.current?.removeEventListener('scroll', handleScroll);
-        };
-    }, [contextMenu.isOpen, closeContextMenu]);
-
-    useEffect(() => {
+        // A simple check for non-touch devices, commonly desktops.
         setIsDesktop(!('ontouchstart' in window) || navigator.maxTouchPoints === 0);
     }, []);
 
-    const processAudioQueue = useCallback(() => {
-        const audioContext = audioContextRef.current;
-        if (isPlayingRef.current || audioQueueRef.current.length === 0 || !audioContext || audioContext.state === 'closed') {
-            isPlayingRef.current = false;
+
+    const handleSave = useCallback(async () => {
+        if (!hasUnsavedChangesRef.current) return;
+
+        const currentContent = editorRef.current?.innerHTML.trim() || '';
+        const currentText = editorRef.current?.innerText.trim() || '';
+
+        const isNewEntry = !currentEntry;
+        const hasOnlyTitle = !!title.trim() && !currentText && attachments.length === 0;
+
+        if (isNewEntry && hasOnlyTitle) {
+            return; 
+        }
+
+        if (!title.trim() && !currentText && attachments.length === 0) {
+            setHasUnsavedChanges(false);
+            setSaveStatus('idle');
             return;
         }
-        isPlayingRef.current = true;
         
-        const audioBuffer = audioQueueRef.current.shift();
-        if (!audioBuffer) {
-            isPlayingRef.current = false;
-            return;
-        }
+        vibrate('light');
+        setSaveStatus('saving');
+        
+        const entryTitle = title.trim() || currentText.split('\n')[0].substring(0, 50) || "Journal Entry";
+        const modifiedDate = new Date().toISOString();
+        let success = false;
+        let newEntryId: string | null = null;
 
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-
-        audioSourceNodesRef.current.add(source);
-        source.onended = () => {
-            audioSourceNodesRef.current.delete(source);
-            isPlayingRef.current = false;
-            processAudioQueue(); // Process next in queue
+        const commonData = {
+            title: entryTitle,
+            subject: subject,
+            content: currentContent,
+            linkedSessionIds,
+            attachments,
+            fontStyle,
+            isSmallText,
+            isFullWidth,
+            isLocked,
+            date: modifiedDate,
         };
 
-        nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContext.currentTime);
-        source.start(nextStartTimeRef.current);
-        nextStartTimeRef.current += audioBuffer.duration;
-    }, []);
-
-    const cancelSpeech = useCallback(() => {
-        audioQueueRef.current = [];
-        isPlayingRef.current = false;
-        audioSourceNodesRef.current.forEach(source => {
-            try { source.stop(); } catch (e) {}
-        });
-        audioSourceNodesRef.current.clear();
-    }, []);
-
-    const speakText = useCallback(async (text: string) => {
-        if (!text.trim() || !('AudioContext' in window || 'webkitAudioContext' in window)) {
-            return;
+        if (currentEntry) {
+            const updatedEntry: JournalEntry = { ...currentEntry, ...commonData };
+            success = await updateJournalEntry(updatedEntry);
+        } else {
+            const newEntry: Omit<JournalEntry, 'id' | 'createdAt'> = commonData;
+            newEntryId = await addJournalEntry(newEntry);
+            success = !!newEntryId;
         }
-
-        cancelSpeech();
-
-        try {
-            if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        
+        if (success) {
+            setHasUnsavedChanges(false);
+            setSaveStatus('saved');
+            setLastModified(new Date(modifiedDate));
+            if (newEntryId) {
+                setCurrentEntry({
+                    id: newEntryId,
+                    createdAt: Date.now(),
+                    ...commonData,
+                });
             }
-            const audioContext = audioContextRef.current;
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
+        } else {
+            setSaveStatus('unsaved');
+        }
+    }, [
+        title, attachments, linkedSessionIds, fontStyle, 
+        isSmallText, isFullWidth, isLocked, currentEntry, updateJournalEntry, 
+        addJournalEntry, vibrate, subject
+    ]);
+    
+    useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+    
+    const markAsChanged = useCallback(() => {
+        if (!hasUnsavedChanges) {
+            setHasUnsavedChanges(true);
+        }
+        setSaveStatus('unsaved');
+
+        if (saveDebounceTimeoutRef.current) {
+            clearTimeout(saveDebounceTimeoutRef.current);
+        }
+        saveDebounceTimeoutRef.current = window.setTimeout(() => {
+            handleSaveRef.current?.();
+        }, 500);
+    }, [hasUnsavedChanges]);
+
+
+    // --- Search Functionality ---
+    const clearSearchHighlighting = useCallback(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+        const marks = Array.from(editor.querySelectorAll('mark.search-highlight'));
+        marks.forEach(mark => {
+            const markNode = mark as Node;
+            const parent = markNode.parentNode;
+            if (parent) {
+                while (markNode.firstChild) {
+                    parent.insertBefore(markNode.firstChild, markNode);
+                }
+                parent.removeChild(markNode);
+                parent.normalize();
             }
-            nextStartTimeRef.current = audioContext.currentTime;
+        });
+        setSearchMatches([]);
+        setCurrentMatchIndex(-1);
+    }, []);
 
-            const cleanedText = text.replace(/[*#]/g, '').replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
-            if (!cleanedText.trim()) return;
+    const performSearch = useCallback((query: string) => {
+        clearSearchHighlighting();
+        if (!query || !editorRef.current) return;
 
-            const sentences = cleanedText.match(/[^.!?]+[.!?]*(\s|$)/g) || [cleanedText];
+        const editor = editorRef.current;
+        const regex = new RegExp(query, 'gi');
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+        const nodesToProcess: Node[] = [];
+        let node;
+        while ((node = walker.nextNode())) {
+            nodesToProcess.push(node);
+        }
+        
+        let matchesFound: HTMLElement[] = [];
 
-            const fetchAndQueue = async (sentence: string) => {
-                if (!sentence.trim()) return;
+        nodesToProcess.forEach(textNode => {
+            if (!textNode.textContent || !regex.test(textNode.textContent)) return;
+            const parent = textNode.parentNode;
+            if (!parent || (parent as HTMLElement).tagName === 'MARK' || (parent as HTMLElement).closest('[data-highlight="true"]')) return;
+
+            const fragment = document.createDocumentFragment();
+            let lastIndex = 0;
+            textNode.textContent.replace(regex, (match, offset) => {
+                if (offset > lastIndex) {
+                    fragment.appendChild(document.createTextNode(textNode.textContent!.slice(lastIndex, offset)));
+                }
+                const mark = document.createElement('mark');
+                mark.className = 'search-highlight';
+                mark.textContent = match;
+                fragment.appendChild(mark);
+                matchesFound.push(mark);
+                lastIndex = offset + match.length;
+                return match;
+            });
+
+            if (lastIndex < textNode.textContent.length) {
+                fragment.appendChild(document.createTextNode(textNode.textContent.slice(lastIndex)));
+            }
+            parent.replaceChild(fragment, textNode);
+        });
+        
+        setSearchMatches(matchesFound);
+        setCurrentMatchIndex(matchesFound.length > 0 ? 0 : -1);
+    }, [clearSearchHighlighting]);
+
+    useEffect(() => {
+        searchMatches.forEach((match, index) => {
+            match.classList.toggle('current', index === currentMatchIndex);
+        });
+        if (currentMatchIndex !== -1 && searchMatches[currentMatchIndex]) {
+            searchMatches[currentMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [currentMatchIndex, searchMatches]);
+    
+    const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const query = e.target.value;
+        setSearchQuery(query);
+        if (query) {
+            performSearch(query);
+        } else {
+            clearSearchHighlighting();
+        }
+    };
+    
+    const goToNextMatch = () => searchMatches.length > 0 && setCurrentMatchIndex(prev => (prev + 1) % searchMatches.length);
+    const goToPrevMatch = () => searchMatches.length > 0 && setCurrentMatchIndex(prev => (prev - 1 + searchMatches.length) % searchMatches.length);
+    
+     // --- Formatting Menu Logic ---
+    useEffect(() => {
+        const editorContainer = document.querySelector('.journal-editor-container');
+        if (!editorContainer) return;
+        
+        const formattingDebounceTimeoutRef = { current: null as number | null };
+
+        const hideMenu = () => {
+            setIsFormattingMenuOpen(false);
+            setActivePalette(null);
+        };
+
+        const handleSelectionChange = () => {
+            if (formattingDebounceTimeoutRef.current) {
+                clearTimeout(formattingDebounceTimeoutRef.current);
+            }
+
+            formattingDebounceTimeoutRef.current = window.setTimeout(() => {
+                if (isOptionsMenuOpen) {
+                    hideMenu();
+                    return;
+                }
+
+                const selection = window.getSelection();
+                if ((!selection || selection.isCollapsed || selection.rangeCount === 0) && !isMouseOverMenu) {
+                    hideMenu();
+                    return;
+                }
+                if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+
+                const range = selection.getRangeAt(0);
+                const positioningContainer = positioningContainerRef.current;
+                const editorNode = editorRef.current;
+
+                if (!positioningContainer || !editorNode || !editorNode.contains(range.commonAncestorContainer)) {
+                    hideMenu();
+                    return;
+                }
+
+                // Update active formats
+                setActiveFormats({
+                    bold: document.queryCommandState('bold'),
+                    italic: document.queryCommandState('italic'),
+                    underline: document.queryCommandState('underline'),
+                    strikethrough: document.queryCommandState('strikeThrough'),
+                });
+
+                const selectionRect = range.getBoundingClientRect();
+                const containerRect = positioningContainer.getBoundingClientRect();
+
+                if (selectionRect.width === 0 && selectionRect.height === 0) {
+                    hideMenu();
+                    return;
+                }
                 
-                try {
-                    const ai = new GoogleGenAI({ apiKey: API_KEY });
-                    const response = await ai.models.generateContent({
-                        model: "gemini-2.5-flash-preview-tts",
-                        contents: [{ parts: [{ text: sentence }] }],
-                        config: {
-                            responseModalities: [Modality.AUDIO],
-                            speechConfig: {
-                                voiceConfig: {
-                                    prebuiltVoiceConfig: { voiceName: settings.auraAiVoice || 'Zephyr' },
-                                },
-                            },
-                        },
-                    });
-                    
-                    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                    if (base64Audio && audioContextRef.current && audioContextRef.current.state !== 'closed') {
-                        const audioData = decode(base64Audio);
-                        const audioBuffer = await decodeAudioData(audioData, audioContext, 24000, 1);
-                        audioQueueRef.current.push(audioBuffer);
-                        
-                        if (!isPlayingRef.current) {
-                            processAudioQueue();
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error with Gemini TTS:", error);
-                    // Silently fail to avoid spamming alerts during speech playback.
-                    // Main actions will trigger the API key error flow if needed.
-                    cancelSpeech();
+                const MENU_WIDTH = 320;
+                const MENU_HEIGHT = 44;
+                const MENU_OFFSET = 10;
+
+                let top = selectionRect.top - containerRect.top - MENU_HEIGHT - MENU_OFFSET;
+                
+                const selectionCenter = selectionRect.left - containerRect.left + selectionRect.width / 2;
+                let left = selectionCenter - MENU_WIDTH / 2;
+
+                if (top < 0) {
+                    top = selectionRect.bottom - containerRect.top + MENU_OFFSET;
                 }
-            };
-            
-            sentences.forEach(fetchAndQueue);
+                
+                const minLeft = 0;
+                const maxLeft = containerRect.width - MENU_WIDTH;
+                left = Math.max(minLeft, Math.min(left, maxLeft));
 
-        } catch (error) {
-            console.error("Error with Gemini TTS:", error);
-            showAlertModal({title: "Speech Error", message: "Sorry, I couldn't generate the audio for that response."});
-        }
-    }, [cancelSpeech, showAlertModal, processAudioQueue, settings.auraAiVoice]);
-
-    const messagesRef = useRef(messages);
-    messagesRef.current = messages;
-    
-    useEffect(() => {
-        return () => {
-            if (messagesRef.current.length > 0) {
-                saveChatSession(messagesRef.current);
-            }
+                setFormattingMenuPosition({ top, left });
+                if (!isFormattingMenuOpen) {
+                    setIsFormattingMenuOpen(true);
+                }
+            }, 50);
         };
-    }, [saveChatSession]);
-
-    // Speech Recognition & TTS cleanup
-    useEffect(() => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = true;
-            recognitionRef.current.interimResults = true;
-
-            recognitionRef.current.onresult = (event: any) => {
-                let interimTranscript = '';
-                let finalTranscript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    } else {
-                        interimTranscript += event.results[i][0].transcript;
-                    }
-                }
-                if (finalTranscript) {
-                    setInput(prev => prev + finalTranscript);
-                }
-            };
-
-            recognitionRef.current.onend = () => {
-                setIsListening(false);
-            };
-
-            recognitionRef.current.onerror = (event: any) => {
-                console.error('Speech recognition error', event.error);
-                showAlertModal({ title: "Mic Error", message: `An error occurred: ${event.error}` });
-                setIsListening(false);
-            };
-        }
-
-        return () => {
-            cancelSpeech();
-            if (audioContextRef.current) {
-                audioContextRef.current.close().catch(console.error);
-                audioContextRef.current = null;
-            }
-             if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
-        };
-    }, [showAlertModal, cancelSpeech]);
-
-    useEffect(() => {
-        if (wasLoading.current && !isLoading) {
-            const lastMessage = messages[messages.length - 1];
-            if (settings.speakAuraAI && lastMessage?.role === 'model' && lastMessage.parts[0] && 'text' in lastMessage.parts[0]) {
-                speakText(lastMessage.parts[0].text);
-            }
-        }
-        wasLoading.current = isLoading;
-    }, [isLoading, messages, settings.speakAuraAI, speakText]);
-
-    // Scroll to bottom
-    useEffect(() => {
-        if (chatState === 'chat' && scrollRef.current) {
-            setTimeout(() => {
-                 if (scrollRef.current) {
-                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                }
-            }, 100);
-        }
-    }, [messages, isLoading, chatState]);
-
-    // Auto-resize textarea
-    useEffect(() => {
-        if (textareaRef.current) {
-            const el = textareaRef.current;
-            el.style.height = 'auto';
-            el.style.height = `${el.scrollHeight}px`;
-        }
-    }, [input]);
-
-
-    const handleSend = async (promptOverride?: string) => {
-        if (isLoading) return;
         
-        setSelectableMessageId(null);
-        const currentInput = promptOverride ?? input;
-        if (!currentInput.trim() && attachments.length === 0) return;
+        document.addEventListener('selectionchange', handleSelectionChange);
+        editorContainer.addEventListener('scroll', hideMenu);
 
-        if (chatState === 'initial') setChatState('chat');
-
-        const userMessagePartsForDisplay: Part[] = [];
-        attachments.forEach(attachment => {
-            userMessagePartsForDisplay.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType, name: attachment.name } });
-        });
-        if (currentInput.trim()) {
-            userMessagePartsForDisplay.push({ text: currentInput.trim() });
-        }
-
-        if (userMessagePartsForDisplay.length === 0) return;
-
-        vibrate();
-        const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', parts: userMessagePartsForDisplay };
-
-        setMessages(prev => [...prev, userMessage]);
-        setInput('');
-        setAttachments([]);
-        setIsLoading(true);
-        setAnimateLastMessage(true);
-
-        try {
-            const ai = new GoogleGenAI({ apiKey: API_KEY });
-            
-            const currentDate = new Date().toLocaleDateString(undefined, {
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-            });
-            const currentTime = new Date().toLocaleTimeString();
-            const userName = userProfile.name || 'friend';
-
-            const systemInstruction = `You are Aura, an advanced and highly intelligent AI companion. Your personality is warm, empathetic, and exceptionally capable. ALWAYS use emojis to make the conversation vibrant 😃.
-Current context: Date: ${currentDate}, Time: ${currentTime}. User: ${userName}.
-
-**Core Capabilities:**
-1. **Journaling:** You can create new journal entries for the user. If they describe a day, a feeling, or an event, offer to or directly create a journal entry for them using the 'create_journal_entry' tool.
-2. **Settings Management:** You can modify application settings (theme, AI tone, AI voice, etc.) using the 'update_app_settings' tool. If the user expresses a preference (e.g., "I want a dark theme" or "Make your tone more funny"), apply it immediately.
-3. **Research:** When Research Mode is active, you have access to real-time information via Google Search. Use it to verify facts, find latest news, or provide deep dives into complex topics.
-4. **Contextual Awareness:** You can see attachments (images, PDFs, journals). If a journal is attached, read its content and any attachments it might have to answer questions accurately.
-
-**Rules:**
-- **Greeting:** ALWAYS start EVERY response with a personal, friendly greeting using the user's name (e.g., "Hello ${userName}! ✨", "I'm here to help, ${userName}! 😊").
-- **Follow-up:** ALWAYS end EVERY response with a thoughtful, open-ended question.
-- **Formatting:** Use markdown extensively (headings, lists, bold, etc.). Use KaTeX for math: \`$$\\text{formula}$$\`.
-- **Images:** Only generate images when requested or highly beneficial, using \`![Image: {detailed prompt}]\`.
-
-You are smarter, faster, and more proactive. Don't just answer; anticipate needs.`;
-
-            const tools: any[] = [
-                {
-                    functionDeclarations: [
-                        {
-                            name: "create_journal_entry",
-                            description: "Creates a new journal entry for the user.",
-                            parameters: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    title: { type: Type.STRING, description: "The title of the journal entry." },
-                                    content: { type: Type.STRING, description: "The content of the journal entry (HTML format preferred)." },
-                                    mood: { type: Type.STRING, description: "The mood for the entry (e.g., Happy, Reflective, Energetic)." },
-                                    tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional tags for the entry." }
-                                },
-                                required: ["title", "content"]
-                            }
-                        },
-                        {
-                            name: "update_app_settings",
-                            description: "Updates the application settings.",
-                            parameters: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    theme: { type: Type.STRING, enum: ["light", "dark", "system"], description: "The app theme." },
-                                    auraAiTone: { type: Type.STRING, enum: ["balanced", "funny", "professional"], description: "The AI's personality tone." },
-                                    auraAiVoice: { type: Type.STRING, description: "The AI's voice name (e.g., Zephyr, Puck, Fenrir)." }
-                                }
-                            }
-                        }
-                    ]
-                }
-            ];
-
-            if (isResearchMode) {
-                tools.push({ googleSearch: {} });
+        return () => {
+            document.removeEventListener('selectionchange', handleSelectionChange);
+            editorContainer.removeEventListener('scroll', hideMenu);
+            if (formattingDebounceTimeoutRef.current) {
+                clearTimeout(formattingDebounceTimeoutRef.current);
             }
+        };
+    }, [isFormattingMenuOpen, isOptionsMenuOpen, isMouseOverMenu]);
 
-            const historyForApi = messages.map(({ role, parts }) => {
-                const apiParts = parts.map(part => {
-                    if ('text' in part) return { text: part.text };
-                    if (part.inlineData?.mimeType === 'application/vnd.aura.journal') {
-                        const journal = journalEntries.find(j => j.id === (part.inlineData as any).data);
-                        if (journal) {
-                            const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
-                            return { text: `Context from journal "${journal.title}":\n${plainTextContent}` };
-                        }
-                        return null;
-                    }
-                    return { inlineData: { data: part.inlineData.data, mimeType: part.inlineData.mimeType } };
-                }).filter(Boolean) as any[];
-                return { role, parts: apiParts };
-            });
-
-            const userMessagePartsForApi: Part[] = [];
-            for (const attachment of attachments) {
-                if (attachment.mimeType === 'application/vnd.aura.journal') {
-                    const journal = journalEntries.find(j => j.id === attachment.data);
-                    if (journal) {
-                        const plainTextContent = new DOMParser().parseFromString(journal.content, 'text/html').body.textContent || '';
-                        let context = `Journal: "${journal.title}"\nContent: ${plainTextContent}`;
-                        if (journal.attachments && journal.attachments.length > 0) {
-                            context += `\nThis journal has ${journal.attachments.length} attachments.`;
-                            journal.attachments.forEach(att => {
-                                context += `\n- Attachment: ${att.name} (${att.type})`;
-                            });
-                        }
-                        userMessagePartsForApi.push({ text: context });
-                    }
-                } else if (attachment.mimeType.startsWith('image/')) {
-                    userMessagePartsForApi.push({ inlineData: { data: attachment.data.split(',')[1], mimeType: attachment.mimeType } });
-                } else {
-                    userMessagePartsForApi.push({ text: `Attached file: "${attachment.name}" (${attachment.mimeType}). Please analyze.` });
-                }
-            }
-            if (currentInput.trim()) {
-                userMessagePartsForApi.push({ text: currentInput.trim() });
-            }
-
-            const modelMessageId = crypto.randomUUID();
-            let fullResponseText = '';
-            let currentThinkingSteps: string[] = [];
-
-            const result = await ai.models.generateContentStream({
-                model: 'gemini-2.5-flash',
-                contents: [...historyForApi, { role: 'user', parts: userMessagePartsForApi }],
-                config: { 
-                    systemInstruction,
-                    tools,
-                    thinkingConfig: isResearchMode ? { thinkingLevel: 'HIGH' } : undefined
-                }
-            });
-
-            setMessages(prev => [...prev, { id: modelMessageId, role: 'model', parts: [{ text: '' }] }]);
-
-            for await (const chunk of result) {
-                if (chunk.thinkingState?.lastAction) {
-                    currentThinkingSteps.push(chunk.thinkingState.lastAction);
-                    setMessages(prev => prev.map(m => m.id === modelMessageId ? { ...m, thinkingSteps: [...new Set(currentThinkingSteps)] } : m));
-                }
-
-                if (chunk.text) {
-                    fullResponseText += chunk.text;
-                    setMessages(prev => prev.map(msg => 
-                        msg.id === modelMessageId ? { ...msg, parts: [{ text: fullResponseText }], thinkingSteps: undefined } : msg
-                    ));
-                }
-
-                if (chunk.functionCalls) {
-                    for (const call of chunk.functionCalls) {
-                        if (call.name === "create_journal_entry") {
-                            const args = call.args as any;
-                            const newEntry: JournalEntry = {
-                                id: crypto.randomUUID(),
-                                title: args.title,
-                                content: args.content,
-                                date: new Date().toISOString(),
-                                mood: args.mood || 'Reflective',
-                                tags: args.tags || [],
-                                attachments: []
-                            };
-                            addJournalEntry(newEntry);
-                            fullResponseText += `\n\n*(Aura: I've created a new journal entry for you titled "${args.title}"! 📖)*`;
-                        } else if (call.name === "update_app_settings") {
-                            const args = call.args as any;
-                            updateSettings(args);
-                            fullResponseText += `\n\n*(Aura: I've updated your settings as requested! ⚙️)*`;
-                        }
-                        
-                        setMessages(prev => prev.map(msg => 
-                            msg.id === modelMessageId ? { ...msg, parts: [{ text: fullResponseText }] } : msg
-                        ));
-                    }
-                }
-            }
-
-        } catch (error) {
-            console.error("Aura AI Error:", error);
-            const errorMessage = error instanceof Error ? error.message : "Connection error";
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', parts: [{ text: `Sorry, I encountered an error: ${errorMessage}. Please try again.` }] }]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Handle initial params from GlobalSearch
     useEffect(() => {
-        const currentModal = modalStack[modalStack.length - 1];
-        if ((currentModal?.view === 'auraAi' || currentModal?.view === 'auraAI') && currentModal.params) {
-            const { initialQuery, research } = currentModal.params;
-            if (initialQuery) {
-                if (research) setIsResearchMode(true);
-                handleSend(initialQuery);
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isOptionsMenuOpen && menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOptionsMenuOpen(false);
+                if (searchQuery) {
+                    clearSearchHighlighting();
+                    setSearchQuery('');
+                }
+            }
+            if (isImageSourceMenuOpen && imageSourceMenuRef.current && !imageSourceMenuRef.current.contains(event.target as Node)) {
+                setIsImageSourceMenuOpen(false);
+            }
+            if (isAttachmentMenuOpen && attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+                setIsAttachmentMenuOpen(false);
+            }
+            if (tablePopup.isOpen && tablePopupRef.current && !tablePopupRef.current.contains(event.target as Node)) {
+                setTablePopup(p => ({ ...p, isOpen: false }));
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isOptionsMenuOpen, searchQuery, clearSearchHighlighting, tablePopup.isOpen, isImageSourceMenuOpen, isAttachmentMenuOpen]);
+    
+    // --- End of Search & Formatting Functionality ---
+
+    useEffect(() => {
+        if (entry) {
+            setCurrentEntry(entry);
+            setTitle(entry.title || '');
+            setContent(entry.content);
+            setLinkedSessionIds(entry.linkedSessionIds || []);
+            setAttachments(entry.attachments || []);
+            setFontStyle(entry.fontStyle || 'default');
+            setIsSmallText(entry.isSmallText || false);
+            setIsFullWidth(entry.isFullWidth || false);
+            setIsLocked(entry.isLocked || false);
+            setLastModified(new Date(entry.date));
+            setHistory([entry.content || '']);
+            setHistoryIndex(0);
+            setSaveStatus('idle');
+            setHasUnsavedChanges(false);
+        } else {
+            setCurrentEntry(undefined);
+            setTitle('');
+            setContent('');
+            setLinkedSessionIds([]);
+            setAttachments([]);
+            setFontStyle('default');
+            setIsSmallText(false);
+            setIsFullWidth(false);
+            setIsLocked(false);
+            setLastModified(new Date());
+            setHistory(['']);
+            setHistoryIndex(0);
+            setSaveStatus('idle');
+            setHasUnsavedChanges(false);
+            if (editorRef.current) {
+                editorRef.current.innerHTML = '';
             }
         }
-    }, []); // Run once on mount
+    }, [entry]);
+
+    useEffect(() => {
+        if (editorRef.current) {
+            if (content && !hasSetInitialContent.current) {
+                editorRef.current.innerHTML = content;
+                hasSetInitialContent.current = true;
+            }
+            const text = editorRef.current.innerText || '';
+            setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
+        }
+    }, [content]);
+
+    // Reset "Saved" status to idle
+    useEffect(() => {
+        if (saveStatus === 'saved') {
+            const timer = setTimeout(() => {
+                setSaveStatus('idle');
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [saveStatus]);
     
-    const handleProgrammaticSend = (prompt: string) => {
-        setInput(prompt);
-        setTimeout(() => handleSend(prompt), 0);
+    // Save on unmount (as a fallback)
+    useEffect(() => {
+        return () => {
+            if (saveDebounceTimeoutRef.current) {
+                clearTimeout(saveDebounceTimeoutRef.current);
+            }
+            if (hasUnsavedChangesRef.current) {
+                handleSaveRef.current?.();
+            }
+        };
+    }, []);
+
+    const handleDelete = useCallback(async () => {
+        if (currentEntry) {
+            showConfirmationModal({
+                title: 'Move to Trash?',
+                message: 'This action cannot be undone. Are you sure you want to permanently delete this entry?',
+                confirmText: 'Delete',
+                onConfirm: async () => {
+                    vibrate('heavy');
+                    const success = await deleteJournalEntry(currentEntry.id);
+                    if (success) {
+                        navigateBack();
+                        setTimeout(() => navigateBack(), 100);
+                    }
+                }
+            });
+        }
+    }, [currentEntry, showConfirmationModal, vibrate, deleteJournalEntry, navigateBack]);
+    
+     const handleDuplicate = useCallback(async () => {
+        if (currentEntry) {
+            const success = await duplicateJournalEntry(currentEntry.id);
+            if (success) {
+                setIsOptionsMenuOpen(false);
+            }
+        }
+    }, [currentEntry, duplicateJournalEntry]);
+    
+    const handleCopyText = () => {
+        const htmlToPlainText = (html: string): string => {
+            const tempDiv = document.createElement('div');
+            let formattedHtml = html.replace(/<li>/gi, '\n• ').replace(/<\/li>/gi, '');
+            tempDiv.innerHTML = formattedHtml;
+            return tempDiv.textContent || tempDiv.innerText || '';
+        };
+        const currentContent = editorRef.current?.innerHTML || '';
+        const plainText = htmlToPlainText(currentContent);
+        const textToCopy = `${title.trim() || 'Untitled Entry'}\n\n${plainText}`;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            showAlertModal({ title: "Copied!", message: "Journal content copied to clipboard.", type: 'success' });
+            setIsOptionsMenuOpen(false);
+        });
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (isDesktop && e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (fileInputRef.current) { fileInputRef.current.value = ""; }
+        if (!file) return;
+        setIsUploading(true);
+        try {
+            let fileToProcess = file;
+            if (file.type.startsWith('image/')) {
+                fileToProcess = await compressImage(file, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+            }
+            const dataUrl = await fileToDataURL(fileToProcess);
+            const newAttachment: Attachment = {
+                id: crypto.randomUUID(), name: fileToProcess.name,
+                type: fileToProcess.type || 'application/octet-stream', data: dataUrl,
+            };
+            setAttachments(prev => [...prev, newAttachment]);
+            markAsChanged();
+        } catch (error) {
+            console.error("Error processing attachment:", error);
+            showAlertModal({ title: "Processing Failed", message: "Could not process the attachment." });
+        } finally {
+            setIsUploading(false);
         }
     };
-    
-    const handleAttachmentClick = () => setShowAttachmentModal(true);
 
-    const handleAttachmentTypeSelect = (acceptType: string) => {
-        setShowAttachmentModal(false);
+    const handleRemoveAttachment = async (attachmentToRemove: Attachment) => {
+        setAttachments(prev => prev.filter(att => att.id !== attachmentToRemove.id));
+        markAsChanged();
+    };
+    
+
+    const handleContentChange = () => {
+        markAsChanged();
+
+        if (contentChangeDebounceRef.current) {
+            clearTimeout(contentChangeDebounceRef.current);
+        }
+
+        contentChangeDebounceRef.current = window.setTimeout(() => {
+            const editor = editorRef.current;
+            if (!editor) return;
+
+            const currentHtml = editor.innerHTML || '';
+            const text = editor.innerText || '';
+            setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
+
+            setHistory(prevHistory => {
+                const newHistory = prevHistory.slice(0, historyIndex + 1);
+                if (newHistory[newHistory.length - 1] !== currentHtml) {
+                    newHistory.push(currentHtml);
+                    setHistoryIndex(newHistory.length - 1);
+                    return newHistory;
+                }
+                return prevHistory;
+            });
+        }, 500);
+    };
+
+    const handleUndo = useCallback(() => {
+        if (canUndo) {
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+            if (editorRef.current) {
+                const newContent = history[newIndex];
+                editorRef.current.innerHTML = newContent;
+                const text = editorRef.current.innerText || '';
+                setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
+            }
+        }
+    }, [canUndo, history, historyIndex]);
+
+    const handleRedo = useCallback(() => {
+        if (canRedo) {
+            const newIndex = historyIndex + 1;
+            setHistoryIndex(newIndex);
+            if (editorRef.current) {
+                const newContent = history[newIndex];
+                editorRef.current.innerHTML = newContent;
+                const text = editorRef.current.innerText || '';
+                setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
+            }
+        }
+    }, [canRedo, history, historyIndex]);
+    
+    const handleLinkSession = useCallback(() => {
+        navigateTo('sessionLinking', {
+            selectedIds: linkedSessionIds,
+            onSave: (newSelectedIds: string[]) => { setLinkedSessionIds(newSelectedIds); markAsChanged(); },
+        });
+    }, [navigateTo, linkedSessionIds, markAsChanged]);
+
+    useEffect(() => {
+        if (!isDesktop) return;
+    
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // The 'Fn' key is not reliably detectable in browsers.
+            // We use the 'Alt' key as a functional equivalent for a simpler, single-modifier shortcut.
+            if (e.altKey) {
+                let handled = false;
+                switch (e.key.toUpperCase()) {
+                    case 'D': // Duplicate
+                        if (currentEntry) {
+                            handleDuplicate();
+                            handled = true;
+                        }
+                        break;
+                    case 'T': // Trash
+                        if (currentEntry) {
+                            handleDelete();
+                            handled = true;
+                        }
+                        break;
+                    case 'C': // Connections
+                        handleLinkSession();
+                        handled = true;
+                        break;
+                }
+        
+                if (handled) {
+                    e.preventDefault();
+                }
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isDesktop, currentEntry, handleDuplicate, handleDelete, handleLinkSession]);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+
+        const handlePaste = async (event: ClipboardEvent) => {
+            // Prioritize checking clipboard files, which works well for both screenshots
+            // and images copied from websites in modern browsers.
+            const files = event.clipboardData?.files;
+            
+            if (!files || files.length === 0) {
+                // Let the browser handle non-file pastes (e.g., plain text).
+                return;
+            }
+
+            // Find the first image file in the pasted content.
+            const imageFile = Array.from(files).find(file => file.type.startsWith('image/'));
+            
+            if (imageFile) {
+                // We found an image, so prevent the default browser paste behavior.
+                event.preventDefault();
+                setIsUploading(true);
+                try {
+                    const compressedFile = await compressImage(imageFile, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+                    const dataUrl = await fileToDataURL(compressedFile);
+
+                    const imageTag = `<figure class="generated-image"><img src="${dataUrl}" alt="Pasted image" /><figcaption><em>Pasted image</em></figcaption></figure><p><br></p>`;
+                    // Insert the image as a data URL.
+                    document.execCommand('insertHTML', false, imageTag);
+                    handleContentChange();
+                } catch (error) {
+                    console.error("Error processing pasted image:", error);
+                    showAlertModal({ title: "Processing Failed", message: "Could not process the pasted image." });
+                } finally {
+                    setIsUploading(false);
+                }
+            }
+            // If no image file is found among the files, do nothing and let the browser
+            // handle it (e.g., pasting a text file's content).
+        };
+
+        editor.addEventListener('paste', handlePaste);
+
+        return () => {
+            editor.removeEventListener('paste', handlePaste);
+        };
+    }, [isLocked, showAlertModal, handleContentChange]);
+    
+    // Drag and Drop Logic
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+
+        let dragCounter = 0;
+
+        const handleDragEnter = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter++;
+            if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+                setIsDraggingOver(true);
+            }
+        };
+
+        const handleDragOver = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        const handleDragLeave = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragCounter--;
+            if (dragCounter === 0) {
+               setIsDraggingOver(false);
+            }
+        };
+
+        const handleDrop = async (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDraggingOver(false);
+            dragCounter = 0;
+
+            const files = e.dataTransfer?.files;
+            if (!files || files.length === 0) return;
+
+            const imageFile = Array.from(files).find(file => file.type.startsWith('image/'));
+
+            if (imageFile) {
+                setIsUploading(true);
+                try {
+                    const compressedFile = await compressImage(imageFile, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+                    const dataUrl = await fileToDataURL(compressedFile);
+                    const imageTag = `<figure class="generated-image"><img src="${dataUrl}" alt="Dropped image" /><figcaption><em>Dropped image</em></figcaption></figure><p><br></p>`;
+
+                    // Position the cursor at the drop location if possible
+                    // @ts-ignore - caretRangeFromPoint is non-standard but widely supported
+                    if (document.caretRangeFromPoint) {
+                         // @ts-ignore
+                        const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                        const selection = window.getSelection();
+                        if (selection && editor.contains(range.startContainer)) {
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
+                    }
+                    
+                    document.execCommand('insertHTML', false, imageTag);
+                    handleContentChange();
+                } catch (error) {
+                    console.error("Error processing dropped image:", error);
+                    showAlertModal({ title: "Processing Failed", message: "Could not process the dropped image." });
+                } finally {
+                    setIsUploading(false);
+                }
+            }
+        };
+
+        editor.addEventListener('dragenter', handleDragEnter);
+        editor.addEventListener('dragover', handleDragOver);
+        editor.addEventListener('dragleave', handleDragLeave);
+        editor.addEventListener('drop', handleDrop);
+
+        return () => {
+            editor.removeEventListener('dragenter', handleDragEnter);
+            editor.removeEventListener('dragover', handleDragOver);
+            editor.removeEventListener('dragleave', handleDragLeave);
+            editor.removeEventListener('drop', handleDrop);
+        };
+    }, [isLocked, showAlertModal, handleContentChange]);
+    
+    // --- Inline Image Click Handler ---
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            
+            if (target.classList.contains('image-resizer-handle')) {
+                return;
+            }
+
+            const img = target.closest('figure.generated-image img') as HTMLImageElement;
+
+            // Don't trigger viewer if an image is selected for resizing
+            if (img && selectedImageContainer !== img) {
+                e.preventDefault();
+
+                const allImages = Array.from(editor.querySelectorAll('figure.generated-image img')) as HTMLImageElement[];
+                
+                const tempAttachments: Attachment[] = allImages.map(imageEl => {
+                    const src = imageEl.src;
+                    const mimeTypeMatch = src.match(/^data:(image\/[^;]+);/);
+                    const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+                    return {
+                        id: crypto.randomUUID(),
+                        name: imageEl.alt || 'Inline Image',
+                        type: mimeType,
+                        data: src
+                    };
+                });
+                
+                const startIndex = allImages.findIndex(imageEl => imageEl === img);
+
+                if (startIndex !== -1) {
+                    navigateTo('attachmentViewer', { attachments: tempAttachments, startIndex });
+                }
+            }
+        };
+
+        editor.addEventListener('click', handleClick);
+        return () => {
+            editor.removeEventListener('click', handleClick);
+        };
+    }, [navigateTo, selectedImageContainer]);
+
+    const saveSelection = useCallback(() => {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            savedRangeRef.current = selection.getRangeAt(0);
+        }
+    }, []);
+
+    const restoreSelection = useCallback(() => {
+        if (savedRangeRef.current) {
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(savedRangeRef.current);
+        }
+    }, []);
+
+     // --- AI Logic ---
+    const handleAiAction = async (task: AITask, promptOverride?: string) => {
+        vibrate();
+        setIsAiModalOpen(false);
+        setIsAiLoading(true);
+        setCurrentAiTask(null);
+
+        const currentContent = editorRef.current?.innerHTML || '';
+        const currentTextContent = editorRef.current?.innerText || '';
+        const customPrompt = promptOverride || aiCustomPrompt;
+
+        if (task === 'ASK') {
+            const answer = await processJournalWithAI(task, currentTextContent, customPrompt);
+            setIsAiLoading(false);
+            showAlertModal({ title: "Aura's Insight", message: answer });
+            setAiCustomPrompt('');
+            return;
+        }
+        
+        if (task === 'GENERATE_IMAGE') {
+            const base64Image = await generateImageForJournal(customPrompt);
+            if (base64Image) {
+                restoreSelection();
+                const imageUrl = `data:image/png;base64,${base64Image}`;
+                const imageTag = `<figure class="generated-image"><img src="${imageUrl}" alt="${customPrompt}" /><figcaption><em>Illustration for: ${customPrompt}</em></figcaption></figure><p><br></p>`;
+                document.execCommand('insertHTML', false, imageTag);
+                handleContentChange();
+            } else {
+                showAlertModal({ title: "Image Generation Failed", message: "Sorry, I couldn't create an image for that prompt." });
+            }
+            setIsAiLoading(false);
+            setAiCustomPrompt('');
+            return;
+        }
+
+        let result = await processJournalWithAI(task, currentContent, customPrompt);
+
+        if (result.includes("couldn't process that request")) {
+            showAlertModal({ title: "AI Error", message: result });
+        } else if (editorRef.current) {
+            switch (task) {
+                case 'IMPROVE':
+                    const imagePromptRegex = /<generate-image-prompt>(.*?)<\/generate-image-prompt>/g;
+                    const prompts = [...result.matchAll(imagePromptRegex)].map(match => match[1]);
+
+                    if (prompts.length > 0) {
+                        const imagePromises = prompts.map(prompt => generateImageForJournal(prompt));
+                        const generatedImages = await Promise.all(imagePromises);
+
+                        let finalHtml = result;
+                        generatedImages.forEach((base64Image, index) => {
+                            const originalTag = `<generate-image-prompt>${prompts[index]}</generate-image-prompt>`;
+                            if (base64Image) {
+                                const prompt = prompts[index];
+                                const imageUrl = `data:image/png;base64,${base64Image}`;
+                                const imageTag = `<figure class="generated-image"><img src="${imageUrl}" alt="${prompt}" /><figcaption><em>Illustration for: ${prompt}</em></figcaption></figure>`;
+                                finalHtml = finalHtml.replace(originalTag, imageTag);
+                            } else {
+                                finalHtml = finalHtml.replace(originalTag, ''); // Remove tag if generation fails
+                            }
+                        });
+                        editorRef.current.innerHTML = finalHtml;
+                    } else {
+                        editorRef.current.innerHTML = result;
+                    }
+                    break;
+                case 'GENERATE':
+                    editorRef.current.innerHTML = result;
+                    break;
+                case 'CONTINUE':
+                    editorRef.current.innerHTML += `<p>${result}</p>`;
+                    break;
+                case 'SUMMARIZE':
+                    const formattedSummary = '<ul>' + result.trim().replace(/^\s*[\*\-]\s*/gm, '<li>').replace(/(\r\n|\n|\r)/gm, '</li>') + '</li></ul>';
+                    editorRef.current.innerHTML = `<h2>Summary</h2><hr>${formattedSummary}<br>` + currentContent;
+                    break;
+            }
+            
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(editorRef.current);
+            range.collapse(false);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            editorRef.current.focus();
+
+            handleContentChange();
+        }
+
+        setIsAiLoading(false);
+        setAiCustomPrompt('');
+    };
+
+    const handleAiModalClose = () => {
+        setIsAiModalOpen(false);
+        setCurrentAiTask(null);
+        setAiCustomPrompt('');
+    };
+     // --- End AI Logic ---
+     
+    const handleInlineImageUpload = () => {
+        inlineImageInputRef.current?.click();
+    };
+
+    const handleImageGenerateOption = () => {
+        restoreSelection();
+        setCurrentAiTask('GENERATE_IMAGE');
+        setIsAiModalOpen(true);
+    };
+    
+    const handleImageSourceSelect = (source: 'upload' | 'generate') => {
+        setIsImageSourceMenuOpen(false);
+        // Use a short timeout to prevent click-through issues
+        // by allowing the bottom sheet to close before the next action is triggered.
+        setTimeout(() => {
+            if (source === 'upload') {
+                handleInlineImageUpload();
+            } else {
+                handleImageGenerateOption();
+            }
+        }, 100);
+    };
+
+    const handleInlineImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (inlineImageInputRef.current) { inlineImageInputRef.current.value = ""; }
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const compressedFile = await compressImage(file, { quality: 0.85, maxWidth: 1920, maxHeight: 1920 });
+            const dataUrl = await fileToDataURL(compressedFile);
+
+            restoreSelection();
+            const imageTag = `<figure class="generated-image"><img src="${dataUrl}" alt="${compressedFile.name}" /><figcaption><em>${compressedFile.name}</em></figcaption></figure><p><br></p>`;
+            document.execCommand('insertHTML', false, imageTag);
+            handleContentChange();
+        } catch (error) {
+            console.error("Error processing inline image:", error);
+            showAlertModal({ title: "Processing Failed", message: "Could not process the image." });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+
+    // --- Table Editing Logic ---
+    const clearTableHighlights = useCallback(() => {
+        editorRef.current?.querySelectorAll('.table-selection-highlight').forEach(el => {
+            el.classList.remove('table-selection-highlight');
+        });
+    }, []);
+    
+    const highlightTableSelection = useCallback((table: HTMLTableElement, type: 'row' | 'column', index: number) => {
+        clearTableHighlights();
+        if (type === 'row') {
+            if (table.rows[index]) {
+                Array.from(table.rows[index].cells).forEach(cell => cell.classList.add('table-selection-highlight'));
+            }
+        } else {
+            Array.from(table.rows).forEach(row => {
+                if (row.cells[index]) {
+                    row.cells[index].classList.add('table-selection-highlight');
+                }
+            });
+        }
+    }, [clearTableHighlights]);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+    
+        const handlePointerDown = (e: PointerEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName !== 'TH') return;
+            const table = target.closest('table.journal-table');
+            if (!table) return;
+    
+            e.preventDefault();
+            
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+
+            longPressTimerRef.current = window.setTimeout(() => {
+                const th = target as HTMLTableCellElement;
+                const row = th.parentElement as HTMLTableRowElement;
+                const isHeaderRow = row.parentElement?.tagName === 'THEAD';
+                const type = isHeaderRow ? 'column' : 'row';
+                const index = isHeaderRow ? th.cellIndex : row.rowIndex;
+    
+                highlightTableSelection(table, type, index);
+                const rect = th.getBoundingClientRect();
+
+                setTablePopup({
+                    isOpen: true,
+                    position: { top: rect.bottom + 8, left: rect.left + rect.width / 2 },
+                    selection: { table, type, index }
+                });
+            }, 500);
+        };
+    
+        const handlePointerUp = () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        };
+    
+        editor.addEventListener('pointerdown', handlePointerDown);
+        editor.addEventListener('pointerup', handlePointerUp);
+    
+        return () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+            editor.removeEventListener('pointerdown', handlePointerDown);
+            editor.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [isLocked, highlightTableSelection]);
+
+    const closeTablePopup = () => {
+        clearTableHighlights();
+        setTablePopup(p => ({ ...p, isOpen: false, selection: null }));
+    };
+
+    const handleTableAction = (action: () => void) => {
+        action();
+        handleContentChange();
+        closeTablePopup();
+    };
+
+    // --- End Table Editing ---
+    
+    // --- Image Selection Logic ---
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor || isLocked) return;
+
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            
+            if (target.classList.contains('image-resizer-handle')) {
+                return;
+            }
+
+            const img = target.closest('figure.generated-image img');
+
+            if (img) {
+                setSelectedImageContainer(img as HTMLImageElement);
+            } else if (selectedImageContainer) {
+                setSelectedImageContainer(null);
+            }
+        };
+        
+        editor.addEventListener('click', handleClick);
+        
+        return () => {
+            editor.removeEventListener('click', handleClick);
+        };
+    }, [isLocked, selectedImageContainer]);
+    // --- End Image Selection ---
+
+
+    const fontClasses: Record<typeof fontStyle, string> = { default: 'font-sans', serif: 'font-serif', mono: 'font-mono' };
+
+    const ToggleSwitch = ({ checked, onToggle }: { checked: boolean, onToggle: () => void }) => {
+        const spring = { type: "spring" as const, stiffness: 700, damping: 30 };
+        return (
+             <div 
+                className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ${checked ? 'bg-light-primary dark:bg-dark-primary justify-end' : 'bg-gray-200 dark:bg-gray-700 justify-start'}`}
+                onClick={onToggle}
+            >
+                <motion.div
+                    className="w-4 h-4 bg-white rounded-full shadow-sm"
+                    layout
+                    transition={spring}
+                />
+            </div>
+        );
+    };
+
+    const ShortcutDisplay = ({ shortcut }: { shortcut: string }) => {
+        if (!shortcut) return null;
+        return (
+            <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                {shortcut}
+            </span>
+        );
+    };
+
+    const MenuItem = ({ icon, label, onClick, danger = false, disabled = false, shortcut }: { icon: React.ReactNode, label: string, onClick?: () => void, danger?: boolean, disabled?: boolean, shortcut?: string }) => (
+        <button onClick={onClick} disabled={disabled} className={`w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${danger ? 'text-red-500' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <div className="flex items-center gap-3">{icon}{label}</div>
+            {shortcut && <ShortcutDisplay shortcut={shortcut} />}
+        </button>
+    );
+
+    const MenuToggleItem = ({ icon, label, checked, onChange }: { icon: React.ReactNode, label: string, checked: boolean, onChange: () => void }) => (
+        <div className="w-full flex items-center justify-between text-left px-2 py-2.5">
+            <div className="flex items-center gap-3">{icon}{label}</div>
+            <ToggleSwitch checked={checked} onToggle={onChange}/>
+        </div>
+    );
+
+    const MenuDivider = () => <div className="h-px bg-black/10 dark:bg-white/10 my-1"/>;
+
+    const SaveIndicator = () => (
+        <div className="flex items-center justify-end w-24 text-sm text-light-text-secondary dark:text-dark-text-secondary">
+            <AnimatePresence mode="wait">
+                {saveStatus === 'saving' && (
+                    <motion.div key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5">
+                        <Loader size={14} className="animate-spin" />
+                        <span>Saving...</span>
+                    </motion.div>
+                )}
+                {saveStatus === 'saved' && (
+                    <motion.div key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-green-500">
+                        <Check size={16} />
+                        <span>Saved</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+
+    const HeaderActions = (
+        <div className="flex items-center gap-1">
+            <SaveIndicator />
+            <AnimatePresence>
+                {linkedSessionIds.length > 0 && (
+                    <motion.div
+                        className="flex items-center gap-1.5 p-2 rounded-full text-light-primary dark:text-dark-primary"
+                        aria-label={`${linkedSessionIds.length} connections`}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                    >
+                        <LinkIcon size={18} />
+                        <span className="text-sm font-semibold">{linkedSessionIds.length}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <motion.button 
+                onClick={() => {vibrate(); setIsOptionsMenuOpen(o => !o);}} 
+                className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
+                whileTap={{ scale: 0.9 }} aria-label="More options"
+            >
+                <MoreHorizontal size={20} />
+            </motion.button>
+        </div>
+    );
+    
+    const ImageSourceMenu = () => (
+        <motion.div
+            ref={imageSourceMenuRef}
+            style={{ top: imageSourceMenuPosition.top, left: imageSourceMenuPosition.left, transform: 'translateX(-50%)' }}
+            className="absolute z-50 w-56 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10 p-2 origin-top"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 600, damping: 35 }}
+        >
+            <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => handleImageSourceSelect('upload')}
+                className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            >
+                <UploadCloud size={18} />
+                <span>Upload Image</span>
+            </button>
+            <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => handleImageSourceSelect('generate')}
+                className="w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            >
+                <Sparkles size={18} />
+                <span>Generate with AI</span>
+            </button>
+        </motion.div>
+    );
+
+    const ImageSourceBottomSheet: React.FC<{
+        onClose: () => void;
+        onSelect: (source: 'upload' | 'generate') => void;
+    }> = ({ onClose, onSelect }) => {
+        return (
+            <motion.div
+                className="fixed inset-0 z-40 flex items-end p-2 bg-black/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+            >
+                <motion.div
+                    className="relative w-full max-w-md mx-auto bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl p-4 pt-8"
+                    initial={{ y: "100%" }}
+                    animate={{ y: "0%" }}
+                    exit={{ y: "100%" }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                    drag="y"
+                    dragConstraints={{ top: 0 }}
+                    onDragEnd={(event, info) => {
+                        if (info.offset.y > 100) {
+                            onClose();
+                        }
+                    }}
+                    dragElastic={{ top: 0, bottom: 0.5 }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
+                        <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                    </div>
+                    <h3 className="text-lg font-semibold text-center mb-4">Insert Image</h3>
+                    <div className="space-y-2">
+                        <button
+                            onClick={() => onSelect('upload')}
+                            className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        >
+                            <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg"><UploadCloud size={20} /></div>
+                            <div>
+                                <p className="font-semibold">Upload Image</p>
+                                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Choose from your device</p>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => onSelect('generate')}
+                            className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        >
+                            <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg"><Sparkles size={20} /></div>
+                            <div>
+                                <p className="font-semibold">Generate with AI</p>
+                                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Create an image from a prompt</p>
+                            </div>
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        );
+    };
+
+    const AttachmentBottomSheet: React.FC<{
+        onClose: () => void;
+        onSelect: (acceptType: string) => void;
+    }> = ({ onClose, onSelect }) => {
+        const attachmentOptions = [
+            { label: 'Photo', icon: ImageIcon, accept: 'image/jpeg, image/png', description: "Upload a JPG or PNG" },
+            { label: 'Files', icon: FileText, accept: 'application/pdf, .ppt, .pptx, application/vnd.ms-powerpoint, application/vnd.openxmlformats-officedocument.presentationml.presentation, .doc, .docx, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document', description: "PDF, Word, PowerPoint..." }
+        ];
+
+        return (
+            <motion.div
+                className="fixed inset-0 z-40 flex items-end p-2 bg-black/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+            >
+                <motion.div
+                    className="relative w-full max-w-md mx-auto bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl p-4 pt-8"
+                    initial={{ y: "100%" }}
+                    animate={{ y: "0%" }}
+                    exit={{ y: "100%" }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                    drag="y"
+                    dragConstraints={{ top: 0 }}
+                    onDragEnd={(event, info) => {
+                        if (info.offset.y > 100) {
+                            onClose();
+                        }
+                    }}
+                    dragElastic={{ top: 0, bottom: 0.5 }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
+                        <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                    </div>
+                    <h3 className="text-lg font-semibold text-center mb-4">Add Attachment</h3>
+                    <div className="space-y-2">
+                        {attachmentOptions.map(option => (
+                            <button
+                                key={option.label}
+                                onClick={() => onSelect(option.accept)}
+                                className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                            >
+                                <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg"><option.icon size={20} /></div>
+                                <div>
+                                    <p className="font-semibold">{option.label}</p>
+                                    <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{option.description}</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </motion.div>
+            </motion.div>
+        );
+    };
+
+    const handleAttachmentButtonClick = () => {
+        vibrate();
+        if (isDesktop) {
+            const button = attachmentButtonRef.current;
+            const container = positioningContainerRef.current;
+            if (button && container) {
+                const buttonRect = button.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                const MENU_HEIGHT = 88; // Approximate height of the menu
+
+                setAttachmentMenuPosition({
+                    top: buttonRect.top - containerRect.top - MENU_HEIGHT,
+                    right: containerRect.right - buttonRect.right,
+                });
+                setIsAttachmentMenuOpen(true);
+            }
+        } else {
+            setIsAttachmentMenuOpen(true);
+        }
+    };
+
+    const handleAttachmentMenuSelect = (acceptType: string) => {
+        setIsAttachmentMenuOpen(false);
         if (fileInputRef.current) {
             fileInputRef.current.accept = acceptType;
             fileInputRef.current.click();
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (fileInputRef.current) { fileInputRef.current.value = ""; }
-        if (!file) return;
-
-        if (!ALLOWED_MIME_TYPES.some(type => file.type.startsWith(type) || file.type === type)) {
-            showAlertModal({ title: "Unsupported File", message: "Please select a supported file type (Image, PDF, Word, PowerPoint)." });
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const dataUrl = event.target?.result as string;
-            setAttachments(prev => [...prev, { id: crypto.randomUUID(), data: dataUrl, mimeType: file.type, name: file.name }]);
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleRemoveAttachment = (idToRemove: string) => setAttachments(prev => prev.filter(att => att.id !== idToRemove));
-
-    const handleMicClick = () => {
-        if (!recognitionRef.current) {
-            showAlertModal({ title: "Not Supported", message: "Speech recognition is not supported in your browser." });
-            return;
-        }
-        if (isListening) {
-            recognitionRef.current.stop();
-        } else {
-            cancelSpeech();
-            vibrate();
-            recognitionRef.current.start();
-            setIsListening(true);
-        }
-    };
-
-    const handleNewChat = () => {
-        cancelSpeech();
-        vibrate();
-        if (messages.length > 0) saveChatSession(messages);
-        setMessages([]);
-        setInput('');
-        setAttachments([]);
-        setChatState('initial');
-        setAnimateLastMessage(false);
-        setFinishedTypingMessages(new Set());
-    };
     
-    const handleHistoryClick = () => {
-        vibrate();
-        setIsHistoryOpen(true);
-    };
-    
-    const handleAddContextClick = () => {
-        vibrate();
-        setIsJournalContextModalOpen(true);
-    };
-
-    const handleAddJournalContext = (selectedJournals: JournalEntry[]) => {
-        if (selectedJournals.length === 0) return;
-        const journalAttachments: LocalAttachment[] = selectedJournals.map(j => ({
-            id: j.id, mimeType: 'application/vnd.aura.journal', name: j.title || 'Untitled Journal', data: j.id,
-        }));
-        setAttachments(prev => [...prev, ...journalAttachments.filter(j => !prev.some(p => p.id === j.id))]);
-    };
-
-    const loadHistory = (session: ChatSession) => {
-        if (messages.length > 0) saveChatSession(messages);
-        setMessages(session.messages);
-        setChatState('chat');
-        setIsHistoryOpen(false);
-        setAnimateLastMessage(false);
-        setFinishedTypingMessages(new Set(session.messages.map(m => m.id)));
-    };
-
-    const handleBack = () => {
-        if (messages.length > 0) saveChatSession(messages);
-        navigateBack();
-    };
-
-    // --- Context Menu and Action Button Handlers ---
-    const handleShare = async (message: ChatMessage) => {
-        closeContextMenu();
-        const rawMarkdown = message.parts.reduce((acc, part) => 'text' in part ? acc + part.text : acc, '');
-        const plainText = markdownToPlainText(rawMarkdown);
-        if (navigator.share) {
-            try {
-                await navigator.share({ title: 'Aura AI Response', text: plainText });
-            } catch (error) { console.error('Error sharing:', error); }
-        } else {
-            navigator.clipboard.writeText(plainText);
-            showAlertModal({ title: "Copied!", message: "Sharing not supported, response copied to clipboard.", type: 'success' });
-        }
-    };
-
-    const handleFeedback = (type: 'like' | 'dislike') => {
-        closeContextMenu();
-        showAlertModal({ title: "Feedback Received", message: "Thank you for helping us improve Aura AI!", type: 'success' });
-    };
-
-    const openContextMenu = (e: React.PointerEvent | React.MouseEvent, message: ChatMessage) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const menuWidth = 192; // w-48
-        const menuHeight = message.role === 'user' ? 150 : 280; // Estimated height
-        const margin = 16; // p-4
-
-        let x = e.clientX;
-        let y = e.clientY;
-
-        if (x + menuWidth + margin > window.innerWidth) {
-            x = window.innerWidth - menuWidth - margin;
-        }
-        if (y + menuHeight + margin > window.innerHeight) {
-            y = window.innerHeight - menuHeight - margin;
-        }
-        if (x < margin) x = margin;
-        if (y < margin) y = margin;
+    const handleRemoveHighlight = useCallback(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        let node = selection.getRangeAt(0).commonAncestorContainer;
         
-        setContextMenu({ isOpen: true, position: { x, y }, message });
-    };
-
-    const handlePointerDown = (e: React.PointerEvent, message: ChatMessage) => {
-        pointerStartPos.current = { x: e.clientX, y: e.clientY };
-        longPressTimer.current = window.setTimeout(() => {
-            longPressTimer.current = undefined; // Mark as fired
-            openContextMenu(e, message);
-        }, 500);
-    };
-
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (longPressTimer.current) {
-            const dx = Math.abs(e.clientX - pointerStartPos.current.x);
-            const dy = Math.abs(e.clientY - pointerStartPos.current.y);
-            if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
-                clearTimeout(longPressTimer.current);
-                longPressTimer.current = undefined;
-            }
-        }
-    };
-
-    const handlePointerUp = () => {
-        if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-            longPressTimer.current = undefined;
-        }
-    };
-
-    const handleContextMenuEvent = (e: React.MouseEvent, message: ChatMessage) => openContextMenu(e, message);
-
-    const handleSelectText = () => {
-        if (contextMenu.message) setSelectableMessageId(contextMenu.message.id);
-        closeContextMenu();
-    };
-
-    const handleRegenerate = async () => {
-        closeContextMenu();
-        const lastUserMessageIndex = messages.length - 2;
-        if (lastUserMessageIndex < 0 || messages[lastUserMessageIndex].role !== 'user' || messages[lastUserMessageIndex + 1]?.role !== 'model') {
-            showAlertModal({ title: "Cannot Regenerate", message: "This action is only available for the last response." });
-            return;
-        }
-
-        const lastUserMessage = messages[lastUserMessageIndex];
-        const historyForRegen = messages.slice(0, lastUserMessageIndex);
-
-        setMessages(historyForRegen);
-
-        const textPart = lastUserMessage.parts.find(p => 'text' in p) as { text: string } | undefined;
-        const attachmentParts = lastUserMessage.parts.filter(p => 'inlineData' in p) as Part & { inlineData: { data: string; mimeType: string; name: string } }[];
-        
-        const attachmentsToSet: LocalAttachment[] = attachmentParts.map(p => ({
-            id: (p as any).id || crypto.randomUUID(), data: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`,
-            mimeType: p.inlineData.mimeType, name: p.inlineData.name || 'attachment'
-        }));
-
-        setInput(textPart?.text || '');
-        setAttachments(attachmentsToSet);
-
-        setTimeout(() => handleSend(), 50);
-    };
-    
-    const handleEditMessage = (message: ChatMessage) => {
-        closeContextMenu();
-        const textPart = message.parts.find(p => 'text' in p) as { text: string } | undefined;
-        if (textPart) {
-            setInput(textPart.text);
-        }
-        
-        const attachmentParts = message.parts.filter(p => 'inlineData' in p) as any[];
-        const attachmentsToSet: LocalAttachment[] = attachmentParts.map(p => ({
-            id: p.id || crypto.randomUUID(),
-            data: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`,
-            mimeType: p.inlineData.mimeType,
-            name: p.inlineData.name || 'attachment'
-        }));
-        setAttachments(attachmentsToSet);
-
-        setMessages(prev => prev.filter(m => m.id !== message.id));
-        textareaRef.current?.focus();
-    };
-
-
-    const ActionButtons: React.FC<{ message: ChatMessage }> = ({ message }) => {
-        const [isCopied, setIsCopied] = useState(false);
-        const handleCopy = () => {
-            const rawMarkdown = message.parts.reduce((acc, part) => 'text' in part ? acc + part.text : acc, '');
-            const plainText = markdownToPlainText(rawMarkdown);
-            navigator.clipboard.writeText(plainText);
-            setIsCopied(true);
-            setTimeout(() => setIsCopied(false), 2000);
-        };
-
-        return (
-            <div className="flex items-center gap-2">
-                <button onClick={handleCopy} className="p-1.5 text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text transition-colors" aria-label="Copy response">
-                    {isCopied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-                </button>
-                <button onClick={() => handleShare(message)} className="p-1.5 text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text transition-colors" aria-label="Share response"><Share2 size={16} /></button>
-                <button onClick={() => handleFeedback('like')} className="p-1.5 text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text transition-colors" aria-label="Like response"><ThumbsUp size={16} /></button>
-                <button onClick={() => handleFeedback('dislike')} className="p-1.5 text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text transition-colors" aria-label="Dislike response"><ThumbsDown size={16} /></button>
-            </div>
-        );
-    };
-
-    // --- History Deletion Logic ---
-    const exitHistorySelectionMode = useCallback(() => {
-        setIsHistorySelectionMode(false);
-        setSelectedHistoryIndices([]);
-    }, []);
-    
-    const handleHistoryPointerDown = useCallback((index: number) => {
-        isHistoryLongPress.current = false;
-        historyLongPressTimer.current = window.setTimeout(() => {
-            isHistoryLongPress.current = true;
-            vibrate();
-            playUISound('tap');
-            if (!isHistorySelectionMode) {
-                setIsHistorySelectionMode(true);
-            }
-            setSelectedHistoryIndices(prev => (prev.includes(index) ? prev : [...prev, index]));
-        }, 500);
-    }, [isHistorySelectionMode, vibrate, playUISound]);
-    
-    const handleHistoryPointerUpOrLeave = useCallback(() => {
-        clearTimeout(historyLongPressTimer.current);
-    }, []);
-    
-    const handleHistoryItemClick = useCallback((session: ChatSession, index: number) => {
-        if (isHistoryLongPress.current) {
-            isHistoryLongPress.current = false;
-            return;
-        }
-        
-        if (isHistorySelectionMode) {
-            vibrate();
-            playUISound('tap');
-            setSelectedHistoryIndices(prev => {
-                const newIndices = prev.includes(index)
-                    ? prev.filter(i => i !== index)
-                    : [...prev, index];
-                
-                if (newIndices.length === 0) {
-                    setIsHistorySelectionMode(false);
+        while(node && node !== editorRef.current) {
+            if (node.nodeType === 1 && (node as HTMLElement).dataset.highlight === 'true') {
+                const span = node as HTMLElement;
+                const parent = span.parentNode;
+                if (parent) {
+                    while (span.firstChild) {
+                        parent.insertBefore(span.firstChild, span);
+                    }
+                    parent.removeChild(span);
+                    parent.normalize();
                 }
-                
-                return newIndices;
-            });
-        } else {
-            loadHistory(session);
+                // Continue search in case of nested highlights
+            }
+            node = node.parentNode;
         }
-    }, [isHistorySelectionMode, vibrate, playUISound, loadHistory]);
-
-    const handleDeleteSelectedHistory = () => {
-        if (selectedHistoryIndices.length === 0) return;
-        showConfirmationModal({
-            title: `Delete ${selectedHistoryIndices.length} chat${selectedHistoryIndices.length > 1 ? 's' : ''}?`,
-            message: 'This action cannot be undone.',
-            confirmText: 'Delete',
-            onConfirm: () => {
-                deleteChatSessions(selectedHistoryIndices);
-                exitHistorySelectionMode();
-            },
-        });
-    };
+        // Fallback for simple browser highlights
+        document.execCommand('backColor', false, 'transparent');
+    }, []);
     
-    const historyHeaderProps = isHistorySelectionMode ? {
-        leftAction: (
-            <motion.button onClick={exitHistorySelectionMode} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-                <X size={24} />
-            </motion.button>
-        ),
-        title: `${selectedHistoryIndices.length} selected`,
-        rightAction: (
-            <motion.button onClick={handleDeleteSelectedHistory} disabled={selectedHistoryIndices.length === 0} className="p-2 rounded-full hover:bg-red-500/10 text-red-500 disabled:opacity-50">
-                <Trash2 size={20} />
-            </motion.button>
-        )
-    } : {
-        title: "History",
-    };
-
-    const formatTimeAgo = (isoString: string) => {
-        const date = new Date(isoString);
-        const now = new Date();
-        const diffInSeconds = (now.getTime() - date.getTime()) / 1000;
-        const diffInHours = Math.round(diffInSeconds / 3600);
-        const diffInDays = Math.round(diffInHours / 24);
-
-        if (diffInHours < 24) {
-            if (diffInHours < 1) return 'Just now';
-            return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-        }
-        if (diffInDays <= 7) {
-            return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
-        }
-        return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    };
-
-    const ContextMenu: React.FC = () => {
-        const { isOpen, position, message } = contextMenu;
+    const handleApplyHighlight = useCallback((color: string) => {
+        handleRemoveHighlight(); // Clear existing highlights in selection first
         
-        const isLatestUserMessage = useMemo(() => {
-            if (!message || message.role !== 'user' || !messages) return false;
-            const userMessages = messages.filter(m => m.role === 'user');
-            return userMessages.length > 0 && userMessages[userMessages.length - 1].id === message.id;
-        }, [message, messages]);
-        
-        if (!isOpen || !message) return null;
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || color === 'transparent') return;
+    
+        const thickness = 75; // Default thickness
+        const calculatedPosition = 65 + (thickness / 4);
+    
+        const span = document.createElement('span');
+        span.dataset.highlight = 'true';
+        span.style.backgroundColor = color;
+        span.style.backgroundImage = `linear-gradient(to top, ${color}, ${color})`;
+        span.style.backgroundRepeat = 'no-repeat';
+        span.style.backgroundSize = `100% ${thickness}%`;
+        span.style.backgroundPosition = `0% ${calculatedPosition}%`;
+        span.className = 'custom-highlight';
+    
+        const range = selection.getRangeAt(0);
+        try {
+            range.surroundContents(span);
+        } catch (e) {
+            console.warn("Could not apply custom highlight due to complex selection. Falling back to simple highlight.", e);
+            document.execCommand('backColor', false, color);
+        }
+    
+        editorRef.current?.focus();
+        editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    }, [handleRemoveHighlight]);
 
-        const isLastModelMessage = message.id === messages[messages.length - 1]?.id && messages[messages.length - 1]?.role === 'model';
 
-        const handleCopy = () => {
-            const textContent = message.parts.reduce((acc, part) => 'text' in part ? acc + part.text : acc, '');
-            const plainText = message.role === 'model' ? markdownToPlainText(textContent) : textContent;
-            navigator.clipboard.writeText(plainText);
-            showAlertModal({ title: "Copied!", message: "Message copied to clipboard.", type: 'success' });
-            closeContextMenu();
+    const FormattingMenu = () => {
+        const handleFormat = (command: string, value?: string) => {
+            document.execCommand(command, false, value);
+            editorRef.current?.focus();
+            editorRef.current?.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+             setActiveFormats({
+                bold: document.queryCommandState('bold'),
+                italic: document.queryCommandState('italic'),
+                underline: document.queryCommandState('underline'),
+                strikethrough: document.queryCommandState('strikeThrough'),
+            });
+        };
+    
+        const handleHighlightFormat = (color: string) => {
+            if (color === 'transparent') {
+                handleRemoveHighlight();
+            } else {
+                handleApplyHighlight(color);
+            }
+            setActivePalette(null);
+        };
+    
+        const handleSelectAll = () => {
+            if (editorRef.current) {
+                editorRef.current.focus();
+                const range = document.createRange();
+                range.selectNodeContents(editorRef.current);
+                const selection = window.getSelection();
+                if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }
         };
 
-        if (message.role === 'user') {
-            return (
-                <motion.div
-                    ref={contextMenuRef}
-                    className="fixed z-50 w-48 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
-                    style={{ top: position.y, left: position.x }}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ type: 'spring', stiffness: 600, damping: 35 }}
-                >
-                    <button onClick={handleCopy} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Copy size={16}/>Copy</span></button>
-                    <button onClick={handleSelectText} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><TextSelect size={16}/>Select Text</span></button>
-                    {isLatestUserMessage && <button onClick={() => handleEditMessage(message)} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><SquarePen size={16}/>Edit</span></button>}
-                </motion.div>
-            );
-        }
-
-        // AI (model) message context menu
-        return (
-            <motion.div
-                ref={contextMenuRef}
-                className="fixed z-50 w-48 bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
-                style={{ top: position.y, left: position.x }}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 600, damping: 35 }}
-            >
-                <button onClick={handleCopy} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Copy size={16}/>Copy</span></button>
-                <button onClick={() => handleShare(message)} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Share2 size={16}/>Share</span></button>
-                <button onClick={handleSelectText} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><TextSelect size={16}/>Select Text</span></button>
-                {isLastModelMessage && <button onClick={handleRegenerate} className="w-full flex items-center justify-between text-left px-2 py-2 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><Repeat size={16}/>Regenerate</span></button>}
-                <div className="h-px bg-black/10 dark:bg-white/10 my-1"/>
-                <button onClick={() => handleFeedback('like')} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsUp size={16}/>Like</span></button>
-                <button onClick={() => handleFeedback('dislike')} className="w-full flex items-center justify-between text-left px-2 py-2.5 rounded hover:bg-black/5 dark:hover:bg-white/5"><span className="flex items-center gap-3"><ThumbsDown size={16}/>Dislike</span></button>
-            </motion.div>
-        );
-    };
-
-    const HeaderActions = (
-        <div className="flex items-center gap-1">
-            <button onClick={handleHistoryClick} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors" aria-label="Chat history">
-                <Clock size={20} />
-            </button>
-            <button onClick={handleNewChat} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors" aria-label="New chat">
-                <SquarePen size={20} />
-            </button>
-        </div>
-    );
+        useEffect(() => {
+            if (activePalette && paletteRef.current && formattingMenuRef.current && positioningContainerRef.current) {
+                const palette = paletteRef.current;
+                const menu = formattingMenuRef.current;
+                const container = positioningContainerRef.current;
     
-    const starterPrompts = [
-        { text: "Journal prompt for self-reflection", icon: <BookText size={20} /> },
-        { text: "Motivational quote for focus", icon: <MessageSquare size={20} /> },
-        { text: "Breathing exercise for calm", icon: <Wind size={20} /> },
-        { text: "Plan my day for wellness", icon: <CheckCircle size={20} /> },
-    ];
-
-    const InitialView = (
-    <motion.div key="initial-view" className="flex-grow flex flex-col items-center justify-center text-center px-4">
-        <div className="flex flex-col items-center justify-center">
-            <motion.div exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }} className="flex flex-col items-center">
-                <div className="w-20 h-20 mb-4 rounded-full flex items-center justify-center bg-[#f4f4f4] border border-black/5">
-                    <Sparkles size={40} className="text-black"/>
-                </div>
-                <h2 className="text-2xl font-semibold">How can I help you today?</h2>
-            </motion.div>
-        </div>
-        
-        <div className="w-full max-w-xl md:max-w-3xl my-8">
-            <motion.div layout exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.15 }} className="w-full">
-                <h3 className="text-sm font-semibold text-light-text-secondary dark:text-dark-text-secondary mb-3 text-left">What should we do?</h3>
-                <div className="grid grid-cols-2 gap-3 w-full">
-                    {starterPrompts.map(prompt => 
-                        <button key={prompt.text} onClick={() => handleProgrammaticSend(prompt.text)} className="p-4 bg-[#f4f4f4] rounded-xl text-left text-sm border border-black/5 shadow-sm hover:shadow-md transition-all flex items-center gap-3">
-                            <span className="text-black">{prompt.icon}</span>
-                            <span className="text-black">{prompt.text}</span>
-                        </button>
-                    )}
-                </div>
-            </motion.div>
-
+                const menuRect = menu.getBoundingClientRect();
+                const paletteRect = palette.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                
+                if (paletteRect.width === 0) return;
+    
+                let left = (menuRect.width / 2) - (paletteRect.width / 2);
+                const absoluteLeft = menuRect.left + left;
+    
+                if (absoluteLeft < containerRect.left) {
+                    left = containerRect.left - menuRect.left;
+                } else if (absoluteLeft + paletteRect.width > containerRect.right) {
+                    left = containerRect.right - menuRect.left - paletteRect.width - 5;
+                }
+    
+                palette.style.left = `${left}px`;
+            }
+        }, [activePalette, isFormattingMenuOpen]);
+    
+        return (
             <AnimatePresence>
-                {attachments.length > 0 && (
-                    <motion.div 
-                        className="w-full mt-4" 
-                        initial={{ opacity: 0, height: 0 }} 
-                        animate={{ opacity: 1, height: 'auto' }} 
-                        exit={{ opacity: 0, height: 0 }}
+                {isFormattingMenuOpen && (
+                    <motion.div
+                        ref={formattingMenuRef}
+                        style={{ top: formattingMenuPosition.top, left: formattingMenuPosition.left }}
+                        className="absolute z-40 cursor-grab"
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ type: 'spring', stiffness: 700, damping: 40 }}
+                        drag
+                        dragConstraints={positioningContainerRef}
+                        dragMomentum={false}
+                        whileTap={{ cursor: 'grabbing' }}
+                        onMouseEnter={() => setIsMouseOverMenu(true)}
+                        onMouseLeave={() => setIsMouseOverMenu(false)}
                     >
-                        <div className="flex gap-3 overflow-x-auto pb-2">
-                            {attachments.map(att => <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />)}
+                        <div className="p-1 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-xl shadow-2xl dark:shadow-[0_10px_50px_rgba(0,0,0,0.4)] border border-white/10 flex items-center gap-1 relative z-10">
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('bold')} className={`p-2 rounded ${activeFormats.bold ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Bold size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('italic')} className={`p-2 rounded ${activeFormats.italic ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Italic size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('underline')} className={`p-2 rounded ${activeFormats.underline ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Underline size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('strikeThrough')} className={`p-2 rounded ${activeFormats.strikethrough ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Strikethrough size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={handleSelectAll} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded" title="Select All"><TextSelect size={18} /></button>
+                            <div className="w-px h-5 bg-black/10 dark:bg-white/10 mx-1"></div>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => handleFormat('copy')} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded"><Copy size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePalette(p => p === 'highlight' ? null : 'highlight')} className={`p-2 rounded ${activePalette === 'highlight' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><Highlighter size={18} /></button>
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePalette(p => p === 'font' ? null : 'font')} className={`p-2 rounded ${activePalette === 'font' ? 'bg-black/10 dark:bg-white/10' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}><PaletteIcon size={18} /></button>
                         </div>
+                        
+                        <AnimatePresence>
+                        {activePalette && (
+                            <motion.div
+                                ref={paletteRef}
+                                className="absolute top-full mt-2 p-2 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-lg shadow-xl border border-white/10"
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ type: 'spring', stiffness: 600, damping: 35 }}
+                            >
+                                {activePalette === 'font' && (
+                                    <div className="flex gap-2">
+                                        {FONT_COLORS.map(({ name, value, isDefault }) => (
+                                            <button key={name} title={name} onMouseDown={(e) => e.preventDefault()} onClick={() => {handleFormat('foreColor', value); setActivePalette(null);}} className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center" style={!isDefault ? { backgroundColor: value } : {}}>
+                                                {isDefault && <span className="text-sm font-serif">A</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {activePalette === 'highlight' && (
+                                    <div className="flex gap-2 items-center">
+                                        {HIGHLIGHT_COLORS.map(({ name, value, isNone }) => (
+                                            <button key={name} title={name} onMouseDown={(e) => e.preventDefault()} onClick={() => handleHighlightFormat(value)} className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center" style={!isNone ? { backgroundColor: value } : {}}>
+                                                    {isNone && <div className="w-full h-0.5 bg-red-500 transform -rotate-45" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                        </AnimatePresence>
                     </motion.div>
                 )}
             </AnimatePresence>
-            
-            <motion.form layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="group w-full mx-auto mt-4">
-                <div className="relative rounded-2xl shadow-xl p-[2px]">
-                    <div className="relative flex flex-col bg-[#ffffff] rounded-[14px] min-h-[136px] transition-colors duration-300">
-                        <div className="p-3 flex gap-2">
-                            <motion.button type="button" onClick={handleAddContextClick} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="flex items-center gap-1.5 px-3 h-9 text-sm rounded-full text-black bg-black/5 hover:bg-black/10 transition-colors">
-                                <BookText size={16} /><span className="text-sm">Add context</span>
-                            </motion.button>
-                            <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { vibrate(); setIsResearchMode(prev => !prev); }} className={`flex items-center gap-2 px-3 h-9 text-sm rounded-full transition-colors ${isResearchMode ? 'bg-black text-white' : 'text-black bg-black/5 hover:bg-black/10'}`}>
-                                <BrainCircuit size={16}/><span>Research {isResearchMode ? 'On' : 'Off'}</span>
-                            </motion.button>
-                        </div>
-                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask, search, or make anything..."} disabled={isLoading} rows={1} className={`w-full flex-grow bg-transparent focus:outline-none resize-none overflow-y-hidden self-center px-4 py-2 text-base text-black ${input.includes('```') ? 'font-mono' : ''}`} />
-                        <div className="p-2 flex justify-between items-center">
-                            <div className="flex items-center gap-1"><button type="button" onClick={handleAttachmentClick} className="p-2 text-black hover:bg-black/5 rounded-full transition-colors flex-shrink-0"><Paperclip size={20} /></button></div>
-                            <div className="flex items-center gap-1">
-                                <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-black hover:bg-black/5'}`}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
-                                <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-black text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </motion.form>
-        </div>
-    </motion.div>
-);
-    
-    const ChatView = (
-        <motion.div key="chat-view" className="flex-grow flex flex-col w-full min-h-0">
-            <OverscrollContainer ref={scrollRef} className="flex-grow w-full overflow-y-auto pb-28 md:pb-32">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, delay: 0.15 }}>
-                    <div className="p-4 space-y-6">
-                        {messages.map((msg, index) => {
-                            const textParts = msg.parts.filter(p => 'text' in p && p.text.trim());
-                            const attachmentParts = msg.parts.filter(p => 'inlineData' in p);
-                            const hasText = textParts.length > 0;
-                            const hasAttachments = attachmentParts.length > 0;
-                            const modelHasText = msg.parts[0] && 'text' in msg.parts[0] && msg.parts[0].text;
-                            const modelIsThinking = msg.role === 'model' && msg.thinkingSteps?.length && !modelHasText;
-                            const modelHasIntermediateThought = msg.role === 'model' && msg.intermediateThought && !modelHasText;
-                            const isLastMessage = index === messages.length - 1;
-                            const animate = isLastMessage && msg.role === 'model' && animateLastMessage;
-                            
-                            return (
-                                <div key={msg.id} className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                    {modelIsThinking ? <ThinkingBubble /> : modelHasIntermediateThought ? <ThoughtBubble text={msg.intermediateThought!} /> : (
-                                        <div
-                                            style={{ userSelect: selectableMessageId === msg.id ? 'text' : 'none' }}
-                                            className={`flex items-start gap-3 w-full max-w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                            onContextMenu={(e) => handleContextMenuEvent(e, msg)}
-                                            onPointerDown={(e) => handlePointerDown(e, msg)}
-                                            onPointerMove={handlePointerMove}
-                                            onPointerUp={handlePointerUp}
-                                            onPointerLeave={handlePointerUp}
-                                        >
-                                            {msg.role === 'model' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black"><Sparkles size={18} /></div>}
-                                            <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
-                                                {msg.role === 'user' ? (
-                                                    (hasText || hasAttachments) && (
-                                                        <>
-                                                            {hasAttachments && (
-                                                                <div className="flex flex-wrap justify-end gap-2 mb-2">
-                                                                    {attachmentParts.map((part, i) => {
-                                                                        const { mimeType, name } = (part as any).inlineData;
-                                                                        return (
-                                                                            <div key={i} className="flex items-center gap-3 p-3 bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 rounded-xl max-w-xs backdrop-blur-sm">
-                                                                                <div className="w-8 h-8 flex-shrink-0">
-                                                                                    <AttachmentIcon type={mimeType || ''} className="w-full h-full" />
-                                                                                </div>
-                                                                                <span className="text-sm text-light-text dark:text-dark-text truncate">{name || 'Attachment'}</span>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            )}
-                                                            {hasText && (
-                                                                <div className="p-3 rounded-2xl bg-[#f4f4f4] text-[#000] rounded-br-lg">
-                                                                {textParts.map((part, i) => (
-                                                                    <div key={i} className="text-lg" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{(part as any).text}</div>
-                                                                ))}
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    )
-                                                ) : (
-                                                    <div className={`text-lg ${isLoading && isLastMessage ? 'typing-cursor' : ''}`}>
-                                                        {modelHasText ? <StreamingMarkdownRenderer text={(msg.parts[0] as any).text} animate={animate} onFinished={() => {
-                                                            setFinishedTypingMessages(prev => {
-                                                                if (prev.has(msg.id)) return prev;
-                                                                const next = new Set(prev);
-                                                                next.add(msg.id);
-                                                                return next;
-                                                            });
-                                                        }}/> : <span className="opacity-0">.</span>}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {msg.role === 'user' && <div className="w-8 h-8 mt-1 flex-shrink-0 rounded-full flex items-center justify-center bg-black/5 text-black"><UserIcon size={18} /></div>}
-                                        </div>
-                                    )}
-                                    <AnimatePresence>
-                                    {msg.role === 'model' && !modelIsThinking && !modelHasIntermediateThought && modelHasText && finishedTypingMessages.has(msg.id) && !isLoading && (
-                                        <motion.div 
-                                            initial={{ opacity: 0, y: 5 }} 
-                                            animate={{ opacity: 1, y: 0 }} 
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.4 }}
-                                            className="flex flex-col items-start gap-2 mt-2 ml-11"
-                                        >
-                                            <ActionButtons message={msg} />
-                                        </motion.div>
-                                    )}
-                                    </AnimatePresence>
-                                </div>
-                            )
-                        })}
-                        <AnimatePresence>
-                           {isLoading && isResearchMode && <ThinkingBubble />}
-                       </AnimatePresence>
-                    </div>
-                </motion.div>
-            </OverscrollContainer>
-             <div className="absolute bottom-0 left-0 right-0 p-4 pt-10 bg-gradient-to-t from-[#f4f4f4] via-[#f4f4f4]/80 to-transparent">
-                <AnimatePresence>{attachments.length > 0 && <motion.div className="w-full pb-2" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}><div className="flex gap-3 overflow-x-auto pb-2">{attachments.map(att => <AttachmentPreview key={att.id} attachment={att} onRemove={() => handleRemoveAttachment(att.id)} />)}</div></motion.div>}</AnimatePresence>
-                 <motion.div layoutId="aura-ai-input-form" layout transition={{ type: 'spring', stiffness: 500, damping: 40 }} className="relative">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex gap-2 items-end p-2 rounded-[70.4px] bg-[#ffffff] border-none transition-colors shadow-lg">
-                        <button type="button" onClick={handleAttachmentClick} className="p-3 text-black hover:bg-black/5 rounded-full transition-colors flex-shrink-0" aria-label="Attach file"><Paperclip size={20} /></button>
-                        <textarea ref={textareaRef} value={input} onChange={e => { setInput(e.target.value); setSelectableMessageId(null); }} onFocus={() => setIsTextareaFocused(true)} onBlur={() => setIsTextareaFocused(false)} onKeyDown={handleKeyDown} placeholder={isListening ? "Listening..." : "Ask anything..."} disabled={isLoading} rows={1} className={`w-full bg-transparent focus:outline-none resize-none overflow-y-hidden self-center max-h-32 text-base px-2 py-2.5 text-black ${input.includes('```') ? 'font-mono' : ''}`} />
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                            <button 
-                                type="button" 
-                                onClick={() => { vibrate(); setIsResearchMode(!isResearchMode); }} 
-                                className={`p-2 rounded-full transition-all duration-300 ${isResearchMode ? 'bg-black text-white shadow-md' : 'text-black hover:bg-black/5'}`}
-                                aria-label="Toggle Research Mode"
-                            >
-                                <BrainCircuit size={20} />
-                            </button>
-                            <button type="button" onClick={handleMicClick} className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-black hover:bg-black/5'}`} style={{ marginRight: '1px', marginLeft: '1px', paddingLeft: '1px', paddingRight: '1px', paddingBottom: '-9px', marginBottom: '3px' }}>{isListening ? <MicOff size={20} /> : <Mic size={20} />}</button>
-                            <button type="submit" disabled={(!input.trim() && attachments.length === 0) || isLoading} className="w-9 h-9 flex items-center justify-center bg-black text-white rounded-full disabled:opacity-50 transition-transform duration-200"><Send size={18} /></button>
-                        </div>
-                    </form>
-                </motion.div>
+        );
+    };
+
+    const AiTaskButton = ({ icon, title, description, task, requiresInput = false }: { icon: React.ReactNode, title: string, description: string, task: AITask, requiresInput?: boolean }) => (
+        <button
+            onClick={() => requiresInput ? setCurrentAiTask(task) : handleAiAction(task)}
+            className="w-full flex items-center gap-4 text-left p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        >
+            <div className="p-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg">{icon}</div>
+            <div>
+                <p className="font-semibold">{title}</p>
+                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{description}</p>
             </div>
-        </motion.div>
+        </button>
     );
 
+     const TablePopupMenu = () => {
+        const { isOpen, position, selection } = tablePopup;
+        if (!isOpen || !selection) return null;
+
+        const { table, type, index } = selection;
+
+        const tableActions = {
+            insertRow: (before = false) => {
+                const newRow = table.insertRow(before ? index : index + 1);
+                const cellCount = table.rows[index]?.cells.length || 2;
+                for (let i = 0; i < cellCount; i++) {
+                    const newCell = (newRow as HTMLTableRowElement).insertCell();
+                    newCell.innerHTML = '<br>';
+                }
+            },
+            deleteRow: () => table.rows.length > 2 && table.deleteRow(index),
+            insertColumn: (before = false) => {
+                const colIndex = before ? index : index + 1;
+                Array.from(table.rows).forEach(row => {
+                    const newCell = (row as HTMLTableRowElement).insertCell(colIndex);
+                    newCell.innerHTML = '<br>';
+                });
+            },
+            deleteColumn: () => {
+                 if (table.rows[0]?.cells.length > 1) {
+                    Array.from(table.rows).forEach(row => (row as HTMLTableRowElement).deleteCell(index));
+                 }
+            },
+            toggleColumnHeader: () => {
+                const header = table.tHead;
+                if (header) {
+                    const headerRow = header.rows[0];
+                    if (headerRow) {
+                        Array.from(headerRow.cells).forEach(cell => {
+                            const td = document.createElement('td');
+                            td.innerHTML = (cell as HTMLTableCellElement).innerHTML;
+                            (cell as HTMLTableCellElement).replaceWith(td);
+                        });
+                        table.tBodies[0]?.prepend(headerRow);
+                    }
+                } else if (table.tBodies[0]?.rows[0]) {
+                    const newHeader = table.createTHead();
+                    const firstRow = table.tBodies[0].rows[0];
+                    Array.from(firstRow.cells).forEach(cell => {
+                        const th = document.createElement('th');
+                        th.innerHTML = (cell as HTMLTableCellElement).innerHTML;
+                        (cell as HTMLTableCellElement).replaceWith(th);
+                    });
+                    newHeader.appendChild(firstRow);
+                }
+            },
+            toggleRowHeader: () => {
+                const hasRowHeaders = table.classList.toggle('row-headers');
+                Array.from(table.tBodies[0]?.rows || []).forEach(row => {
+                    const tableRow = row as HTMLTableRowElement;
+                    if (tableRow.cells[0]) {
+                        const newCellType = hasRowHeaders ? 'th' : 'td';
+                        const oldCell = tableRow.cells[0];
+                        const newCell = document.createElement(newCellType);
+                        newCell.innerHTML = oldCell.innerHTML;
+                        oldCell.replaceWith(newCell);
+                    }
+                });
+            },
+            deleteTable: () => table.remove(),
+        };
+
+        const hasHeaderRow = !!table.tHead;
+        const hasRowHeaders = table.classList.contains('row-headers');
+
+        return (
+            <motion.div
+                ref={tablePopupRef}
+                className="fixed z-50 w-64 bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-xl border border-white/10 shadow-3xl p-2"
+                style={{
+                    top: position.top, left: position.left,
+                    transform: 'translateX(-50%)',
+                }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+                {type === 'row' && (
+                    <>
+                        <MenuItem icon={<ArrowUpFromLine size={16}/>} label="Insert Row Above" onClick={() => handleTableAction(() => tableActions.insertRow(true))} />
+                        <MenuItem icon={<ArrowDownFromLine size={16}/>} label="Insert Row Below" onClick={() => handleTableAction(() => tableActions.insertRow(false))} />
+                        <MenuItem icon={<Trash size={16}/>} label="Delete Row" onClick={() => handleTableAction(tableActions.deleteRow)} />
+                        <MenuDivider/>
+                    </>
+                )}
+                 {type === 'column' && (
+                    <>
+                        <MenuItem icon={<ArrowLeftFromLine size={16}/>} label="Insert Column Left" onClick={() => handleTableAction(() => tableActions.insertColumn(true))} />
+                        <MenuItem icon={<ArrowRightFromLine size={16}/>} label="Insert Column Right" onClick={() => handleTableAction(() => tableActions.insertColumn(false))} />
+                        <MenuItem icon={<Trash size={16}/>} label="Delete Column" onClick={() => handleTableAction(tableActions.deleteColumn)} />
+                        <MenuDivider/>
+                    </>
+                )}
+                <MenuItem icon={<Pilcrow size={16}/>} label={`${hasHeaderRow ? 'Disable' : 'Enable'} Header Row`} onClick={() => handleTableAction(tableActions.toggleColumnHeader)} />
+                <MenuItem icon={<CaseUpper size={16}/>} label={`${hasRowHeaders ? 'Disable' : 'Enable'} Row Headers`} onClick={() => handleTableAction(tableActions.toggleRowHeader)} />
+                <MenuDivider/>
+                <MenuItem icon={<Trash2 size={16}/>} label="Delete Table" danger onClick={() => handleTableAction(tableActions.deleteTable)} />
+            </motion.div>
+        );
+    };
+
+    const FormattingToolbar = () => {
+        const handleCommand = (command: string, value?: string) => {
+            document.execCommand(command, false, value);
+            handleContentChange();
+        };
+    
+        const handleImageButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+            saveSelection();
+            if (isDesktop) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const containerRect = positioningContainerRef.current?.getBoundingClientRect();
+                if (rect && containerRect) {
+                    setImageSourceMenuPosition({ 
+                        top: rect.bottom - containerRect.top + 10,
+                        left: rect.left - containerRect.left + rect.width / 2
+                    });
+                }
+            }
+            setIsImageSourceMenuOpen(true);
+        };
+    
+        const COMMANDS = [
+            { icon: <Heading2 size={20} />, title: 'Heading', action: () => handleCommand('formatBlock', '<h2>') },
+            { icon: <List size={20} />, title: 'Bulleted List', action: () => handleCommand('insertUnorderedList') },
+            { icon: <ListOrdered size={20} />, title: 'Numbered List', action: () => handleCommand('insertOrderedList') },
+            { icon: <Table size={20} />, title: 'Table', action: () => {
+                const tableHTML = `<table class="journal-table"><thead><tr><th>Header 1</th><th>Header 2</th></tr></thead><tbody><tr><td><br></td><td><br></td></tr></tbody></table><p><br></p>`;
+                handleCommand('insertHTML', tableHTML);
+            }},
+            { icon: <Minus size={20} />, title: 'Divider', action: () => handleCommand('insertHorizontalRule') },
+        ];
+        
+        return (
+            <motion.div
+                className="sticky top-0 z-30"
+                initial={{ y: "-100%" }}
+                animate={{ y: "0%" }}
+                exit={{ y: "-100%" }}
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+            >
+                <div className="flex justify-center p-2 bg-light-glass/80 dark:bg-dark-glass/80 backdrop-blur-md border-b border-white/10 shadow-lg">
+                    <div className="flex items-center gap-1">
+                        {COMMANDS.map(cmd => (
+                            <button
+                                key={cmd.title}
+                                onMouseDown={e => e.preventDefault()}
+                                onClick={() => cmd.action()}
+                                title={cmd.title}
+                                className="p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                            >
+                                {cmd.icon}
+                            </button>
+                        ))}
+                        <div className="w-px h-6 bg-black/10 dark:bg-white/10 mx-1"></div>
+                        <button
+                            key="Image"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={handleImageButtonClick}
+                            title="Image"
+                            className="p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                        >
+                            <ImageIcon size={20} />
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
+
+
     return (
-        <div className="w-full h-full flex flex-col bg-[#ffffff] font-['Montserrat',_Arial,_sans-serif] text-black">
-            <Header title="Aura AI" showBackButton onBack={handleBack} rightAction={HeaderActions} titleClassName="text-black" />
-            <div className="absolute top-[64px] left-0 right-0 h-16 bg-gradient-to-b from-[#f4f4f4] to-transparent z-10 pointer-events-none" />
-            <ContextMenu />
+        <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
             <AnimatePresence>
-                {isHistoryOpen && (
+                {isImageSourceMenuOpen && (
+                    isDesktop 
+                    ? <ImageSourceMenu /> 
+                    : <ImageSourceBottomSheet 
+                        onClose={() => setIsImageSourceMenuOpen(false)} 
+                        onSelect={handleImageSourceSelect} 
+                    />
+                )}
+                {isAttachmentMenuOpen && (
+                    isDesktop
+                        ? <JournalAttachmentMenu
+                            menuRef={attachmentMenuRef}
+                            position={attachmentMenuPosition}
+                            onSelect={handleAttachmentMenuSelect}
+                        />
+                        : <AttachmentBottomSheet
+                            onClose={() => setIsAttachmentMenuOpen(false)}
+                            onSelect={handleAttachmentMenuSelect}
+                        />
+                )}
+            </AnimatePresence>
+            <TablePopupMenu/>
+            <Header title={entry ? 'Edit Entry' : 'New Entry'} showBackButton onBack={navigateBack} rightAction={HeaderActions} />
+             <AnimatePresence>
+                {isOptionsMenuOpen && (
+                     <motion.div
+                        key="journal-options-menu"
+                        ref={menuRef}
+                        className="absolute top-16 right-4 w-64 max-h-[calc(100dvh-5rem)] overflow-y-auto bg-light-bg-secondary/85 dark:bg-dark-bg-secondary/85 backdrop-blur-md rounded-xl border border-white/10 dark:border-white/5 shadow-3xl origin-top-right z-30 p-3 text-base"
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    >
+                      <div className="space-y-1">
+                        <div className="relative mb-2">
+                            <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-md">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary pointer-events-none"/>
+                                <input 
+                                    type="text" 
+                                    placeholder="Find in page..." 
+                                    value={searchQuery}
+                                    onChange={handleSearchInputChange}
+                                    className="w-full pl-8 pr-2 py-2.5 text-sm bg-transparent focus:outline-none"/>
+                                {searchQuery && (
+                                    <div className="flex items-center gap-1 pr-2">
+                                        <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary whitespace-nowrap">
+                                            {searchMatches.length > 0 ? `${currentMatchIndex + 1} of ${searchMatches.length}` : '0/0'}
+                                        </span>
+                                        <button onClick={goToPrevMatch} disabled={searchMatches.length === 0} className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-50 font-sans text-lg leading-none">↑</button>
+                                        <button onClick={goToNextMatch} disabled={searchMatches.length === 0} className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-50 font-sans text-lg leading-none">↓</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-around mb-2">
+                            {([
+                                { style: 'default', label: 'Sans', char: 'Ag' },
+                                { style: 'serif', label: 'Serif', char: 'Ag' },
+                                { style: 'mono', label: 'Mono', char: 'Ag' },
+                            ] as const).map(({ style, label, char }) => (
+                                <button
+                                    key={style}
+                                    onClick={() => { setFontStyle(style); markAsChanged(); }}
+                                    className="flex flex-col items-center gap-1 p-2 rounded-md"
+                                >
+                                    <span className={`text-2xl font-semibold transition-colors mt-1 ${fontClasses[style]} ${fontStyle === style ? 'text-light-primary dark:text-dark-primary' : ''}`}>
+                                        {char}
+                                    </span>
+                                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <MenuDivider/>
+                        {(canUndo || canRedo) && (<>
+                            <MenuItem icon={<Undo size={16}/>} label="Undo" onClick={handleUndo} disabled={!canUndo} />
+                            <MenuItem icon={<Redo size={16}/>} label="Redo" onClick={handleRedo} disabled={!canRedo} />
+                            <MenuDivider/>
+                        </>)}
+                        <MenuItem icon={<Copy size={16}/>} label="Copy text" onClick={handleCopyText} />
+                        <MenuItem icon={<Repeat size={16}/>} label="Duplicate" shortcut={isDesktop ? 'Alt+D' : undefined} onClick={handleDuplicate} disabled={!currentEntry} />
+                        <MenuItem icon={<Trash2 size={16}/>} label="Move to Trash" shortcut={isDesktop ? 'Alt+T' : undefined} onClick={handleDelete} danger disabled={!currentEntry} />
+                        <MenuDivider/>
+                        <MenuToggleItem icon={<ArrowLeftRight size={16}/>} label="Small text" checked={isSmallText} onChange={() => {setIsSmallText(s => !s); markAsChanged();}} />
+                        <MenuToggleItem icon={<ChevronsRight size={16}/>} label="Full width" checked={isFullWidth} onChange={() => {setIsFullWidth(s => !s); markAsChanged();}} />
+                        <MenuDivider/>
+                        <MenuToggleItem icon={<Lock size={16}/>} label="Lock page" checked={isLocked} onChange={() => {setIsLocked(l => !l); markAsChanged();}} />
+                         <MenuDivider/>
+                         <MenuItem icon={<LinkIcon size={16}/>} label={`Connections (${linkedSessionIds.length})`} shortcut={isDesktop ? 'Alt+C' : undefined} onClick={handleLinkSession}/>
+                         <MenuDivider/>
+                         <div className="text-xs text-light-text-secondary dark:text-dark-text-secondary opacity-75 px-2 pt-2 space-y-1">
+                             <p>Word count: {wordCount}</p>
+                             <p>Last edited by {userProfile.name}</p>
+                             <p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', hour12: true }).format(lastModified)}</p>
+                         </div>
+                      </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <div 
+                ref={positioningContainerRef}
+                className={`relative flex-grow w-full ${isFullWidth ? 'is-full-width px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300 overflow-hidden`}>
+                <FormattingMenu />
+                <div className={`${fontClasses[fontStyle]} flex flex-col gap-2 mb-4`}>
+                    <input
+                        type="text" value={title} onChange={(e) => {setTitle(e.target.value); markAsChanged();}}
+                        placeholder="Title..."
+                        className="w-full bg-transparent text-3xl font-bold focus:outline-none pb-2 border-b border-white/10 placeholder:text-light-text-secondary/50 dark:placeholder:text-dark-text-secondary/50"
+                        autoFocus={!entry} readOnly={isLocked}
+                    />
+                    {!isLocked && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">Subject:</span>
+                            <select 
+                                value={subject}
+                                onChange={(e) => { setSubject(e.target.value); markAsChanged(); }}
+                                className="bg-black/5 dark:bg-white/5 border border-white/10 rounded-lg px-2 py-0.5 text-xs focus:outline-none text-light-text dark:text-dark-text"
+                            >
+                                <option value="">None</option>
+                                {syllabus.map(s => (
+                                    <option key={s.id} value={s.title}>{s.title}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
+                <OverscrollContainer className="relative flex-grow w-full journal-editor-container overflow-y-auto">
+                    <AnimatePresence>
+                        {isToolbarVisible && !isLocked && <FormattingToolbar />}
+                    </AnimatePresence>
+                    <div className="pb-24">
+                        <AnimatePresence>
+                            {isDraggingOver && (
+                                <motion.div
+                                    className="absolute inset-0 z-10 bg-light-primary/10 dark:bg-dark-primary/10 border-2 border-dashed border-light-primary dark:border-dark-primary rounded-lg pointer-events-none flex flex-col items-center justify-center"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <UploadCloud size={48} className="text-light-primary dark:text-dark-primary" />
+                                    <p className="mt-2 font-semibold text-light-primary dark:text-dark-primary">Drop image here</p>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                        {selectedImageContainer && !isLocked && (
+                            <ImageResizer targetElement={selectedImageContainer} onResizeEnd={handleContentChange} editorRef={editorRef} isLocked={isLocked}/>
+                        )}
+                        <div
+                            ref={editorRef} contentEditable={!isLocked} onInput={handleContentChange}
+                            onContextMenu={(e) => e.preventDefault()}
+                            onFocus={() => setIsToolbarVisible(true)}
+                            onBlur={() => setIsToolbarVisible(false)}
+                            data-placeholder="Start writing..."
+                            className={`w-full min-h-full bg-transparent focus:outline-none resize-none caret-light-text dark:caret-dark-text leading-7 ${isSmallText ? 'text-base' : 'text-lg'} ${fontClasses[fontStyle]}`}
+                            autoFocus={!entry}
+                        />
+                        <div className="mt-8 pt-6 border-t border-white/10">
+                            <AnimatePresence>
+                                {attachments.length > 0 && (
+                                    <div className="space-y-3">
+                                    <h2 className="font-semibold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-3">Attachments</h2>
+                                    {attachments.map((att, index) => (
+                                        <motion.div
+                                            key={att.id}
+                                            layout
+                                            className="bg-light-glass/80 dark:bg-dark-glass/80 rounded-2xl border border-white/10 overflow-hidden"
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.1 }}
+                                        >
+                                            <div className="flex items-center justify-between p-3 border-b border-white/10">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <AttachmentIcon type={att.type} />
+                                                    <span className="font-semibold truncate pr-2">{att.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <button onClick={() => handleRemoveAttachment(att)} className="p-2 text-light-text-secondary dark:text-dark-text-secondary rounded-full hover:bg-black/10 dark:hover:bg-white/10" aria-label="Remove attachment"><Trash2 size={16} /></button>
+                                                    <button onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="px-4 py-1.5 text-sm font-semibold bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-sm">View</button>
+                                                </div>
+                                            </div>
+                                            <div onClick={() => navigateTo('attachmentViewer', { attachments, startIndex: index })} className="h-48 flex items-center justify-center bg-black/5 dark:bg-white/5 cursor-pointer">
+                                                {att.type.startsWith('image/') ? <img src={att.data} alt={att.name} className="max-w-full max-h-full object-contain" /> : att.type === 'application/pdf' ? <PdfViewer dataUrl={att.data} isThumbnail={true} /> : <div className="flex flex-col items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary"><AttachmentIcon type={att.type} /><span>Click to View</span></div>}
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                    </div>
+                                )}
+                            </AnimatePresence>
+                            <AnimatePresence>
+                                {isUploading && <motion.div className="flex items-center gap-2 text-light-text-secondary dark:text-dark-text-secondary mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><LoaderCircle size={16} className="animate-spin" /><span>Compressing & preparing...</span></motion.div>}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+                </OverscrollContainer>
+                <AnimatePresence>
+                    {!isLocked && (
+                        <>
+                        <motion.button
+                            onClick={() => {vibrate(); setIsAiModalOpen(true);}}
+                            className="absolute bottom-6 left-6 group z-20"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            aria-label="Aura AI Assistant"
+                            initial={{ scale: 0, y: 50 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0, y: 50 }}
+                        >
+                            <div className="absolute -inset-1 bg-flow-gradient bg-400% animate-gradient-flow rounded-full blur-md opacity-75 group-hover:opacity-100 transition duration-500"></div>
+                            <div className="relative w-16 h-16 flex items-center justify-center bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-full shadow-lg">
+                                <Sparkles size={24} className="text-cyan-400"/>
+                            </div>
+                        </motion.button>
+                        <motion.button
+                            ref={attachmentButtonRef}
+                            onClick={handleAttachmentButtonClick}
+                            disabled={isUploading}
+                            className="absolute bottom-6 right-6 w-16 h-16 bg-light-primary dark:bg-dark-primary text-white rounded-full flex items-center justify-center shadow-lg z-20 disabled:opacity-50"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            aria-label="Attach file"
+                            initial={{ scale: 0, y: 50 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0, y: 50 }}
+                        >
+                           <AnimatePresence mode="wait">
+                            {isUploading 
+                                ? <motion.div key="loader" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><LoaderCircle size={24} className="animate-spin" /></motion.div>
+                                : <motion.div key="icon" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}><Paperclip size={24} /></motion.div>
+                            }
+                            </AnimatePresence>
+                        </motion.button>
+                        </>
+                    )}
+                </AnimatePresence>
+                <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} />
+                <input type="file" ref={inlineImageInputRef} onChange={handleInlineImageFileSelect} style={{ display: 'none' }} accept="image/jpeg, image/png" />
+            </div>
+            <AnimatePresence>
+                {isAiModalOpen && (
                     <motion.div
-                        className="fixed inset-0 z-40 bg-transparent backdrop-blur-[2px]"
+                        className="fixed inset-0 z-40 flex items-end p-2 bg-black/50"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        onClick={() => { 
-                            if (!isHistorySelectionMode) {
-                                vibrate();
-                                playUISound('tap');
-                                setIsHistoryOpen(false);
-                            }
-                        }}
+                        onClick={handleAiModalClose}
                     >
-                        <motion.div 
-                            className="absolute top-0 right-0 bottom-0 w-full max-w-sm bg-light-bg-secondary dark:bg-dark-bg-secondary border-l border-white/10 flex flex-col"
-                            initial={{ x: "100%" }} 
-                            animate={{ x: "0%" }} 
-                            exit={{ x: "100%" }} 
-                            transition={{ type: 'spring', stiffness: 300, damping: 30 }} 
-                            onClick={e => e.stopPropagation()}
-                            drag="x"
-                            dragConstraints={{ left: 0, right: 0 }}
-                            dragElastic={0}
-                            onDragEnd={(event, info) => {
-                                if (info.offset.x > 100 && info.velocity.x > 200) { // Swipe right to close
-                                    if (!isHistorySelectionMode) {
-                                        vibrate();
-                                        playUISound('tap');
-                                        setIsHistoryOpen(false);
-                                    }
-                                }
-                            }}
+                        <motion.div
+                            className="relative w-full max-w-md mx-auto bg-light-bg-secondary/95 dark:bg-dark-bg-secondary/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-3xl p-4 pt-8"
+                            initial={{ y: "100%" }}
+                            animate={{ y: "0%" }}
+                            exit={{ y: "100%" }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                            drag="y"
+                            dragConstraints={{ top: 0 }}
+                            onDragEnd={(_, info) => { if (info.offset.y > 100) handleAiModalClose(); }}
+                            dragElastic={{ top: 0, bottom: 0.5 }}
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <Header {...historyHeaderProps} />
-                            <OverscrollContainer className="flex-grow overflow-y-auto">
-                                <div className="p-4 space-y-3">
-                                    {auraChatSessions.length > 0 ? auraChatSessions.map((session, index) => {
-                                        const firstUserMessage = session.messages.find(msg => msg.role === 'user')?.parts.find(p => 'text' in p) as { text: string } | undefined;
-                                        const isSelected = selectedHistoryIndices.includes(index);
-                                        return (
-                                            <motion.div
-                                                key={index}
-                                                onClick={() => handleHistoryItemClick(session, index)}
-                                                onPointerDown={() => handleHistoryPointerDown(index)}
-                                                onPointerUp={handleHistoryPointerUpOrLeave}
-                                                onPointerLeave={handleHistoryPointerUpOrLeave}
-                                                className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 border cursor-pointer ${isSelected ? 'bg-light-primary/20 dark:bg-dark-primary/20 border-light-primary/50 dark:border-dark-primary/50' : 'bg-light-glass dark:bg-dark-glass border-transparent'}`}
-                                                whileTap={{ scale: 0.98 }}
-                                            >
-                                                <AnimatePresence>
-                                                    {isHistorySelectionMode && (
-                                                        <motion.div
-                                                            initial={{ scale: 0, opacity: 0 }}
-                                                            animate={{ scale: 1, opacity: 1 }}
-                                                            exit={{ scale: 0, opacity: 0 }}
-                                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                                            className="w-6 h-6 flex-shrink-0"
-                                                        >
-                                                            <div className={`w-full h-full rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-light-primary dark:bg-dark-primary border-transparent' : 'border-gray-400'}`}>
-                                                                {isSelected && <Check size={16} className="text-white" />}
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                                <div className="flex-grow overflow-hidden">
-                                                    <p className="font-medium truncate">{firstUserMessage?.text || "Chat with attachments"}</p>
-                                                    <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{formatTimeAgo(session.timestamp)}</p>
-                                                </div>
-                                            </motion.div>
-                                        );
-                                    }) : <div className="text-center text-light-text-secondary dark:text-dark-text-secondary pt-16"><BookText size={40} className="mx-auto mb-4" /><p>No recent chats.</p></div>}
-                                </div>
-                            </OverscrollContainer>
-                             {!isHistorySelectionMode && (
-                                <div className="p-4 flex-shrink-0 border-t border-white/10">
-                                    <p className="text-xs text-center text-light-text-secondary dark:text-dark-text-secondary mb-3">
-                                        Only the last 10 chat sessions are stored.
-                                    </p>
-                                    <button onClick={() => navigateTo('auraAiSettings')} className="w-full flex items-center justify-start gap-3 px-3 py-2 border border-black/10 dark:border-white/10 rounded-lg font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                                        <SettingsIcon size={18} /><span>AI Settings</span>
-                                    </button>
-                                </div>
+                           <div className="absolute top-0 left-0 right-0 flex justify-center pt-3 cursor-grab">
+                               <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+                           </div>
+                           <AnimatePresence mode="wait">
+                            {currentAiTask ? (
+                                <motion.div
+                                    key="ai-input"
+                                    initial={{ opacity: 0, x: 50 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -50 }}
+                                >
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <button onClick={() => setCurrentAiTask(null)} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ArrowLeft size={18}/></button>
+                                        <h3 className="text-lg font-semibold">
+                                            {currentAiTask === 'GENERATE' ? 'Generate from Prompt' 
+                                            : currentAiTask === 'GENERATE_IMAGE' ? 'Generate Image'
+                                            : 'Ask about your entry'}
+                                        </h3>
+                                    </div>
+                                    <textarea
+                                        value={aiCustomPrompt}
+                                        onChange={(e) => setAiCustomPrompt(e.target.value)}
+                                        placeholder={
+                                            currentAiTask === 'GENERATE' ? 'e.g., about my productive day...' 
+                                            : currentAiTask === 'GENERATE_IMAGE' ? 'Describe the image you want...'
+                                            : 'e.g., what themes are present?'
+                                        }
+                                        className="w-full h-24 p-2 bg-light-glass dark:bg-dark-glass rounded-lg border border-white/10 focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
+                                        autoFocus
+                                    />
+                                    <div className="flex justify-center mt-4">
+                                        <motion.button
+                                            onClick={() => handleAiAction(currentAiTask)}
+                                            disabled={!aiCustomPrompt.trim()}
+                                            className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 text-white rounded-full font-semibold shadow-lg disabled:opacity-50"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                                        >
+                                            <Sparkles size={18} />
+                                            <span>{currentAiTask === 'ASK' ? 'Ask' : 'Generate'}</span>
+                                        </motion.button>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <motion.div 
+                                    key="ai-menu"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <h3 className="text-lg font-semibold text-center mb-3">Aura AI Assistant</h3>
+                                    <div className="space-y-2">
+                                        <AiTaskButton icon={<Wand2 size={20}/>} title="Organize & Refine" description="Structure, format, and add diagrams." task="IMPROVE" />
+                                        <AiTaskButton icon={<BookText size={20}/>} title="Continue Writing" description="Generate what comes next" task="CONTINUE" />
+                                        <AiTaskButton icon={<BrainCircuit size={20}/>} title="Summarize" description="Get the key points" task="SUMMARIZE" />
+                                        <AiTaskButton icon={<Sparkles size={20}/>} title="Generate from Prompt" description="Create a new entry from an idea" task="GENERATE" requiresInput/>
+                                        <AiTaskButton icon={<MessageSquare size={20}/>} title="Ask a Question" description="Get insights about your entry" task="ASK" requiresInput/>
+                                    </div>
+                                </motion.div>
                             )}
+                            </AnimatePresence>
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
-            <motion.div
-                className="flex-grow flex flex-col w-full min-h-0"
-                drag="x"
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0}
-                onDragEnd={(event, info) => {
-                    if (info.offset.x < -100 && info.velocity.x < -200) { // Swipe left to open
-                        if (!isHistoryOpen) {
-                            handleHistoryClick();
-                        }
-                    }
-                }}
-            >
-                <AnimatePresence>{chatState === 'initial' ? InitialView : ChatView}</AnimatePresence>
-            </motion.div>
-            <JournalContextModal isOpen={isJournalContextModalOpen} onClose={() => setIsJournalContextModalOpen(false)} onAddContext={handleAddJournalContext} />
-            <AttachmentTypeModal isOpen={showAttachmentModal} onClose={() => setShowAttachmentModal(false)} onSelect={handleAttachmentTypeSelect} />
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
-             <style>{`
-                .prose-styles {
-                    line-height: 1.7;
-                    word-wrap: break-word;
-                }
-                .prose-styles p, .prose-styles ul, .prose-styles ol, .prose-styles table {
-                    margin-top: 0.75em;
-                    margin-bottom: 0.75em;
-                }
-                .prose-styles h1, .prose-styles h2, .prose-styles h3, .prose-styles h4 {
-                    margin-top: 1em;
-                    margin-bottom: 0.25em;
-                }
-                .prose-styles h1 { font-size: 1.8em; font-weight: bold; }
-                .prose-styles h2 { font-size: 1.5em; font-weight: bold; }
-                .prose-styles h3 { font-size: 1.25em; font-weight: bold; }
-                .prose-styles h4 { font-size: 1.1em; font-weight: bold; }
-                .prose-styles ul { list-style-type: disc; padding-left: 1.5rem; }
-                .prose-styles ol { list-style-type: decimal; padding-left: 1.5rem; }
-                .prose-styles a { color: #60a5fa; text-decoration: underline; }
-                .prose-styles hr { border: none; border-top: 1px solid rgba(128, 128, 128, 0.2); margin: 1.5rem 0; }
-                .prose-styles code {
-                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-                    background-color: rgba(128, 128, 128, 0.1);
-                    padding: 0.2em 0.4em;
-                    border-radius: 0.25rem;
-                    font-size: 0.9em;
-                }
-                .prose-styles pre {
-                    background-color: rgba(0,0,0,0.8) !important;
-                    color: #f8f8f2 !important;
-                    padding: 0;
+            <style>{`
+                .journal-editor-container [contentEditable=true] { -webkit-user-select: text; user-select: text; }
+                .journal-editor-container [contentEditable=true]:empty:before { content: attr(data-placeholder); color: #a0a0a0; opacity: 0.5; }
+                .journal-editor-container p { min-height: 1.75rem; }
+                .journal-editor-container h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.25rem; }
+                .journal-editor-container ul, .journal-editor-container ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+                .journal-editor-container ul { list-style-type: disc; }
+                .journal-editor-container ol { list-style-type: decimal; }
+                .journal-editor-container li { margin-bottom: 0.25rem; }
+                .journal-editor-container hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 1.5rem 0; }
+                html.light .journal-editor-container hr { border-top-color: rgba(0, 0, 0, 0.1); }
+                .journal-editor-container table.journal-table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 1rem 0; 
                     border-radius: 0.75rem;
                     overflow: hidden;
-                    font-size: 0.9em;
+                    border: 1px solid rgba(128, 128, 128, 0.2);
                 }
-                .prose-styles pre code {
-                    background-color: transparent !important;
-                    padding: 1rem;
+                .journal-editor-container table.journal-table th, .journal-editor-container table.journal-table td { 
+                    border: 1px solid rgba(128, 128, 128, 0.2); 
+                    padding: 0.75rem;
+                    text-align: left; 
+                    min-height: 1.5rem;
+                    position: relative;
+                }
+                .journal-editor-container table.journal-table th { 
+                    font-weight: 600; 
+                }
+                .journal-editor-container table.journal-table .table-selection-highlight {
+                    background-color: hsla(var(--accent-dark), 0.2);
+                }
+                html.light .journal-editor-container table.journal-table .table-selection-highlight {
+                     background-color: hsla(var(--accent-light), 0.2);
+                }
+                .journal-editor-container table.journal-table.row-headers th:first-child {
+                    font-weight: 600;
+                }
+                html.dark .journal-editor-container table.journal-table {
+                     border-color: rgba(128, 128, 128, 0.2);
+                }
+                html.dark .journal-editor-container table.journal-table th, html.dark .journal-editor-container table.journal-table td { 
+                    border-color: rgba(128, 128, 128, 0.2); 
+                    color: #e5e7eb;
+                }
+                html.dark .journal-editor-container table.journal-table th { 
+                    background-color: rgba(128, 128, 128, 0.15); 
+                }
+                html.light .journal-editor-container table.journal-table {
+                    border-color: rgba(0, 0, 0, 0.1);
+                }
+                html.light .journal-editor-container table.journal-table th, html.light .journal-editor-container table.journal-table td { 
+                    border-color: rgba(0, 0, 0, 0.1); 
+                    color: #1f2937;
+                }
+                html.light .journal-editor-container table.journal-table th { 
+                    background-color: rgba(0, 0, 0, 0.05); 
+                }
+                .journal-editor-container figure.generated-image {
+                    margin: 1rem 0;
+                    text-align: center;
                     display: block;
-                    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+                    position: relative;
+                    max-width: 100%;
                 }
-                .prose-styles .math-formula-block {
-                    overflow-x: auto;
-                    padding: 0.5rem;
-                    margin: 0.5rem 0;
+                .journal-editor-container figure.generated-image img {
+                    max-width: 100%;
+                    height: auto;
+                    border-radius: 0.75rem;
+                    border: 1px solid rgba(128, 128, 128, 0.2);
+                    display: inline-block;
+                    cursor: pointer;
                 }
-                .prose-styles table.aura-table { width: 100%; border-collapse: collapse; margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; border: 1px solid rgba(128, 128, 128, 0.2); }
-                .prose-styles table.aura-table th, .prose-styles table.aura-table td { border: 1px solid rgba(128, 128, 128, 0.2); padding: 0.5rem; text-align: left; }
-                .prose-styles table.aura-table th { font-weight: 600; background-color: rgba(128, 128, 128, 0.05); }
-                .prose-styles blockquote {
-                    border-left: 4px solid rgba(128, 128, 128, 0.2);
-                    padding-left: 1rem;
-                    margin-left: 0;
-                    margin-right: 0;
-                    font-style: italic;
+                .journal-editor-container figure.generated-image figcaption {
+                    font-size: 0.875rem;
                     color: #a0a0a0;
+                    margin-top: 0.5rem;
                 }
-                html.light .prose-styles blockquote {
-                    color: #606060;
+                .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
+                .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+                mark.search-highlight { background-color: #facc15; color: black; border-radius: 3px; }
+                mark.search-highlight.current { background-color: #fb923c; }
+                .custom-highlight { color: inherit; }
+                html.dark .journal-editor-container .custom-highlight { color: #1a1a1a !important; }
+                html.dark .journal-editor-container [style*="rgb(254, 240, 138)"],
+                html.dark .journal-editor-container [style*="rgb(251, 207, 232)"],
+                html.dark .journal-editor-container [style*="rgb(191, 219, 254)"],
+                html.dark .journal-editor-container [style*="rgb(167, 243, 208)"],
+                html.dark .journal-editor-container [style*="rgb(233, 213, 255)"] {
+                    color: #1a1a1a !important;
                 }
-
-                @keyframes typing-blink {
-                    0% { opacity: 1; }
-                    50% { opacity: 0; }
-                    100% { opacity: 1; }
+                .image-resizer-handle {
+                    position: absolute;
+                    width: 12px;
+                    height: 12px;
+                    background-color: white;
+                    border: 2px solid hsl(var(--accent-dark));
+                    border-radius: 50%;
+                    pointer-events: auto;
+                    z-index: 10;
                 }
-                .typing-cursor::after {
-                    content: '▋';
-                    animation: typing-blink 1s infinite;
-                    font-size: 1em;
-                    line-height: 1;
-                    margin-left: 0.1em;
-                    vertical-align: baseline;
-                    color: #a0a0a0;
+                html.light .image-resizer-handle {
+                    border-color: hsl(var(--accent-light));
                 }
-                .dark\\:bg-dark-primary { background-color: hsl(var(--accent-dark)); }
-                .bg-light-primary { background-color: hsl(var(--accent-light)); }
-                .dark\\:text-dark-primary { color: hsl(var(--accent-dark)); }
-                .text-light-primary { color: hsl(var(--accent-light)); }
-                .bg-light-primary\\/10 { background-color: hsla(var(--accent-light), 0.1); }
-                .dark\\:bg-dark-primary\\/10 { background-color: hsla(var(--accent-dark), 0.1); }
-                .bg-light-primary\\/20 { background-color: hsla(var(--accent-light), 0.2); }
-                .dark\\:bg-dark-primary\\/20 { background-color: hsla(var(--accent-dark), 0.2); }
-                .border-light-primary\\/50 { border-color: hsla(var(--accent-light), 0.5); }
-                .dark\\:border-dark-primary\\/50 { border-color: hsla(var(--accent-dark), 0.5); }
-                .focus-within\\:border-light-primary\\/50:focus-within { border-color: hsla(var(--accent-light), 0.5); }
-                .dark\\:focus-within\\:border-dark-primary\\/50:focus-within { border-color: hsla(var(--accent-dark), 0.5); }
-                .hover\\:bg-light-primary\\/10:hover { background-color: hsla(var(--accent-light), 0.1); }
-                .dark\\:hover\\:bg-dark-primary\\/10:hover { background-color: hsla(var(--accent-dark), 0.1); }
-                .hover\\:text-light-primary:hover { color: hsl(var(--accent-light)); }
-                .dark\\:hover\\:text-dark-primary:hover { color: hsl(var(--accent-dark)); }
-             `}</style>
+                @media screen and (max-width: 640px) {
+                    .journal-editor-container table.journal-table {
+                        display: block;
+                        overflow-x: auto;
+                        white-space: nowrap;
+                    }
+                    .journal-editor-container table.journal-table th,
+                    .journal-editor-container table.journal-table td {
+                        white-space: normal;
+                    }
+                }
+            `}</style>
         </div>
     );
 };
 
-export default AuraAiPage;
+export default JournalEntryPage;
