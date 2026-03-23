@@ -66,9 +66,10 @@ const formatTimerTime = (seconds: number) => {
 };
 
 const calculateProgress = (node: TopicNode): number => {
-  if (node.children.length === 0) return node.isCompleted ? 100 : 0;
-  const total = node.children.reduce((acc, child) => acc + calculateProgress(child), 0);
-  return total / node.children.length;
+  const children = node.children || [];
+  if (children.length === 0) return node.isCompleted ? 100 : 0;
+  const total = children.reduce((acc, child) => acc + calculateProgress(child), 0);
+  return total / children.length;
 };
 
 const FocusPage: React.FC = () => {
@@ -310,17 +311,17 @@ const FocusPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
        <Header title="Focus"/>
        <div className="flex-grow p-4 overflow-y-auto">
             <div className="flex justify-between items-center mb-6 gap-4">
-                <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-1">Completed</span>
-                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{overallProgress.toFixed(2)}%</span>
+                <div className="flex flex-col items-center justify-center bg-light-glass dark:bg-dark-glass p-4 rounded-2xl shadow-sm border border-white/20 dark:border-white/10 flex-1">
+                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider font-semibold mb-1">Completed</span>
+                    <span className="text-2xl font-bold text-light-text dark:text-dark-text">{overallProgress.toFixed(2)}%</span>
                 </div>
-                <div className="flex flex-col items-center justify-center bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-1">Time Spent</span>
-                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{formatTime(todayTimeSpent)}</span>
+                <div className="flex flex-col items-center justify-center bg-light-glass dark:bg-dark-glass p-4 rounded-2xl shadow-sm border border-white/20 dark:border-white/10 flex-1">
+                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider font-semibold mb-1">Time Spent</span>
+                    <span className="text-2xl font-bold text-light-text dark:text-dark-text">{formatTime(todayTimeSpent)}</span>
                 </div>
             </div>
             
