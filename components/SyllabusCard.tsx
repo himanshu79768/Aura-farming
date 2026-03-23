@@ -60,6 +60,12 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
   const progress = calculateProgress(node);
   const isSubject = node.type === 'subject';
 
+  const childTypes = ['chapter', 'unit', 'topic', 'subtopic'];
+  const currentTypeIndex = childTypes.indexOf(node.type);
+  const nextType = currentTypeIndex >= 0 && currentTypeIndex < childTypes.length - 1 
+      ? childTypes[currentTypeIndex + 1] 
+      : 'subtopic';
+
   const handleToggleComplete = () => {
     if (children.length === 0) {
       onUpdate({ ...node, isCompleted: !node.isCompleted });
@@ -68,12 +74,6 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
 
   const handleAddChild = () => {
     if (!newTitle.trim()) return;
-    
-    const childTypes = ['chapter', 'unit', 'topic', 'subtopic'];
-    const currentTypeIndex = childTypes.indexOf(node.type);
-    const nextType = currentTypeIndex >= 0 && currentTypeIndex < childTypes.length - 1 
-        ? childTypes[currentTypeIndex + 1] 
-        : 'subtopic';
 
     const newChild: TopicNode = {
       id: crypto.randomUUID(),
