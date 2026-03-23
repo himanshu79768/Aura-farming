@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Check, Plus, Play } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Check, Plus, Play } from 'lucide-react';
 import { TopicNode } from '../types';
 
 interface SyllabusCardProps {
@@ -139,12 +139,17 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
                     </button>
                 </>
             ) : (
-                <div className="flex flex-col w-full">
+                <div className="flex flex-col w-full cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
                     <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-light-text dark:text-dark-text">{node.title}</span>
+                        <div className="flex items-center gap-2">
+                            {children.length > 0 && (
+                                isExpanded ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />
+                            )}
+                            <span className="text-sm font-medium text-light-text dark:text-dark-text">{node.title}</span>
+                        </div>
                         {children.length === 0 && (
                             <button 
-                                onClick={handleToggleComplete}
+                                onClick={(e) => { e.stopPropagation(); handleToggleComplete(); }}
                                 className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-blue-500 border-transparent text-white' : 'bg-transparent border-light-text-secondary/30 dark:border-dark-text-secondary/30'}`}
                             >
                                 {node.isCompleted && <Check size={14} />}
