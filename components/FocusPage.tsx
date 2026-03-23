@@ -118,7 +118,7 @@ const FocusPage: React.FC = () => {
           if (isPaused) {
               const elapsed = timerDuration - timeLeft;
               if (elapsed >= 300) {
-                  const name = sessionName || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
+                  const name = sessionName || sessionSubject || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
                   addFocusSession(elapsed, name, sessionSubject);
               }
           }
@@ -201,7 +201,7 @@ const FocusPage: React.FC = () => {
   const handlePlaySubject = (subject: string) => {
       setActiveSubject(subject);
       setSessionSubject(subject);
-      setSessionName('');
+      setSessionName(subject);
       setSelectedChapterId('');
       setSelectedUnitId('');
       setSelectedTopicId('');
@@ -219,7 +219,7 @@ const FocusPage: React.FC = () => {
       vibrate();
       const elapsed = timerDuration - timeLeft;
       if (elapsed >= 300) {
-        const name = sessionName || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
+        const name = sessionName || sessionSubject || (mode === 'pomodoro' ? `Pomodoro: ${pomodoroState.phase}` : '');
         addFocusSession(elapsed, name, sessionSubject);
         showAlertModal({ title: "Session Saved", message: `You've saved a ${Math.round(elapsed / 60)} minute session.`, type: 'success' });
       } else if (elapsed > 1) {
@@ -228,7 +228,7 @@ const FocusPage: React.FC = () => {
       if (mode === 'pomodoro') {
           setPomodoroState({ round: 1, phase: 'focus' });
           selectTimerDuration(POMODORO_DURATIONS.focus / 60);
-          setSessionName('');
+          setSessionName(sessionSubject || '');
       } else {
           resetTimer();
       }
@@ -287,7 +287,15 @@ const FocusPage: React.FC = () => {
 
                   <div className="flex justify-center items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-full w-full max-w-xs mb-6">
                       {modes.map((m, index) => (
-                          <button key={m} onClick={() => { setModeIndex(index); resetTimer(); }} className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-gray-900 dark:text-white' : 'text-gray-500'}`}>
+                          <button key={m} onClick={() => { 
+                              setModeIndex(index); 
+                              if (modes[index] === 'pomodoro') {
+                                  setPomodoroState({ round: 1, phase: 'focus' });
+                                  selectTimerDuration(POMODORO_DURATIONS.focus / 60, true);
+                              } else {
+                                  resetTimer(); 
+                              }
+                          }} className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-gray-900 dark:text-white' : 'text-gray-500'}`}>
                               <span>{m}</span>
                               {modeIndex === index && <motion.div layoutId="focus-mode" className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm z-[-1]" />}
                           </button>
