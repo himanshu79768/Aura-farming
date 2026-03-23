@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Timer, BarChart, Clock, Download, BookOpen, X, Trash2, Check, PenLine, Save } from 'lucide-react';
-import { useAppContext } from '../AppContext';
+import { useAppContext } from '../App';
 import Header from './Header';
 import SearchBar from './SearchBar';
 import { FocusSession } from '../types';
