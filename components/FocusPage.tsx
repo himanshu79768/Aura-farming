@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Edit, Check, Award, Maximize, Minimize, ChevronLeft } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Edit, Check, Award, Maximize, Minimize, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '../App';
 import Header from './Header';
 import { Mood, TopicNode } from '../types';
@@ -255,17 +255,17 @@ const FocusPage: React.FC = () => {
       const activeUnitNode = units.find(u => u.id === selectedUnitId);
       const topics = activeUnitNode?.children || [];
 
-      // Update session name based on dropdowns
-      useEffect(() => {
-          const chapter = chapters.find(c => c.id === selectedChapterId)?.title || '';
-          const unit = units.find(u => u.id === selectedUnitId)?.title || '';
-          const topic = topics.find(t => t.id === selectedTopicId)?.title || '';
+      const updateSessionName = (chapterId: string, unitId: string, topicId: string) => {
+          const chapter = chapters.find(c => c.id === chapterId)?.title || '';
+          const unit = units.find(u => u.id === unitId)?.title || '';
+          const topic = topics.find(t => t.id === topicId)?.title || '';
           const parts = [chapter, unit, topic].filter(Boolean);
           if (parts.length > 0) {
               setSessionName(parts.join(' - '));
+          } else {
+              setSessionName('');
           }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [selectedChapterId, selectedUnitId, selectedTopicId]);
+      };
 
       return (
           <div ref={timerContainerRef} className={`w-full h-full flex flex-col ${isFullscreen ? 'bg-white dark:bg-gray-900' : ''}`}>
@@ -309,7 +309,12 @@ const FocusPage: React.FC = () => {
                   <div className="w-full max-w-sm flex flex-col gap-3 mb-6">
                       <select 
                           value={selectedChapterId} 
-                          onChange={(e) => { setSelectedChapterId(e.target.value); setSelectedUnitId(''); setSelectedTopicId(''); }}
+                          onChange={(e) => { 
+                              setSelectedChapterId(e.target.value); 
+                              setSelectedUnitId(''); 
+                              setSelectedTopicId(''); 
+                              updateSessionName(e.target.value, '', '');
+                          }}
                           disabled={isTimerActive}
                           className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
                       >
@@ -320,7 +325,11 @@ const FocusPage: React.FC = () => {
                       {chapters.length > 0 && selectedChapterId && (
                           <select 
                               value={selectedUnitId} 
-                              onChange={(e) => { setSelectedUnitId(e.target.value); setSelectedTopicId(''); }}
+                              onChange={(e) => { 
+                                  setSelectedUnitId(e.target.value); 
+                                  setSelectedTopicId(''); 
+                                  updateSessionName(selectedChapterId, e.target.value, '');
+                              }}
                               disabled={isTimerActive}
                               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
                           >
@@ -332,7 +341,10 @@ const FocusPage: React.FC = () => {
                       {units.length > 0 && selectedUnitId && (
                           <select 
                               value={selectedTopicId} 
-                              onChange={(e) => setSelectedTopicId(e.target.value)}
+                              onChange={(e) => {
+                                  setSelectedTopicId(e.target.value);
+                                  updateSessionName(selectedChapterId, selectedUnitId, e.target.value);
+                              }}
                               disabled={isTimerActive}
                               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
                           >
