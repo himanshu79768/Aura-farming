@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Timer, BarChart, Clock, Download, BookOpen, X, Trash2, Check } from 'lucide-react';
-import { useAppContext } from '../App';
+import { Timer, BarChart, Clock, Download, BookOpen, X, Trash2, Check, PenLine, Save } from 'lucide-react';
+import { useAppContext } from '../AppContext';
 import Header from './Header';
 import SearchBar from './SearchBar';
 import { FocusSession } from '../types';
@@ -101,9 +101,17 @@ const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked,
                         <BookOpen size={14} className="text-light-primary dark:text-dark-primary shrink-0" />
                     )}
                 </p>
-                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                    {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, {new Date(session.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                </p>
+                <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1">
+                    <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
+                        {new Date(session.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, {new Date(session.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                    </p>
+                    {(session.chapter || session.unit) && (
+                        <div className="flex items-center gap-1 text-[10px] text-light-text-secondary/60 dark:text-dark-text-secondary/60 uppercase tracking-tighter">
+                            {session.chapter && <span>• {session.chapter}</span>}
+                            {session.unit && <span>• {session.unit}</span>}
+                        </div>
+                    )}
+                </div>
             </div>
             <div className="font-medium text-right flex-shrink-0">
                 {Math.round(session.duration / 60)} min
@@ -116,11 +124,18 @@ const SessionItem: React.FC<SessionItemProps> = React.memo(({ session, isLinked,
 const FocusHistoryPage: React.FC = () => {
     const { 
         focusHistory, navigateBack, navigateTo, focusSearchQuery, setFocusSearchQuery, 
+        updateFocusSession, syllabus,
         journalEntries, showConfirmationModal, deleteMultipleFocusSessions, vibrate, playUISound 
     } = useAppContext();
     const [filter, setFilter] = useState<FilterRange>('all');
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [editingSession, setEditingSession] = useState<FocusSession | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editSubject, setEditSubject] = useState('');
+    const [editChapter, setEditChapter] = useState('');
+    const [editUnit, setEditUnit] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
     
     const longPressTimerRef = useRef<number>();
     const isLongPress = useRef(false);
@@ -226,9 +241,29 @@ const FocusHistoryPage: React.FC = () => {
         } else {
             vibrate();
             playUISound('tap');
-            navigateTo('linkedJournals', { session });
+            setEditingSession(session);
+            setEditName(session.name || '');
+            setEditSubject(session.subject || '');
+            setEditChapter(session.chapter || '');
+            setEditUnit(session.unit || '');
         }
-    }, [isSelectionMode, navigateTo, vibrate, playUISound]);
+    }, [isSelectionMode, vibrate, playUISound]);
+
+    const handleSaveEdit = async () => {
+        if (!editingSession) return;
+        setIsSaving(true);
+        vibrate('light');
+        const success = await updateFocusSession(editingSession.id, {
+            name: editName,
+            subject: editSubject,
+            chapter: editChapter,
+            unit: editUnit
+        });
+        if (success) {
+            setEditingSession(null);
+        }
+        setIsSaving(false);
+    };
     
     const exitSelectionMode = () => {
         setIsSelectionMode(false);
@@ -349,6 +384,124 @@ const FocusHistoryPage: React.FC = () => {
                     )}
                 </div>
             </OverscrollContainer>
+
+            <AnimatePresence>
+                {editingSession && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => !isSaving && setEditingSession(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="w-full max-w-sm bg-light-card dark:bg-dark-card rounded-3xl p-6 shadow-2xl border border-white/10"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold flex items-center gap-2">
+                                    <PenLine size={20} className="text-light-primary dark:text-dark-primary" />
+                                    Edit Session
+                                </h3>
+                                <button 
+                                    onClick={() => setEditingSession(null)}
+                                    className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full"
+                                    disabled={isSaving}
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-light-text-secondary dark:text-dark-text-secondary mb-1 ml-1 uppercase tracking-wider">
+                                        Session Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editName}
+                                        onChange={e => setEditName(e.target.value)}
+                                        placeholder="e.g. Morning Deep Work"
+                                        className="w-full p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-transparent focus:border-light-primary dark:focus:border-dark-primary outline-none transition-all"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-light-text-secondary dark:text-dark-text-secondary mb-1 ml-1 uppercase tracking-wider">
+                                        Subject
+                                    </label>
+                                    <select 
+                                        value={editSubject}
+                                        onChange={e => setEditSubject(e.target.value)}
+                                        className="w-full p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-transparent focus:border-light-primary dark:focus:border-dark-primary outline-none transition-all text-sm"
+                                    >
+                                        <option value="">None</option>
+                                        {syllabus.map(s => (
+                                            <option key={s.id} value={s.title}>{s.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-light-text-secondary dark:text-dark-text-secondary mb-1 ml-1 uppercase tracking-wider">
+                                            Chapter
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editChapter}
+                                            onChange={e => setEditChapter(e.target.value)}
+                                            placeholder="e.g. Chapter 1"
+                                            className="w-full p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-transparent focus:border-light-primary dark:focus:border-dark-primary outline-none transition-all text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-light-text-secondary dark:text-dark-text-secondary mb-1 ml-1 uppercase tracking-wider">
+                                            Unit
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editUnit}
+                                            onChange={e => setEditUnit(e.target.value)}
+                                            placeholder="e.g. Unit 1.1"
+                                            className="w-full p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-transparent focus:border-light-primary dark:focus:border-dark-primary outline-none transition-all text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 flex gap-3">
+                                    <button
+                                        onClick={() => navigateTo('linkedJournals', { session: editingSession })}
+                                        className="flex-1 p-4 bg-light-glass dark:bg-dark-glass rounded-2xl font-medium flex items-center justify-center gap-2 border border-white/10"
+                                        disabled={isSaving}
+                                    >
+                                        <BookOpen size={18} />
+                                        Journals
+                                    </button>
+                                    <button
+                                        onClick={handleSaveEdit}
+                                        className="flex-1 p-4 bg-light-primary dark:bg-dark-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-light-primary/20 dark:shadow-dark-primary/20"
+                                        disabled={isSaving}
+                                    >
+                                        {isSaving ? (
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Save size={18} />
+                                                Save
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
              <style>{`
                 .dark\\:bg-dark-primary { background-color: hsl(var(--accent-dark)); }
                 .bg-light-primary { background-color: hsl(var(--accent-light)); }
