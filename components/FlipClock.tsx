@@ -17,11 +17,10 @@ const FlipUnit: React.FC<FlipUnitProps> = ({ digit, label }) => {
   }, [digit, prevDigit]);
 
   const digitStr = digit.toString().padStart(2, '0');
-  const prevDigitStr = prevDigit.toString().padStart(2, '0');
 
   return (
-    <div className="flex flex-col items-center mx-2">
-      <div className="relative w-24 h-32 md:w-32 md:h-44 bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-200 dark:border-white/10">
+    <div className="flex flex-col items-center mx-2 md:mx-4">
+      <div className="relative w-28 h-40 sm:w-40 sm:h-56 md:w-56 md:h-80 bg-white dark:bg-gray-900 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-gray-200 dark:border-white/10">
         {/* Static Background */}
         <div className="absolute inset-0 flex flex-col">
           <div className="h-1/2 bg-gray-100 dark:bg-gray-800 border-b border-black/5 dark:border-black/20" />
@@ -36,7 +35,7 @@ const FlipUnit: React.FC<FlipUnitProps> = ({ digit, label }) => {
             animate={{ rotateX: 0, opacity: 1 }}
             exit={{ rotateX: 90, opacity: 0 }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="absolute inset-0 flex items-center justify-center text-6xl md:text-8xl font-mono font-bold text-gray-900 dark:text-white"
+            className="absolute inset-0 flex items-center justify-center text-7xl sm:text-8xl md:text-[10rem] font-mono font-bold text-gray-900 dark:text-white"
           >
             {digitStr}
           </motion.div>
@@ -46,7 +45,7 @@ const FlipUnit: React.FC<FlipUnitProps> = ({ digit, label }) => {
         <div className="absolute top-1/2 left-0 w-full h-px bg-black/40 z-10" />
       </div>
       {label && (
-        <span className="mt-2 text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+        <span className="mt-4 text-sm sm:text-base font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
           {label}
         </span>
       )}
