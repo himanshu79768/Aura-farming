@@ -264,7 +264,8 @@ const FocusPage: React.FC = () => {
           if (parts.length > 0) {
               setSessionName(parts.join(' - '));
           }
-      }, [selectedChapterId, selectedUnitId, selectedTopicId, chapters, units, topics, setSessionName]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [selectedChapterId, selectedUnitId, selectedTopicId]);
 
       return (
           <div ref={timerContainerRef} className={`w-full h-full flex flex-col ${isFullscreen ? 'bg-white dark:bg-gray-900' : ''}`}>
