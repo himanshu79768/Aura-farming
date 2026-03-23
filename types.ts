@@ -41,6 +41,8 @@ export interface JournalEntry {
   isFullWidth?: boolean;
   isLocked?: boolean;
   subject?: string;
+  mood?: string;
+  tags?: string[];
 }
 
 export interface FocusSession {
