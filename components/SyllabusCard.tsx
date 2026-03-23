@@ -28,15 +28,15 @@ const formatTime = (seconds: number) => {
 };
 
 const CircularProgress: React.FC<{ progress: number, colorClass: string }> = ({ progress, colorClass }) => {
-    const radius = 24;
+    const radius = 28;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (progress / 100) * circumference;
 
     return (
-        <div className="relative w-16 h-16 flex items-center justify-center">
-            <svg className="w-16 h-16 transform -rotate-90">
-                <circle cx="32" cy="32" r={radius} strokeWidth="6" className="stroke-current text-black/5 dark:text-white/5" fill="transparent" />
-                <circle cx="32" cy="32" r={radius} strokeWidth="6" className={`stroke-current ${colorClass}`} fill="transparent" strokeLinecap="round" style={{ strokeDasharray: circumference, strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
+        <div className="relative w-20 h-20 flex items-center justify-center">
+            <svg className="w-20 h-20 transform -rotate-90">
+                <circle cx="40" cy="40" r={radius} strokeWidth="6" className="stroke-current text-black/5 dark:text-white/5" fill="transparent" />
+                <circle cx="40" cy="40" r={radius} strokeWidth="6" className={`stroke-current ${colorClass}`} fill="transparent" strokeLinecap="round" style={{ strokeDasharray: circumference, strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
             </svg>
             <span className="absolute text-sm font-bold text-light-text dark:text-dark-text">{Math.round(progress)}%</span>
         </div>
@@ -71,14 +71,14 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
     
     const childTypes = ['chapter', 'unit', 'topic', 'subtopic'];
     const currentTypeIndex = childTypes.indexOf(node.type);
-    const newType = currentTypeIndex >= 0 && currentTypeIndex < childTypes.length - 1 
+    const nextType = currentTypeIndex >= 0 && currentTypeIndex < childTypes.length - 1 
         ? childTypes[currentTypeIndex + 1] 
         : 'subtopic';
 
     const newChild: TopicNode = {
       id: crypto.randomUUID(),
       title: newTitle.trim(),
-      type: newType as any,
+      type: nextType as any,
       children: [],
       isCompleted: false,
     };
@@ -145,7 +145,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
                         {children.length === 0 && (
                             <button 
                                 onClick={handleToggleComplete}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-light-accent dark:bg-dark-accent border-transparent text-white' : 'bg-transparent border-light-text-secondary/30 dark:border-dark-text-secondary/30'}`}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-blue-500 border-transparent text-white' : 'bg-transparent border-light-text-secondary/30 dark:border-dark-text-secondary/30'}`}
                             >
                                 {node.isCompleted && <Check size={14} />}
                             </button>
@@ -164,7 +164,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
         {isSubject && (
             <button 
                 onClick={() => onPlay(node.title)}
-                className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-transform active:scale-95 ml-4 ${bgColorClass}`}
+                className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-300 hover:scale-110 hover:shadow-lg active:scale-95 ml-4 ${bgColorClass}`}
             >
                 <Play size={24} className="ml-1" />
             </button>
@@ -197,7 +197,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
                     type="text" 
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder={`New ${node.type === 'subject' ? 'chapter' : node.type === 'chapter' ? 'unit' : 'topic'}...`}
+                    placeholder={`New ${nextType}...`}
                     className="flex-grow px-3 py-2 text-sm bg-black/5 dark:bg-white/5 border border-white/10 dark:border-white/5 rounded-md focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent text-light-text dark:text-dark-text"
                     autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && handleAddChild()}
