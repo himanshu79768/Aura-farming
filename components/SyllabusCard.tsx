@@ -13,11 +13,12 @@ interface SyllabusCardProps {
 }
 
 const calculateProgress = (node: TopicNode): number => {
-  if (node.children.length === 0) {
+  const children = node.children || [];
+  if (children.length === 0) {
     return node.isCompleted ? 100 : 0;
   }
-  const total = node.children.reduce((acc, child) => acc + calculateProgress(child), 0);
-  return total / node.children.length;
+  const total = children.reduce((acc, child) => acc + calculateProgress(child), 0);
+  return total / children.length;
 };
 
 const formatTime = (seconds: number) => {
@@ -34,17 +35,17 @@ const CircularProgress: React.FC<{ progress: number, colorClass: string }> = ({ 
     return (
         <div className="relative w-16 h-16 flex items-center justify-center">
             <svg className="w-16 h-16 transform -rotate-90">
-                <circle cx="32" cy="32" r={radius} strokeWidth="6" className="stroke-current text-gray-200 dark:text-gray-700" fill="transparent" />
+                <circle cx="32" cy="32" r={radius} strokeWidth="6" className="stroke-current text-black/5 dark:text-white/5" fill="transparent" />
                 <circle cx="32" cy="32" r={radius} strokeWidth="6" className={`stroke-current ${colorClass}`} fill="transparent" strokeLinecap="round" style={{ strokeDasharray: circumference, strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
             </svg>
-            <span className="absolute text-sm font-bold text-gray-800 dark:text-gray-200">{Math.round(progress)}%</span>
+            <span className="absolute text-sm font-bold text-light-text dark:text-dark-text">{Math.round(progress)}%</span>
         </div>
     );
 };
 
 const LinearProgress: React.FC<{ progress: number, colorClass: string }> = ({ progress, colorClass }) => {
     return (
-        <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
             <div className={`h-full ${colorClass}`} style={{ width: `${progress}%`, transition: 'width 0.5s ease-in-out' }} />
         </div>
     );
@@ -55,11 +56,12 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
 
+  const children = node.children || [];
   const progress = calculateProgress(node);
   const isSubject = node.type === 'subject';
 
   const handleToggleComplete = () => {
-    if (node.children.length === 0) {
+    if (children.length === 0) {
       onUpdate({ ...node, isCompleted: !node.isCompleted });
     }
   };
@@ -83,7 +85,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
 
     onUpdate({
       ...node,
-      children: [...node.children, newChild],
+      children: [...children, newChild],
     });
     setNewTitle('');
     setIsAdding(false);
@@ -93,31 +95,31 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
   const handleUpdateChild = (childId: string, updatedChild: TopicNode) => {
     onUpdate({
       ...node,
-      children: node.children.map(c => c.id === childId ? updatedChild : c),
+      children: children.map(c => c.id === childId ? updatedChild : c),
     });
   };
 
   const getSubjectColor = (title: string) => {
-      if (title.includes('ACCOUNTING')) return 'text-blue-500';
-      if (title.includes('LAWS')) return 'text-slate-500';
-      if (title.includes('APTITUDE')) return 'text-yellow-500';
-      if (title.includes('ECONOMICS')) return 'text-red-500';
-      return 'text-indigo-500';
+      if (title.includes('ACCOUNTING')) return 'text-blue-500 dark:text-blue-400';
+      if (title.includes('LAWS')) return 'text-slate-500 dark:text-slate-400';
+      if (title.includes('APTITUDE')) return 'text-yellow-500 dark:text-yellow-400';
+      if (title.includes('ECONOMICS')) return 'text-red-500 dark:text-red-400';
+      return 'text-light-accent dark:text-dark-accent';
   };
 
   const getSubjectBgColor = (title: string) => {
-    if (title.includes('ACCOUNTING')) return 'bg-blue-500';
-    if (title.includes('LAWS')) return 'bg-slate-500';
-    if (title.includes('APTITUDE')) return 'bg-yellow-500';
-    if (title.includes('ECONOMICS')) return 'bg-red-500';
-    return 'bg-indigo-500';
+    if (title.includes('ACCOUNTING')) return 'bg-blue-500 dark:bg-blue-600';
+    if (title.includes('LAWS')) return 'bg-slate-500 dark:bg-slate-600';
+    if (title.includes('APTITUDE')) return 'bg-yellow-500 dark:bg-yellow-600';
+    if (title.includes('ECONOMICS')) return 'bg-red-500 dark:bg-red-600';
+    return 'bg-light-accent dark:bg-dark-accent';
   };
 
-  const colorClass = isSubject ? getSubjectColor(node.title) : 'bg-blue-500';
-  const bgColorClass = isSubject ? getSubjectBgColor(node.title) : 'bg-blue-500';
+  const colorClass = isSubject ? getSubjectColor(node.title) : 'bg-light-accent dark:bg-dark-accent';
+  const bgColorClass = isSubject ? getSubjectBgColor(node.title) : 'bg-light-accent dark:bg-dark-accent';
 
   return (
-    <div className={`w-full ${isSubject ? 'bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-4 overflow-hidden' : 'mt-4'}`}>
+    <div className={`w-full ${isSubject ? 'bg-light-glass dark:bg-dark-glass rounded-2xl shadow-sm border border-white/20 dark:border-white/10 mb-4 overflow-hidden' : 'mt-4'}`}>
       <div className={`flex items-center p-4 ${isSubject ? '' : 'py-0'}`}>
         {isSubject ? (
             <CircularProgress progress={progress} colorClass={colorClass} />
@@ -126,11 +128,11 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
         <div className={`flex-grow ${isSubject ? 'ml-4' : ''}`}>
             {isSubject ? (
                 <>
-                    <h3 className="font-bold text-sm tracking-wide text-gray-900 dark:text-gray-100">{node.title}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{formatTime(timeSpent)}</p>
+                    <h3 className="font-bold text-sm tracking-wide text-light-text dark:text-dark-text">{node.title}</h3>
+                    <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary mt-1">{formatTime(timeSpent)}</p>
                     <button 
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="text-xs text-gray-500 dark:text-gray-400 flex items-center mt-2 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                        className="text-xs text-light-text-secondary dark:text-dark-text-secondary flex items-center mt-2 hover:text-light-text dark:hover:text-dark-text transition-colors"
                     >
                         {isExpanded ? 'Hide Details' : 'See Details'}
                         {isExpanded ? <ChevronUp size={14} className="ml-1" /> : <ChevronDown size={14} className="ml-1" />}
@@ -139,20 +141,20 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
             ) : (
                 <div className="flex flex-col w-full">
                     <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{node.title}</span>
-                        {node.children.length === 0 && (
+                        <span className="text-sm font-medium text-light-text dark:text-dark-text">{node.title}</span>
+                        {children.length === 0 && (
                             <button 
                                 onClick={handleToggleComplete}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-indigo-100 border-indigo-200 text-indigo-600 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400' : 'bg-gray-50 border-gray-200 dark:bg-gray-700 dark:border-gray-600'}`}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-light-accent dark:bg-dark-accent border-transparent text-white' : 'bg-transparent border-light-text-secondary/30 dark:border-dark-text-secondary/30'}`}
                             >
                                 {node.isCompleted && <Check size={14} />}
                             </button>
                         )}
                     </div>
-                    {node.children.length > 0 && (
+                    {children.length > 0 && (
                         <div className="flex items-center gap-3">
                             <LinearProgress progress={progress} colorClass={bgColorClass} />
-                            <span className="text-xs text-gray-500 font-medium">{progress.toFixed(1)}%</span>
+                            <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary font-medium">{progress.toFixed(1)}%</span>
                         </div>
                     )}
                 </div>
@@ -177,8 +179,8 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className={`px-4 pb-4 ${isSubject ? 'pt-4 border-t border-gray-100 dark:border-gray-700' : 'pl-4 border-l-2 border-gray-100 dark:border-gray-700 ml-2 mt-2'}`}>
-              {node.children.map(child => (
+            <div className={`px-4 pb-4 ${isSubject ? 'pt-4 border-t border-white/10 dark:border-white/5' : 'pl-4 border-l-2 border-black/5 dark:border-white/5 ml-2 mt-2'}`}>
+              {children.map(child => (
                 <SyllabusCard 
                   key={child.id} 
                   node={child} 
@@ -196,19 +198,19 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder={`New ${node.type === 'subject' ? 'chapter' : node.type === 'chapter' ? 'unit' : 'topic'}...`}
-                    className="flex-grow px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex-grow px-3 py-2 text-sm bg-black/5 dark:bg-white/5 border border-white/10 dark:border-white/5 rounded-md focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent text-light-text dark:text-dark-text"
                     autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && handleAddChild()}
                   />
-                  <button onClick={handleAddChild} className="p-2 text-white bg-indigo-500 hover:bg-indigo-600 rounded-md"><Check size={16} /></button>
-                  <button onClick={() => setIsAdding(false)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">Cancel</button>
+                  <button onClick={handleAddChild} className="p-2 text-white bg-light-accent dark:bg-dark-accent rounded-md"><Check size={16} /></button>
+                  <button onClick={() => setIsAdding(false)} className="p-2 text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5 rounded-md">Cancel</button>
                 </div>
               ) : (
                 <button 
                   onClick={() => setIsAdding(true)}
-                  className="flex items-center text-xs font-medium text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 mt-4 py-1"
+                  className="flex items-center text-xs font-medium text-light-accent dark:text-dark-accent mt-4 py-1"
                 >
-                  <Plus size={14} className="mr-1" /> Add {node.children.length === 0 ? 'subtopic' : 'more'}
+                  <Plus size={14} className="mr-1" /> Add {children.length === 0 ? 'subtopic' : 'more'}
                 </button>
               )}
             </div>
