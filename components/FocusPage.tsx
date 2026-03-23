@@ -6,6 +6,7 @@ import Header from './Header';
 import { Mood, TopicNode } from '../types';
 import { MUSIC_PRESETS, SESSION_COMPLETE_AFFIRMATIONS } from '../constants';
 import SyllabusCard from './SyllabusCard';
+import FlipClock from './FlipClock';
 
 const FOCUS_DURATIONS = [5, 10, 15, 20];
 const POMODORO_DURATIONS = { focus: 25 * 60, shortBreak: 5 * 60, longBreak: 15 * 60 };
@@ -287,15 +288,21 @@ const FocusPage: React.FC = () => {
 
                   <div className="flex justify-center items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-full w-full max-w-xs mb-6">
                       {modes.map((m, index) => (
-                          <button key={m} onClick={() => { 
-                              setModeIndex(index); 
-                              if (modes[index] === 'pomodoro') {
-                                  setPomodoroState({ round: 1, phase: 'focus' });
-                                  selectTimerDuration(POMODORO_DURATIONS.focus / 60, false);
-                              } else {
-                                  resetTimer(); 
-                              }
-                          }} className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-gray-900 dark:text-white' : 'text-gray-500'}`}>
+                          <button 
+                            key={m} 
+                            onClick={() => { 
+                                if (isTimerActive) return;
+                                setModeIndex(index); 
+                                if (modes[index] === 'pomodoro') {
+                                    setPomodoroState({ round: 1, phase: 'focus' });
+                                    selectTimerDuration(POMODORO_DURATIONS.focus / 60, false);
+                                } else {
+                                    resetTimer(); 
+                                }
+                            }} 
+                            disabled={isTimerActive}
+                            className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-gray-900 dark:text-white' : 'text-gray-500'} ${isTimerActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
                               <span>{m}</span>
                               {modeIndex === index && <motion.div layoutId="focus-mode" className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm z-[-1]" />}
                           </button>
@@ -309,8 +316,14 @@ const FocusPage: React.FC = () => {
                   )}
 
                   <div className="relative flex items-center justify-center mb-6 scale-90">
-                      <TimerRing progress={progress} mood={mood} isShining={showShine} />
-                      <div className="absolute text-5xl font-mono font-bold tracking-tighter text-gray-900 dark:text-white">{formatTimerTime(timeLeft)}</div>
+                      {isFullscreen ? (
+                          <FlipClock seconds={timeLeft} />
+                      ) : (
+                          <>
+                              <TimerRing progress={progress} mood={mood} isShining={showShine} />
+                              <div className="absolute text-5xl font-mono font-bold tracking-tighter text-gray-900 dark:text-white">{formatTimerTime(timeLeft)}</div>
+                          </>
+                      )}
                   </div>
 
                   <div className="w-full max-w-sm flex flex-col gap-3 mb-6">
