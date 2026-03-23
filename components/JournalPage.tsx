@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Calendar, ChevronLeft, ChevronRight, X, Link as LinkIcon, Trash2, Check, Filter } from 'lucide-react';
-import { useAppContext } from '../AppContext';
+import { useAppContext } from '../App';
 import { JournalEntry } from '../types';
 import Header from './Header';
 import SearchBar from './SearchBar';
