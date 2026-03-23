@@ -270,6 +270,7 @@ interface AppContextType {
   focusHistory: FocusSession[];
   addFocusSession: (durationInSeconds: number, name?: string, subject?: string) => void;
   deleteMultipleFocusSessions: (ids: string[]) => Promise<boolean>;
+  updateFocusSession: (id: string, updates: Partial<FocusSession>) => Promise<boolean>;
   myEvents: MyEvent[];
   addMyEvent: (event: Omit<MyEvent, 'id' | 'createdAt'>) => Promise<string | null>;
   deleteMyEvent: (id: string) => Promise<boolean>;
@@ -359,6 +360,12 @@ const DEFAULT_SETTINGS: Settings = {
     dailyTargetHours: 4,
     subjects: ['Accounts', 'Law', 'Economics', 'Maths', 'LR', 'Stats'],
     recentTopics: [],
+    syllabus: [
+        { id: '1', title: 'PAPER 1: ACCOUNTING', type: 'subject', children: [], isCompleted: false },
+        { id: '2', title: 'PAPER 2: BUSINESS LAWS', type: 'subject', children: [], isCompleted: false },
+        { id: '3', title: 'PAPER 3: QUANTITATIVE APTITUDE', type: 'subject', children: [], isCompleted: false },
+        { id: '4', title: 'PAPER 4: BUSINESS ECONOMICS', type: 'subject', children: [], isCompleted: false },
+    ],
 };
 const DEFAULT_PROFILE: UserProfile = { name: '', completedSessions: 0 };
 const DEFAULT_USER_DATA: UserData = {
@@ -500,6 +507,7 @@ export default function App() {
                 dailyTargetHours: data.dailyTargetHours ?? DEFAULT_SETTINGS.dailyTargetHours,
                 subjects: data.subjects || DEFAULT_SETTINGS.subjects,
                 recentTopics: data.recentTopics || DEFAULT_SETTINGS.recentTopics,
+                syllabus: data.syllabus || DEFAULT_SETTINGS.syllabus,
             });
             setMood(data.mood || Mood.Calm);
             setFavoriteQuotes(data.favoriteQuotes ? Object.keys(data.favoriteQuotes) : []);
@@ -799,6 +807,22 @@ export default function App() {
             return false;
         }
     }, [currentUser, masterUid, showAlertModal, userProfile.completedSessions]);
+
+    const updateFocusSession = useCallback(async (id: string, updates: Partial<FocusSession>): Promise<boolean> => {
+        const dataPathUid = masterUid || currentUser?.uid;
+        if (!dataPathUid) return false;
+
+        try {
+            const sessionRef = ref(db, `users/${dataPathUid}/focusHistory/${id}`);
+            await update(sessionRef, updates);
+            playUISound('success');
+            return true;
+        } catch (error) {
+            console.error("Error updating focus session:", error);
+            showAlertModal({ title: "Update Failed", message: "Could not update the session. Please try again." });
+            return false;
+        }
+    }, [currentUser, masterUid, showAlertModal]);
 
     const addMyEvent = useCallback(async (event: Omit<MyEvent, 'id' | 'createdAt'>): Promise<string | null> => {
         const dataPathUid = masterUid || currentUser?.uid;
@@ -1120,6 +1144,7 @@ export default function App() {
     currentUser,
     currentView, modalStack,
     auraChatSessions, saveChatSession, deleteChatSessions,
+    updateFocusSession,
     isImmersive, toggleImmersive,
     toggleSearch,
     isAiLoading, setIsAiLoading,
@@ -1136,6 +1161,7 @@ export default function App() {
     showConfirmationModal, showAlertModal,
     currentUser,
     currentView, isAiLoading,
+    updateFocusSession,
     isImmersive, toggleImmersive,
     toggleSearch,
     triggerMagicTransition,
