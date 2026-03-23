@@ -194,7 +194,12 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                             {node.title}
                         </h3>
                     )}
-                    <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary mt-1">{formatTime(timeSpent)}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{formatTime(timeSpent)}</p>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-light-accent dark:text-dark-accent opacity-60">
+                            {isExpanded ? '• Hide Details' : '• Show Details'}
+                        </span>
+                    </div>
                 </>
             ) : (
                 <div className="flex flex-col w-full">
@@ -234,6 +239,9 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                         <div className="flex items-center gap-3">
                             <LinearProgress progress={progress} colorClass={bgColorClass} trackColorClass={trackBgColorClass} />
                             <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary font-medium">{progress.toFixed(1)}%</span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-light-accent dark:text-dark-accent opacity-50">
+                                {isExpanded ? 'Hide' : 'Show'}
+                            </span>
                         </div>
                     )}
                 </div>
