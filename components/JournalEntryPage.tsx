@@ -9,7 +9,7 @@ import {
     ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, Rows3, Columns3, Trash,
     Image as ImageIcon, UploadCloud
 } from 'lucide-react';
-import { useAppContext } from '../AppContext';
+import { useAppContext } from '../App';
 import { JournalEntry, Attachment, AITask } from '../types';
 import Header from './Header';
 import PdfViewer from './PdfViewer';
