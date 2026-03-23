@@ -2,23 +2,22 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAppContext } from '../App';
 import { BookOpen } from 'lucide-react';
-import { ACCENT_COLORS } from '../constants';
-import { AccentColor } from '../types';
+
+const getSubjectColor = (subject: string): string => {
+    const t = subject.toUpperCase();
+    if (t.includes('ACCOUNTING')) return '#3b82f6'; // blue-500
+    if (t.includes('LAWS'))       return '#64748b'; // slate-500
+    if (t.includes('APTITUDE'))   return '#eab308'; // yellow-500
+    if (t.includes('ECONOMICS'))  return '#ef4444'; // red-500
+    return '#8b5cf6'; // fallback accent
+};
 
 const SubjectAnalyticsWidget: React.FC = () => {
-    const { focusHistory, settings } = useAppContext();
-
-    const chartColors = useMemo(() => {
-        const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        const themeKey = isDark ? 'dark' : 'light';
-        const palette: AccentColor[] = ['blue', 'purple', 'pink', 'orange', 'green', 'teal', 'cyan'];
-        return palette.map(colorName => `hsl(${ACCENT_COLORS[colorName][themeKey]})`);
-    }, [settings.theme]);
+    const { focusHistory } = useAppContext();
 
     const subjectData = useMemo(() => {
         const data: Record<string, number> = {};
         
-        // Only consider last 7 days for widget
         const now = new Date();
         const cutoffDate = new Date(now.setDate(now.getDate() - 7));
         cutoffDate.setHours(0, 0, 0, 0);
@@ -32,7 +31,7 @@ const SubjectAnalyticsWidget: React.FC = () => {
 
         const sortedData = Object.entries(data)
             .sort(([, a], [, b]) => b - a)
-            .slice(0, 4); // Top 4 subjects
+            .slice(0, 4);
 
         const total = sortedData.reduce((sum, [, val]) => sum + val, 0);
 
@@ -40,7 +39,7 @@ const SubjectAnalyticsWidget: React.FC = () => {
     }, [focusHistory]);
 
     return (
-        <div className="w-full h-full p-6 flex flex-col justify-between text-light-card-foreground dark:text-dark-card-foreground">
+        <div className="w-full h-full p-6 flex flex-col justify-between text-light-card-foreground dark:text-dark-card-foreground" style={{ marginBottom: '9.5rem' }}>
             <div>
                 <h3 className="font-semibold text-left text-base flex items-center gap-2">
                     <BookOpen size={16} /> Top Subjects
@@ -50,7 +49,7 @@ const SubjectAnalyticsWidget: React.FC = () => {
             
             <div className="flex-grow flex flex-col justify-center my-2 gap-3">
                 {subjectData.items.length > 0 ? (
-                    subjectData.items.map(([subject, minutes], index) => {
+                    subjectData.items.map(([subject, minutes]) => {
                         const percentage = subjectData.total > 0 ? (minutes / subjectData.total) * 100 : 0;
                         return (
                             <div key={subject} className="w-full">
@@ -61,10 +60,10 @@ const SubjectAnalyticsWidget: React.FC = () => {
                                 <div className="w-full h-2 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
                                     <motion.div 
                                         className="h-full rounded-full"
-                                        style={{ backgroundColor: chartColors[index % chartColors.length] }}
+                                        style={{ backgroundColor: getSubjectColor(subject) }}
                                         initial={{ width: 0 }}
                                         animate={{ width: `${percentage}%` }}
-                                        transition={{ type: 'spring', stiffness: 100, damping: 20, delay: index * 0.1 }}
+                                        transition={{ type: 'spring', stiffness: 100, damping: 20 }}
                                     />
                                 </div>
                             </div>
