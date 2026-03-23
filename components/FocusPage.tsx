@@ -258,17 +258,16 @@ const FocusPage: React.FC = () => {
       const updateSessionName = (chapterId: string, unitId: string, topicId: string) => {
           const chapter = chapters.find(c => c.id === chapterId)?.title || '';
           const unit = units.find(u => u.id === unitId)?.title || '';
-          const topic = topics.find(t => t.id === topicId)?.title || '';
-          const parts = [chapter, unit, topic].filter(Boolean);
+          const parts = [activeSubject, chapter, unit].filter(Boolean);
           if (parts.length > 0) {
-              setSessionName(parts.join(' - '));
+              setSessionName(parts.join(' : '));
           } else {
-              setSessionName('');
+              setSessionName(activeSubject || '');
           }
       };
 
       return (
-          <div ref={timerContainerRef} className={`w-full h-full flex flex-col ${isFullscreen ? 'bg-white dark:bg-gray-900' : ''}`}>
+          <div ref={timerContainerRef} className={`w-full h-full flex flex-col ${isFullscreen ? 'bg-white dark:bg-black' : ''}`}>
               <audio ref={audioRef} loop />
               <audio ref={tingAudioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" />
               
@@ -355,10 +354,40 @@ const FocusPage: React.FC = () => {
                   </div>
 
                   {!isTimerActive && !isPaused && mode === 'timer' && (
-                      <div className="flex space-x-3 mb-6">
+                      <div className="flex flex-wrap justify-center gap-3 mb-6">
                           {FOCUS_DURATIONS.map(min => (
                               <button key={min} onClick={() => selectTimerDuration(min)} className={`px-5 py-2 rounded-full font-medium transition-colors ${timerDuration === min * 60 ? subjectColorClass : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>{min}m</button>
                           ))}
+                          {isCustomInput ? (
+                              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-1">
+                                  <input 
+                                      type="number" 
+                                      value={customMinutes} 
+                                      onChange={e => setCustomMinutes(e.target.value)} 
+                                      className="w-12 bg-transparent text-center focus:outline-none dark:text-white text-gray-900 font-medium" 
+                                      placeholder="Min"
+                                      autoFocus
+                                      onBlur={() => {
+                                          if (customMinutes && !isNaN(Number(customMinutes)) && Number(customMinutes) > 0) {
+                                              selectTimerDuration(Number(customMinutes));
+                                          }
+                                          setIsCustomInput(false);
+                                      }}
+                                      onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                              if (customMinutes && !isNaN(Number(customMinutes)) && Number(customMinutes) > 0) {
+                                                  selectTimerDuration(Number(customMinutes));
+                                              }
+                                              setIsCustomInput(false);
+                                          }
+                                      }}
+                                  />
+                              </div>
+                          ) : (
+                              <button onClick={() => setIsCustomInput(true)} className={`px-5 py-2 rounded-full font-medium transition-colors ${!FOCUS_DURATIONS.includes(timerDuration / 60) && timerDuration > 0 ? subjectColorClass : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
+                                  {!FOCUS_DURATIONS.includes(timerDuration / 60) && timerDuration > 0 ? `${Math.floor(timerDuration / 60)}m` : 'Custom'}
+                              </button>
+                          )}
                       </div>
                   )}
 
@@ -402,6 +431,10 @@ const FocusPage: React.FC = () => {
                         node={node} 
                         onUpdate={(updated) => {
                             const newSyllabus = settings.syllabus!.map(n => n.id === updated.id ? updated : n);
+                            setSettings({ ...settings, syllabus: newSyllabus });
+                        }}
+                        onDelete={(id) => {
+                            const newSyllabus = settings.syllabus!.filter(n => n.id !== id);
                             setSettings({ ...settings, syllabus: newSyllabus });
                         }}
                         onPlay={handlePlaySubject}
