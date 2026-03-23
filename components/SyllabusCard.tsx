@@ -28,7 +28,7 @@ const formatTime = (seconds: number) => {
     return `${h}h ${m.toString().padStart(2, '0')}m`;
 };
 
-const CircularProgress: React.FC<{ progress: number, colorClass: string }> = ({ progress, colorClass }) => {
+const CircularProgress: React.FC<{ progress: number, colorClass: string, trackColorClass: string }> = ({ progress, colorClass, trackColorClass }) => {
     const radius = 28;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (progress / 100) * circumference;
@@ -36,7 +36,7 @@ const CircularProgress: React.FC<{ progress: number, colorClass: string }> = ({ 
     return (
         <div className="relative w-20 h-20 flex items-center justify-center">
             <svg className="w-20 h-20 transform -rotate-90">
-                <circle cx="40" cy="40" r={radius} strokeWidth="6" className="stroke-current text-black/5 dark:text-white/5" fill="transparent" />
+                <circle cx="40" cy="40" r={radius} strokeWidth="6" className={`stroke-current ${trackColorClass}`} fill="transparent" />
                 <circle cx="40" cy="40" r={radius} strokeWidth="6" className={`stroke-current ${colorClass}`} fill="transparent" strokeLinecap="round" style={{ strokeDasharray: circumference, strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
             </svg>
             <span className="absolute text-sm font-bold text-light-text dark:text-dark-text">{Math.round(progress)}%</span>
@@ -44,9 +44,9 @@ const CircularProgress: React.FC<{ progress: number, colorClass: string }> = ({ 
     );
 };
 
-const LinearProgress: React.FC<{ progress: number, colorClass: string }> = ({ progress, colorClass }) => {
+const LinearProgress: React.FC<{ progress: number, colorClass: string, trackColorClass: string }> = ({ progress, colorClass, trackColorClass }) => {
     return (
-        <div className="w-full h-2 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
+        <div className={`w-full h-2 rounded-full overflow-hidden ${trackColorClass}`}>
             <div className={`h-full ${colorClass}`} style={{ width: `${progress}%`, transition: 'width 0.5s ease-in-out' }} />
         </div>
     );
@@ -134,14 +134,32 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
     return 'bg-light-accent dark:bg-dark-accent';
   };
 
-  const colorClass = isSubject ? getSubjectColor(node.title) : 'bg-light-accent dark:bg-dark-accent';
-  const bgColorClass = isSubject ? getSubjectBgColor(node.title) : 'bg-light-accent dark:bg-dark-accent';
+  const getSubjectTrackBgColor = (title: string) => {
+    if (title.includes('ACCOUNTING')) return 'bg-blue-500/20 dark:bg-blue-600/20';
+    if (title.includes('LAWS')) return 'bg-slate-500/20 dark:bg-slate-600/20';
+    if (title.includes('APTITUDE')) return 'bg-yellow-500/20 dark:bg-yellow-600/20';
+    if (title.includes('ECONOMICS')) return 'bg-red-500/20 dark:bg-red-600/20';
+    return 'bg-light-accent/20 dark:bg-dark-accent/20';
+  };
+
+  const getSubjectTrackTextColor = (title: string) => {
+    if (title.includes('ACCOUNTING')) return 'text-blue-500/20 dark:text-blue-600/20';
+    if (title.includes('LAWS')) return 'text-slate-500/20 dark:text-slate-600/20';
+    if (title.includes('APTITUDE')) return 'text-yellow-500/20 dark:text-yellow-600/20';
+    if (title.includes('ECONOMICS')) return 'text-red-500/20 dark:text-red-600/20';
+    return 'text-light-accent/20 dark:text-dark-accent/20';
+  };
+
+  const colorClass = getSubjectColor(subjectTitle);
+  const bgColorClass = getSubjectBgColor(subjectTitle);
+  const trackBgColorClass = getSubjectTrackBgColor(subjectTitle);
+  const trackTextColorClass = getSubjectTrackTextColor(subjectTitle);
 
   return (
     <div className={`w-full ${isSubject ? 'bg-light-glass dark:bg-dark-glass rounded-2xl shadow-sm border border-white/20 dark:border-white/10 mb-4 overflow-hidden' : 'mt-4'}`}>
       <div className={`flex items-center p-4 ${isSubject ? '' : 'py-0'}`}>
         {isSubject ? (
-            <CircularProgress progress={progress} colorClass={colorClass} />
+            <CircularProgress progress={progress} colorClass={colorClass} trackColorClass={trackTextColorClass} />
         ) : null}
         
         <div className={`flex-grow ${isSubject ? 'ml-4' : ''}`}>
@@ -221,7 +239,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                     </div>
                     {children.length > 0 && (
                         <div className="flex items-center gap-3">
-                            <LinearProgress progress={progress} colorClass={bgColorClass} />
+                            <LinearProgress progress={progress} colorClass={bgColorClass} trackColorClass={trackBgColorClass} />
                             <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary font-medium">{progress.toFixed(1)}%</span>
                         </div>
                     )}
