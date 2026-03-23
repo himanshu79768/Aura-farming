@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronRight, Check, Plus, Play } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Check, Plus, Play, Trash2 } from 'lucide-react';
 import { TopicNode } from '../types';
 
 interface SyllabusCardProps {
   node: TopicNode;
   onUpdate: (updatedNode: TopicNode) => void;
+  onDelete?: (id: string) => void;
   onPlay: (subjectTitle: string) => void;
   level?: number;
   subjectTitle: string;
@@ -51,10 +52,13 @@ const LinearProgress: React.FC<{ progress: number, colorClass: string }> = ({ pr
     );
 };
 
-const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, level = 0, subjectTitle, timeSpent = 0 }) => {
+const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, onPlay, level = 0, subjectTitle, timeSpent = 0 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [isEditingNode, setIsEditingNode] = useState(false);
+  const [editTitle, setEditTitle] = useState(node.title);
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const children = node.children || [];
   const progress = calculateProgress(node);
@@ -65,6 +69,21 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
   const nextType = currentTypeIndex >= 0 && currentTypeIndex < childTypes.length - 1 
       ? childTypes[currentTypeIndex + 1] 
       : 'subtopic';
+
+  const handlePressStart = () => {
+      pressTimer.current = setTimeout(() => {
+          setIsEditingNode(true);
+          setEditTitle(node.title);
+          if (navigator.vibrate) navigator.vibrate(50);
+      }, 500);
+  };
+
+  const handlePressEnd = () => {
+      if (pressTimer.current) {
+          clearTimeout(pressTimer.current);
+          pressTimer.current = null;
+      }
+  };
 
   const handleToggleComplete = () => {
     if (children.length === 0) {
@@ -128,7 +147,30 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
         <div className={`flex-grow ${isSubject ? 'ml-4' : ''}`}>
             {isSubject ? (
                 <>
-                    <h3 className="font-bold text-sm tracking-wide text-light-text dark:text-dark-text">{node.title}</h3>
+                    {isEditingNode ? (
+                        <div className="flex items-center gap-2 w-full mb-1" onClick={e => e.stopPropagation()}>
+                            <input 
+                                type="text" 
+                                value={editTitle} 
+                                onChange={e => setEditTitle(e.target.value)} 
+                                className="flex-grow px-2 py-1 text-sm bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
+                                autoFocus
+                            />
+                            <button onClick={() => { onUpdate({...node, title: editTitle}); setIsEditingNode(false); }} className="p-1 text-green-500 bg-green-500/10 rounded"><Check size={16}/></button>
+                            {onDelete && <button onClick={() => onDelete(node.id)} className="p-1 text-red-500 bg-red-500/10 rounded"><Trash2 size={16}/></button>}
+                        </div>
+                    ) : (
+                        <h3 
+                            className="font-bold text-sm tracking-wide text-light-text dark:text-dark-text cursor-pointer select-none"
+                            onMouseDown={handlePressStart}
+                            onMouseUp={handlePressEnd}
+                            onMouseLeave={handlePressEnd}
+                            onTouchStart={handlePressStart}
+                            onTouchEnd={handlePressEnd}
+                        >
+                            {node.title}
+                        </h3>
+                    )}
                     <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary mt-1">{formatTime(timeSpent)}</p>
                     <button 
                         onClick={() => setIsExpanded(!isExpanded)}
@@ -139,15 +181,36 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
                     </button>
                 </>
             ) : (
-                <div className="flex flex-col w-full cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex flex-col w-full cursor-pointer" onClick={() => !isEditingNode && setIsExpanded(!isExpanded)}>
                     <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-2">
-                            {children.length > 0 && (
-                                isExpanded ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />
-                            )}
-                            <span className="text-sm font-medium text-light-text dark:text-dark-text">{node.title}</span>
-                        </div>
-                        {children.length === 0 && (
+                        {isEditingNode ? (
+                            <div className="flex items-center gap-2 w-full mr-2" onClick={e => e.stopPropagation()}>
+                                <input 
+                                    type="text" 
+                                    value={editTitle} 
+                                    onChange={e => setEditTitle(e.target.value)} 
+                                    className="flex-grow px-2 py-1 text-sm bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
+                                    autoFocus
+                                />
+                                <button onClick={() => { onUpdate({...node, title: editTitle}); setIsEditingNode(false); }} className="p-1 text-green-500 bg-green-500/10 rounded"><Check size={16}/></button>
+                                {onDelete && <button onClick={() => onDelete(node.id)} className="p-1 text-red-500 bg-red-500/10 rounded"><Trash2 size={16}/></button>}
+                            </div>
+                        ) : (
+                            <div 
+                                className="flex items-center gap-2 flex-grow select-none"
+                                onMouseDown={handlePressStart}
+                                onMouseUp={handlePressEnd}
+                                onMouseLeave={handlePressEnd}
+                                onTouchStart={handlePressStart}
+                                onTouchEnd={handlePressEnd}
+                            >
+                                {children.length > 0 && (
+                                    isExpanded ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />
+                                )}
+                                <span className="text-sm font-medium text-light-text dark:text-dark-text">{node.title}</span>
+                            </div>
+                        )}
+                        {children.length === 0 && !isEditingNode && (
                             <button 
                                 onClick={(e) => { e.stopPropagation(); handleToggleComplete(); }}
                                 className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-blue-500 border-transparent text-white' : 'bg-transparent border-light-text-secondary/30 dark:border-dark-text-secondary/30'}`}
@@ -190,6 +253,12 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onPlay, lev
                   key={child.id} 
                   node={child} 
                   onUpdate={(updated) => handleUpdateChild(child.id, updated)} 
+                  onDelete={(id) => {
+                      onUpdate({
+                          ...node,
+                          children: children.filter(c => c.id !== id),
+                      });
+                  }}
                   onPlay={onPlay}
                   level={level + 1}
                   subjectTitle={subjectTitle}
