@@ -40,6 +40,7 @@ export interface JournalEntry {
   isSmallText?: boolean;
   isFullWidth?: boolean;
   isLocked?: boolean;
+  subject?: string;
 }
 
 export interface FocusSession {
@@ -48,6 +49,8 @@ export interface FocusSession {
   duration: number; // in seconds
   name?: string;
   subject?: string;
+  chapter?: string;
+  unit?: string;
   createdAt?: any; // For Firestore serverTimestamp
 }
 
