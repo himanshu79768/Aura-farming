@@ -9,7 +9,7 @@ import {
     ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, Rows3, Columns3, Trash,
     Image as ImageIcon, UploadCloud
 } from 'lucide-react';
-import { useAppContext } from '../App';
+import { useAppContext } from '../AppContext';
 import { JournalEntry, Attachment, AITask } from '../types';
 import Header from './Header';
 import PdfViewer from './PdfViewer';
@@ -253,11 +253,12 @@ const JournalAttachmentMenu = ({ onSelect, menuRef, position }: {
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
     const { 
         settings, navigateBack, addJournalEntry, updateJournalEntry, deleteJournalEntry, duplicateJournalEntry, vibrate, 
-        showConfirmationModal, navigateTo, showAlertModal, userProfile, setIsAiLoading
+        showConfirmationModal, navigateTo, showAlertModal, userProfile, setIsAiLoading, syllabus
     } = useAppContext();
 
     const [currentEntry, setCurrentEntry] = useState<JournalEntry | undefined>(entry);
-    const [title, setTitle] = useState('');
+    const [title, setTitle] = useState(entry?.title || '');
+    const [subject, setSubject] = useState(entry?.subject || '');
     const [content, setContent] = useState('');
     const [linkedSessionIds, setLinkedSessionIds] = useState<string[]>([]);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -379,6 +380,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
 
         const commonData = {
             title: entryTitle,
+            subject: subject,
             content: currentContent,
             linkedSessionIds,
             attachments,
@@ -2074,13 +2076,28 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({ entry }) => {
                 ref={positioningContainerRef}
                 className={`relative flex-grow w-full ${isFullWidth ? 'is-full-width px-4 md:px-8 lg:px-12' : 'max-w-md md:max-w-2xl lg:max-w-4xl mx-auto px-4'} flex flex-col transition-all duration-300 overflow-hidden`}>
                 <FormattingMenu />
-                <div className={`${fontClasses[fontStyle]}`}>
+                <div className={`${fontClasses[fontStyle]} flex flex-col gap-2 mb-4`}>
                     <input
                         type="text" value={title} onChange={(e) => {setTitle(e.target.value); markAsChanged();}}
                         placeholder="Title..."
-                        className="w-full bg-transparent text-3xl font-bold focus:outline-none mb-4 pb-2 border-b border-white/10 placeholder:text-light-text-secondary/50 dark:placeholder:text-dark-text-secondary/50"
+                        className="w-full bg-transparent text-3xl font-bold focus:outline-none pb-2 border-b border-white/10 placeholder:text-light-text-secondary/50 dark:placeholder:text-dark-text-secondary/50"
                         autoFocus={!entry} readOnly={isLocked}
                     />
+                    {!isLocked && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">Subject:</span>
+                            <select 
+                                value={subject}
+                                onChange={(e) => { setSubject(e.target.value); markAsChanged(); }}
+                                className="bg-black/5 dark:bg-white/5 border border-white/10 rounded-lg px-2 py-0.5 text-xs focus:outline-none text-light-text dark:text-dark-text"
+                            >
+                                <option value="">None</option>
+                                {syllabus.map(s => (
+                                    <option key={s.id} value={s.title}>{s.title}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
                 <OverscrollContainer className="relative flex-grow w-full journal-editor-container overflow-y-auto">
                     <AnimatePresence>
