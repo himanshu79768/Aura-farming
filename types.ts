@@ -75,6 +75,14 @@ export interface CountdownEvent {
   date: string; // YYYY-MM-DD format
 }
 
+export interface TopicNode {
+  id: string;
+  title: string;
+  type: 'subject' | 'chapter' | 'unit' | 'topic' | 'subtopic';
+  children: TopicNode[];
+  isCompleted: boolean;
+}
+
 export interface Settings {
   theme: Theme;
   sound: boolean;
@@ -101,6 +109,7 @@ export interface Settings {
   dailyTargetHours?: number;
   subjects?: string[];
   recentTopics?: string[];
+  syllabus?: TopicNode[];
 }
 
 export interface ChatSession {
