@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreVertical, Edit, Share2, Trash2, FileText, Copy, FileImage, FileQuestion, Link as LinkIcon, Check, Loader } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { useAppContext } from '../App';
+import { useAppContext } from '../AppContext';
 import { JournalEntry, Attachment } from '../types';
 import Header from './Header';
 import PdfViewer from './PdfViewer';
