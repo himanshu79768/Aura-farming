@@ -34,7 +34,7 @@ const CircularProgress: React.FC<{ progress: number, colorClass: string, trackCo
     const strokeDashoffset = circumference - (progress / 100) * circumference;
 
     return (
-        <div className="relative w-20 h-20 flex items-center justify-center">
+        <div className="relative w-20 h-20 shrink-0 flex items-center justify-center">
             <svg className="w-20 h-20 transform -rotate-90">
                 <circle cx="40" cy="40" r={radius} strokeWidth="6" className={`stroke-current ${trackColorClass}`} fill="transparent" />
                 <circle cx="40" cy="40" r={radius} strokeWidth="6" className={`stroke-current ${colorClass}`} fill="transparent" strokeLinecap="round" style={{ strokeDasharray: circumference, strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
@@ -181,7 +181,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                 type="text" 
                                 value={editTitle} 
                                 onChange={e => setEditTitle(e.target.value)} 
-                                className="flex-grow px-2 py-1 text-sm bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
+                                className="flex-grow px-2 py-1 text-base bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
                                 autoFocus
                             />
                             <button onClick={() => { onUpdate({...node, title: editTitle}); setIsEditingNode(false); }} className="p-1 text-green-500 bg-green-500/10 rounded"><Check size={16}/></button>
@@ -189,14 +189,14 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                         </div>
                     ) : (
                         <h3 
-                            className="font-bold text-sm tracking-wide text-light-text dark:text-dark-text select-none"
+                            className="font-bold text-base tracking-wide text-light-text dark:text-dark-text select-none"
                         >
                             {node.title}
                         </h3>
                     )}
                     <div className="flex items-center gap-2 mt-1">
                         <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{formatTime(timeSpent)}</p>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-light-accent dark:text-dark-accent opacity-60">
+                        <span className="text-[10px] uppercase tracking-widest text-light-accent dark:text-dark-accent opacity-60">
                             {isExpanded ? '• Hide Details' : '• Show Details'}
                         </span>
                     </div>
@@ -210,7 +210,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                     type="text" 
                                     value={editTitle} 
                                     onChange={e => setEditTitle(e.target.value)} 
-                                    className="flex-grow px-2 py-1 text-sm bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
+                                    className="flex-grow px-2 py-1 text-base bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
                                     autoFocus
                                 />
                                 <button onClick={() => { onUpdate({...node, title: editTitle}); setIsEditingNode(false); }} className="p-1 text-green-500 bg-green-500/10 rounded"><Check size={16}/></button>
@@ -221,15 +221,15 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                 className="flex items-center gap-2 flex-grow select-none"
                             >
                                 {children.length > 0 && (
-                                    isExpanded ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />
+                                    isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />
                                 )}
-                                <span className="text-sm font-medium text-light-text dark:text-dark-text">{node.title}</span>
+                                <span className="text-base font-medium text-light-text dark:text-dark-text">{node.title}</span>
                             </div>
                         )}
                         {children.length === 0 && !isEditingNode && (
                             <button 
                                 onClick={(e) => { e.stopPropagation(); handleToggleComplete(); }}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-blue-500 border-transparent text-white' : 'bg-transparent border-light-text-secondary/30 dark:border-dark-text-secondary/30'}`}
+                                className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center border transition-colors ${node.isCompleted ? 'bg-blue-500 border-transparent text-white' : 'bg-transparent border-light-text-secondary/30 dark:border-dark-text-secondary/30'}`}
                             >
                                 {node.isCompleted && <Check size={14} />}
                             </button>
@@ -239,9 +239,6 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                         <div className="flex items-center gap-3">
                             <LinearProgress progress={progress} colorClass={bgColorClass} trackColorClass={trackBgColorClass} />
                             <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary font-medium">{progress.toFixed(1)}%</span>
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-light-accent dark:text-dark-accent opacity-50">
-                                {isExpanded ? 'Hide' : 'Show'}
-                            </span>
                         </div>
                     )}
                 </div>
@@ -251,7 +248,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
         {isSubject && (
             <button 
                 onClick={() => onPlay(node.title)}
-                className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-300 hover:scale-110 hover:shadow-lg active:scale-95 ml-4 ${bgColorClass}`}
+                className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-300 hover:scale-110 hover:shadow-lg active:scale-95 ml-4 ${bgColorClass}`}
             >
                 <Play size={24} className="ml-1" />
             </button>
