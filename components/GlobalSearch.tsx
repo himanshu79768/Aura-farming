@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, BookOpen, MessageSquare, Timer, Settings, Wind, Plus } from 'lucide-react';
+import { X, BookOpen, MessageSquare, Timer, Settings, Wind, Plus, Sparkles } from 'lucide-react';
 import { useAppContext } from '../App';
 import { JournalEntry, Quote, FocusSession } from '../types';
 
@@ -120,7 +120,7 @@ const GlobalSearch: React.FC = () => {
             }));
 
         return [auraAction, ...actions, ...journals, ...focusSessions, ...allQuotes];
-    }, [debouncedQuery, journalEntries, quotes, focusHistory, searchableActions, navigateTo, auraAction]);
+    }, [debouncedQuery, journalEntries, quotes, focusHistory, searchableActions, navigateTo]);
     
     const groupedResults = useMemo(() => {
         // Fix: Explicitly typing the accumulator and casting the initial value for `reduce` ensures correct type inference.
