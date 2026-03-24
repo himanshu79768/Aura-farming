@@ -24,7 +24,7 @@ const TimerRing: React.FC<{ progress: number; mood: Mood; isShining: boolean }> 
     const gradientId = `timer-gradient-${mood}`;
     const colors = moodColors[mood];
     const smoothProgress = useSpring(progress, { stiffness: 30, damping: 20 });
-    const strokeDashoffset = useTransform(smoothProgress, (p) => circumference - p * circumference);
+    const strokeDashoffset = useTransform(smoothProgress, (p: number) => circumference - p * circumference);
     
     useEffect(() => { smoothProgress.set(progress); }, [progress, smoothProgress]);
 
@@ -318,7 +318,7 @@ const FocusPage: React.FC = () => {
                   )}
 
                   {isFullscreen && (
-                      <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-8 text-center uppercase tracking-wider">
+                      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center uppercase tracking-wider">
                           {activeSubject}
                       </h2>
                   )}
@@ -475,6 +475,7 @@ const FocusPage: React.FC = () => {
                         timeSpent={focusHistory.filter(s => s.subject === node.title).reduce((acc, s) => acc + s.duration, 0)}
                     />
                 ))}
+                <div className="h-24" />
             </div>
        </div>
     </div>
