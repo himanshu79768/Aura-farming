@@ -238,10 +238,10 @@ const FocusPage: React.FC = () => {
   const progress = timerDuration === 0 ? 0 : (timerDuration - timeLeft) / timerDuration;
 
   const getSubjectBgColor = (title: string) => {
-    if (title.includes('ACCOUNTING')) return 'bg-blue-500 hover:bg-blue-600 text-white';
-    if (title.includes('LAWS')) return 'bg-slate-500 hover:bg-slate-600 text-white';
-    if (title.includes('APTITUDE')) return 'bg-yellow-500 hover:bg-yellow-600 text-white';
-    if (title.includes('ECONOMICS')) return 'bg-red-500 hover:bg-red-600 text-white';
+    if (title.includes('ACCOUNTING')) return 'bg-blue-400 hover:bg-blue-500 text-white';
+    if (title.includes('LAWS')) return 'bg-yellow-400 hover:bg-yellow-500 text-white';
+    if (title.includes('APTITUDE')) return 'bg-pink-400 hover:bg-pink-500 text-white';
+    if (title.includes('ECONOMICS')) return 'bg-purple-400 hover:bg-purple-500 text-white';
     return 'bg-light-accent hover:bg-light-accent/90 text-white';
   };
 
@@ -286,36 +286,44 @@ const FocusPage: React.FC = () => {
                       </button>
                   )}
 
-                  <div className="flex justify-center items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-full w-full max-w-xs mb-6">
-                      {modes.map((m, index) => (
-                          <button 
-                            key={m} 
-                            onClick={() => { 
-                                if (isTimerActive) return;
-                                setModeIndex(index); 
-                                if (modes[index] === 'pomodoro') {
-                                    setPomodoroState({ round: 1, phase: 'focus' });
-                                    selectTimerDuration(POMODORO_DURATIONS.focus / 60, false);
-                                } else {
-                                    resetTimer(); 
-                                }
-                            }} 
-                            disabled={isTimerActive}
-                            className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-gray-900 dark:text-white' : 'text-gray-500'} ${isTimerActive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                              <span>{m}</span>
-                              {modeIndex === index && <motion.div layoutId="focus-mode" className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm z-[-1]" />}
-                          </button>
-                      ))}
-                  </div>
+                  {!isFullscreen && (
+                      <div className="flex justify-center items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-full w-full max-w-xs mb-6">
+                          {modes.map((m, index) => (
+                              <button 
+                                key={m} 
+                                onClick={() => { 
+                                    if (isTimerActive) return;
+                                    setModeIndex(index); 
+                                    if (modes[index] === 'pomodoro') {
+                                        setPomodoroState({ round: 1, phase: 'focus' });
+                                        selectTimerDuration(POMODORO_DURATIONS.focus / 60, false);
+                                    } else {
+                                        resetTimer(); 
+                                    }
+                                }} 
+                                disabled={isTimerActive}
+                                className={`relative w-full py-2 text-sm font-medium rounded-full capitalize transition-colors ${modeIndex === index ? 'text-gray-900 dark:text-white' : 'text-gray-500'} ${isTimerActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                  <span>{m}</span>
+                                  {modeIndex === index && <motion.div layoutId="focus-mode" className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm z-[-1]" />}
+                              </button>
+                          ))}
+                      </div>
+                  )}
 
-                  {mode === 'pomodoro' && (
+                  {!isFullscreen && mode === 'pomodoro' && (
                       <p className="text-gray-500 dark:text-gray-400 mb-4 font-medium uppercase tracking-widest text-sm">
                           {pomodoroState.phase === 'focus' ? `Focus Round ${pomodoroState.round}` : pomodoroState.phase === 'shortBreak' ? 'Short Break' : 'Long Break'}
                       </p>
                   )}
 
-                  <div className="relative flex items-center justify-center mb-6 scale-90">
+                  {isFullscreen && (
+                      <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-8 text-center uppercase tracking-wider">
+                          {activeSubject}
+                      </h2>
+                  )}
+
+                  <div className={`relative flex items-center justify-center mb-6 ${isFullscreen ? 'w-full scale-100' : 'scale-90'}`}>
                       {isFullscreen ? (
                           <FlipClock seconds={timeLeft} />
                       ) : (
@@ -326,55 +334,57 @@ const FocusPage: React.FC = () => {
                       )}
                   </div>
 
-                  <div className="w-full max-w-sm flex flex-col gap-3 mb-6">
-                      <select 
-                          value={selectedChapterId} 
-                          onChange={(e) => { 
-                              setSelectedChapterId(e.target.value); 
-                              setSelectedUnitId(''); 
-                              setSelectedTopicId(''); 
-                              updateSessionName(e.target.value, '', '');
-                          }}
-                          disabled={isTimerActive}
-                          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
-                      >
-                          <option value="">Select Chapter...</option>
-                          {chapters.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                      </select>
-                      
-                      {chapters.length > 0 && selectedChapterId && (
+                  {!isFullscreen && (
+                      <div className="w-full max-w-sm flex flex-col gap-3 mb-6">
                           <select 
-                              value={selectedUnitId} 
+                              value={selectedChapterId} 
                               onChange={(e) => { 
-                                  setSelectedUnitId(e.target.value); 
+                                  setSelectedChapterId(e.target.value); 
+                                  setSelectedUnitId(''); 
                                   setSelectedTopicId(''); 
-                                  updateSessionName(selectedChapterId, e.target.value, '');
+                                  updateSessionName(e.target.value, '', '');
                               }}
                               disabled={isTimerActive}
                               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
                           >
-                              <option value="">Select Unit...</option>
-                              {units.map(u => <option key={u.id} value={u.id}>{u.title}</option>)}
+                              <option value="">Select Chapter...</option>
+                              {chapters.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
                           </select>
-                      )}
+                          
+                          {chapters.length > 0 && selectedChapterId && (
+                              <select 
+                                  value={selectedUnitId} 
+                                  onChange={(e) => { 
+                                      setSelectedUnitId(e.target.value); 
+                                      setSelectedTopicId(''); 
+                                      updateSessionName(selectedChapterId, e.target.value, '');
+                                  }}
+                                  disabled={isTimerActive}
+                                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
+                              >
+                                  <option value="">Select Unit...</option>
+                                  {units.map(u => <option key={u.id} value={u.id}>{u.title}</option>)}
+                              </select>
+                          )}
 
-                      {units.length > 0 && selectedUnitId && (
-                          <select 
-                              value={selectedTopicId} 
-                              onChange={(e) => {
-                                  setSelectedTopicId(e.target.value);
-                                  updateSessionName(selectedChapterId, selectedUnitId, e.target.value);
-                              }}
-                              disabled={isTimerActive}
-                              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
-                          >
-                              <option value="">Select Topic...</option>
-                              {topics.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-                          </select>
-                      )}
-                  </div>
+                          {units.length > 0 && selectedUnitId && (
+                              <select 
+                                  value={selectedTopicId} 
+                                  onChange={(e) => {
+                                      setSelectedTopicId(e.target.value);
+                                      updateSessionName(selectedChapterId, selectedUnitId, e.target.value);
+                                  }}
+                                  disabled={isTimerActive}
+                                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-50 text-gray-900 dark:text-white"
+                              >
+                                  <option value="">Select Topic...</option>
+                                  {topics.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                              </select>
+                          )}
+                      </div>
+                  )}
 
-                  {!isTimerActive && !isPaused && mode === 'timer' && (
+                  {!isFullscreen && !isTimerActive && !isPaused && mode === 'timer' && (
                       <div className="flex flex-wrap justify-center gap-3 mb-6">
                           {FOCUS_DURATIONS.map(min => (
                               <button key={min} onClick={() => selectTimerDuration(min)} className={`px-5 py-2 rounded-full font-medium transition-colors ${timerDuration === min * 60 ? subjectColorClass : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>{min}m</button>
@@ -412,19 +422,21 @@ const FocusPage: React.FC = () => {
                       </div>
                   )}
 
-                  <div className="flex items-center space-x-8">
-                      <button onClick={() => resetTimer()} className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-700 dark:text-gray-300"><RotateCcw size={24} /></button>
-                      <button onClick={() => { vibrate(); toggleTimer(); }} className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl hover:scale-105 transition-transform active:scale-95 ${subjectColorClass}`}>
-                          {isTimerActive ? <Pause size={32} /> : <Play size={32} className="ml-2" />}
-                      </button>
-                      {isPaused ? (
-                          <button onClick={handleSave} className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full"><Check size={24} /></button>
-                      ) : (
-                          <button onClick={() => navigateTo('soundOptions')} className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-700 dark:text-gray-300">
-                              {settings.sound ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                  {!isFullscreen && (
+                      <div className="flex items-center space-x-8">
+                          <button onClick={() => resetTimer()} className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-700 dark:text-gray-300"><RotateCcw size={24} /></button>
+                          <button onClick={() => { vibrate(); toggleTimer(); }} className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl hover:scale-105 transition-transform active:scale-95 ${subjectColorClass}`}>
+                              {isTimerActive ? <Pause size={32} /> : <Play size={32} className="ml-2" />}
                           </button>
-                      )}
-                  </div>
+                          {isPaused ? (
+                              <button onClick={handleSave} className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full"><Check size={24} /></button>
+                          ) : (
+                              <button onClick={() => navigateTo('soundOptions')} className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-700 dark:text-gray-300">
+                                  {settings.sound ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                              </button>
+                          )}
+                      </div>
+                  )}
               </div>
           </div>
       );
@@ -433,8 +445,8 @@ const FocusPage: React.FC = () => {
   return (
     <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
        <Header title="Focus"/>
-       <div className="flex-grow p-4 overflow-y-auto">
-            <div className="sticky top-0 z-10 bg-light-bg dark:bg-dark-bg pt-2 pb-4 flex justify-between items-center mb-2 gap-4">
+       <div className="flex-grow px-4 pb-4 overflow-y-auto">
+            <div className="sticky top-0 z-10 bg-light-bg dark:bg-dark-bg pt-4 pb-4 flex justify-between items-center mb-2 gap-4">
                 <div className="flex flex-col items-center justify-center bg-light-glass dark:bg-dark-glass p-4 rounded-2xl shadow-sm border border-white/20 dark:border-white/10 flex-1">
                     <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider mb-1">Completed</span>
                     <span className="text-2xl text-light-text dark:text-dark-text">{overallProgress.toFixed(2)}%</span>
