@@ -426,7 +426,7 @@ const FocusAnalyticsPage: React.FC = () => {
                                     />
                                 </ChartCard>
                                  <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>} className="md:col-span-2 lg:col-span-2">
-                                     <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary pb-[20px]">
+                                     <div className="flex justify-around items-end h-48 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary pb-[28px] pt-[28px]">
                                         {(() => {
                                             const dayDataValues = Object.values(analyticsData.dayOfWeekData);
                                             const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues.map(v => Number(v))) : 0;
@@ -435,7 +435,7 @@ const FocusAnalyticsPage: React.FC = () => {
                                                 const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
                                                 return (
                                                     <div key={day} className="flex flex-col items-center flex-grow h-full justify-end relative">
-                                                        <div className="font-semibold text-light-text dark:text-dark-text absolute -top-5">{count}</div>
+                                                        <div className="font-semibold text-light-text dark:text-dark-text absolute -top-6 text-xs">{count}</div>
                                                         <motion.div
                                                             className="w-full rounded-t-sm"
                                                             style={{ backgroundColor: chartColors[index % chartColors.length], height: `${height}%` }}
@@ -443,7 +443,7 @@ const FocusAnalyticsPage: React.FC = () => {
                                                             animate={{ scaleY: 1 }}
                                                             transition={{ type: 'spring', stiffness: 200, damping: 20 }}
                                                         />
-                                                        <div className="absolute -bottom-[20px]">{day}</div>
+                                                        <div className="absolute -bottom-[22px] text-xs">{day}</div>
                                                     </div>
                                                 );
                                             });
@@ -457,39 +457,62 @@ const FocusAnalyticsPage: React.FC = () => {
                                     />
                                  </ChartCard>
                                  <ChartCard title="Daily Target Progress" icon={<Award size={16}/>} className="md:col-span-2 lg:col-span-3">
-                                     <div className="flex justify-around items-end h-40 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary relative pb-[20px]">
+                                     <div className="flex flex-col text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
                                         {(() => {
                                             const targetMinutes = (settings.dailyTargetHours || 4) * 60;
-                                            const trendData = analyticsData.dailyTrendData.slice(-7); // Show last 7 days
+                                            const trendData = analyticsData.dailyTrendData.slice(-7);
                                             const maxMinutes = Math.max(...trendData.map(d => d.minutes), targetMinutes);
-                                            
+                                            const targetPct = (targetMinutes / maxMinutes) * 100;
+
                                             return (
                                                 <>
-                                                    {/* Target Line */}
-                                                    <div className="absolute w-full border-t border-dashed border-light-accent dark:border-dark-accent opacity-50 z-0" style={{ bottom: `calc(${(targetMinutes / maxMinutes) * 100}% + 20px)` }}>
-                                                        <span className="absolute -top-5 right-0 text-xs text-light-accent dark:text-dark-accent">{settings.dailyTargetHours || 4}h Target</span>
+                                                    {/* Bar area with target line */}
+                                                    <div className="relative h-44 w-full mb-2">
+                                                        {/* Target dotted line — purely inside bar area */}
+                                                        <div
+                                                            className="absolute left-0 right-0 border-t border-dashed border-light-accent dark:border-dark-accent opacity-60 z-10 pointer-events-none"
+                                                            style={{ bottom: `${targetPct}%` }}
+                                                        >
+                                                            <span className="absolute -top-4 right-0 text-xs text-light-accent dark:text-dark-accent font-medium">
+                                                                {settings.dailyTargetHours || 4}h goal
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Bars row */}
+                                                        <div className="absolute inset-0 flex justify-around items-end gap-1">
+                                                            {trendData.map((data) => {
+                                                                const height = maxMinutes > 0 ? (data.minutes / maxMinutes) * 100 : 0;
+                                                                const isTargetMet = data.minutes >= targetMinutes;
+                                                                return (
+                                                                    <div key={data.date} className="flex flex-col items-center flex-grow h-full justify-end z-10 relative">
+                                                                        <div className="font-semibold text-light-text dark:text-dark-text absolute -top-5 text-[10px] whitespace-nowrap">
+                                                                            {Math.floor(data.minutes / 60)}h {data.minutes % 60}m
+                                                                        </div>
+                                                                        <motion.div
+                                                                            className={`w-full rounded-t-sm ${isTargetMet ? 'bg-green-500' : 'bg-light-primary dark:bg-dark-primary'}`}
+                                                                            style={{ height: `${height}%` }}
+                                                                            initial={{ scaleY: 0, originY: 1 }}
+                                                                            animate={{ scaleY: 1 }}
+                                                                            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                                                                        />
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
-                                                    
-                                                    {trendData.map((data, index) => {
-                                                        const height = maxMinutes > 0 ? (data.minutes / maxMinutes) * 100 : 0;
-                                                        const isTargetMet = data.minutes >= targetMinutes;
-                                                        const dateObj = new Date(data.date);
-                                                        const dayStr = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
-                                                        
-                                                        return (
-                                                            <div key={data.date} className="flex flex-col items-center flex-grow h-full justify-end z-10 relative">
-                                                                <div className="font-semibold text-light-text dark:text-dark-text absolute -top-5">{Math.round(data.minutes / 60)}h {data.minutes % 60}m</div>
-                                                                <motion.div
-                                                                    className={`w-full rounded-t-sm ${isTargetMet ? 'bg-green-500' : 'bg-light-primary dark:bg-dark-primary'}`}
-                                                                    style={{ height: `${height}%` }}
-                                                                    initial={{ scaleY: 0, originY: 1 }}
-                                                                    animate={{ scaleY: 1 }}
-                                                                    transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                                                                />
-                                                                <div className="absolute -bottom-[20px]">{dayStr}</div>
-                                                            </div>
-                                                        );
-                                                    })}
+
+                                                    {/* Day labels row below */}
+                                                    <div className="flex justify-around gap-1 mt-1">
+                                                        {trendData.map((data) => {
+                                                            const dateObj = new Date(data.date);
+                                                            const dayStr = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
+                                                            return (
+                                                                <div key={data.date} className="flex-grow text-center text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                                                                    {dayStr}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </>
                                             );
                                         })()}
@@ -498,7 +521,14 @@ const FocusAnalyticsPage: React.FC = () => {
                                  <ChartCard title="Time by Subject" icon={<BookOpen size={16}/>} className="md:col-span-2 lg:col-span-3">
                                      <PieChart 
                                         data={Object.entries(analyticsData.subjectData).map(([label, value]) => ({ label, value }))} 
-                                        colors={chartColors}
+                                        colors={Object.keys(analyticsData.subjectData).map(subject => {
+                                            const t = subject.toUpperCase();
+                                            if (t.includes('ACCOUNTING')) return '#60a5fa';
+                                            if (t.includes('LAWS'))       return '#facc15';
+                                            if (t.includes('APTITUDE'))   return '#f472b6';
+                                            if (t.includes('ECONOMICS'))  return '#c084fc';
+                                            return '#8b5cf6';
+                                        })}
                                     />
                                  </ChartCard>
                             </motion.div>
