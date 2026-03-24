@@ -223,7 +223,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                 {children.length > 0 && (
                                     isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />
                                 )}
-                                <span className="text-lg font-medium text-light-text dark:text-dark-text">{node.title}</span>
+                                <span className="text-base font-medium text-light-text dark:text-dark-text">{node.title}</span>
                             </div>
                         )}
                         {children.length === 0 && !isEditingNode && (
