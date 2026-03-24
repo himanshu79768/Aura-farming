@@ -5,10 +5,10 @@ import { BookOpen } from 'lucide-react';
 
 const getSubjectColor = (subject: string): string => {
     const t = subject.toUpperCase();
-    if (t.includes('ACCOUNTING')) return '#3b82f6'; // blue-500
-    if (t.includes('LAWS'))       return '#64748b'; // slate-500
-    if (t.includes('APTITUDE'))   return '#eab308'; // yellow-500
-    if (t.includes('ECONOMICS'))  return '#ef4444'; // red-500
+    if (t.includes('ACCOUNTING')) return '#60a5fa'; // blue-400
+    if (t.includes('LAWS'))       return '#facc15'; // yellow-400
+    if (t.includes('APTITUDE'))   return '#f472b6'; // pink-400
+    if (t.includes('ECONOMICS'))  return '#c084fc'; // purple-400
     return '#8b5cf6'; // fallback accent
 };
 
@@ -39,7 +39,8 @@ const SubjectAnalyticsWidget: React.FC = () => {
     }, [focusHistory]);
 
     return (
-        <div className="w-full h-full p-6 flex flex-col justify-between text-light-card-foreground dark:text-dark-card-foreground" style={{ marginBottom: '9.5rem' }}>
+        <div style={{ marginBottom: '9.5rem' }}>
+        <div className="w-full h-full p-6 flex flex-col justify-between text-light-card-foreground dark:text-dark-card-foreground">
             <div>
                 <h3 className="font-semibold text-left text-base flex items-center gap-2">
                     <BookOpen size={16} /> Top Subjects
@@ -75,6 +76,7 @@ const SubjectAnalyticsWidget: React.FC = () => {
                     </div>
                 )}
             </div>
+        </div>
         </div>
     );
 };
