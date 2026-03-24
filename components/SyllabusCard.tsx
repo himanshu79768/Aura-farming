@@ -39,7 +39,7 @@ const CircularProgress: React.FC<{ progress: number, colorClass: string, trackCo
                 <circle cx="40" cy="40" r={radius} strokeWidth="6" className={`stroke-current ${trackColorClass}`} fill="transparent" />
                 <circle cx="40" cy="40" r={radius} strokeWidth="6" className={`stroke-current ${colorClass}`} fill="transparent" strokeLinecap="round" style={{ strokeDasharray: circumference, strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
             </svg>
-            <span className="absolute text-sm font-bold text-light-text dark:text-dark-text">{Math.round(progress)}%</span>
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-light-text dark:text-dark-text">{Math.round(progress)}%</span>
         </div>
     );
 };
@@ -126,34 +126,34 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
   };
 
   const getSubjectColor = (title: string) => {
-      if (title.includes('ACCOUNTING')) return 'text-blue-500 dark:text-blue-400';
-      if (title.includes('LAWS')) return 'text-slate-500 dark:text-slate-400';
-      if (title.includes('APTITUDE')) return 'text-yellow-500 dark:text-yellow-400';
-      if (title.includes('ECONOMICS')) return 'text-red-500 dark:text-red-400';
+      if (title.includes('ACCOUNTING')) return 'text-blue-400 dark:text-blue-300';
+      if (title.includes('LAWS')) return 'text-yellow-400 dark:text-yellow-300';
+      if (title.includes('APTITUDE')) return 'text-pink-400 dark:text-pink-300';
+      if (title.includes('ECONOMICS')) return 'text-purple-400 dark:text-purple-300';
       return 'text-light-accent dark:text-dark-accent';
   };
 
   const getSubjectBgColor = (title: string) => {
-    if (title.includes('ACCOUNTING')) return 'bg-blue-500 dark:bg-blue-600';
-    if (title.includes('LAWS')) return 'bg-slate-500 dark:bg-slate-600';
-    if (title.includes('APTITUDE')) return 'bg-yellow-500 dark:bg-yellow-600';
-    if (title.includes('ECONOMICS')) return 'bg-red-500 dark:bg-red-600';
+    if (title.includes('ACCOUNTING')) return 'bg-blue-400 dark:bg-blue-500';
+    if (title.includes('LAWS')) return 'bg-yellow-400 dark:bg-yellow-500';
+    if (title.includes('APTITUDE')) return 'bg-pink-400 dark:bg-pink-500';
+    if (title.includes('ECONOMICS')) return 'bg-purple-400 dark:bg-purple-500';
     return 'bg-light-accent dark:bg-dark-accent';
   };
 
   const getSubjectTrackBgColor = (title: string) => {
-    if (title.includes('ACCOUNTING')) return 'bg-blue-500/20 dark:bg-blue-600/20';
-    if (title.includes('LAWS')) return 'bg-slate-500/20 dark:bg-slate-600/20';
-    if (title.includes('APTITUDE')) return 'bg-yellow-500/20 dark:bg-yellow-600/20';
-    if (title.includes('ECONOMICS')) return 'bg-red-500/20 dark:bg-red-600/20';
+    if (title.includes('ACCOUNTING')) return 'bg-blue-400/20 dark:bg-blue-500/20';
+    if (title.includes('LAWS')) return 'bg-yellow-400/20 dark:bg-yellow-500/20';
+    if (title.includes('APTITUDE')) return 'bg-pink-400/20 dark:bg-pink-500/20';
+    if (title.includes('ECONOMICS')) return 'bg-purple-400/20 dark:bg-purple-500/20';
     return 'bg-light-accent/20 dark:bg-dark-accent/20';
   };
 
   const getSubjectTrackTextColor = (title: string) => {
-    if (title.includes('ACCOUNTING')) return 'text-blue-500/20 dark:text-blue-600/20';
-    if (title.includes('LAWS')) return 'text-slate-500/20 dark:text-slate-600/20';
-    if (title.includes('APTITUDE')) return 'text-yellow-500/20 dark:text-yellow-600/20';
-    if (title.includes('ECONOMICS')) return 'text-red-500/20 dark:text-red-600/20';
+    if (title.includes('ACCOUNTING')) return 'text-blue-400/20 dark:text-blue-500/20';
+    if (title.includes('LAWS')) return 'text-yellow-400/20 dark:text-yellow-500/20';
+    if (title.includes('APTITUDE')) return 'text-pink-400/20 dark:text-pink-500/20';
+    if (title.includes('ECONOMICS')) return 'text-purple-400/20 dark:text-purple-500/20';
     return 'text-light-accent/20 dark:text-dark-accent/20';
   };
 
@@ -181,7 +181,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                 type="text" 
                                 value={editTitle} 
                                 onChange={e => setEditTitle(e.target.value)} 
-                                className="flex-grow px-2 py-1 text-base bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
+                                className="flex-grow px-2 py-1 text-lg bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
                                 autoFocus
                             />
                             <button onClick={() => { onUpdate({...node, title: editTitle}); setIsEditingNode(false); }} className="p-1 text-green-500 bg-green-500/10 rounded"><Check size={16}/></button>
@@ -189,15 +189,15 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                         </div>
                     ) : (
                         <h3 
-                            className="font-bold text-base tracking-wide text-light-text dark:text-dark-text select-none"
+                            className="font-bold text-lg tracking-wide text-light-text dark:text-dark-text select-none"
                         >
                             {node.title}
                         </h3>
                     )}
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex flex-col mt-1">
                         <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{formatTime(timeSpent)}</p>
-                        <span className="text-[10px] uppercase tracking-widest text-light-accent dark:text-dark-accent opacity-60">
-                            {isExpanded ? '• Hide Details' : '• Show Details'}
+                        <span className="text-[10px] tracking-widest text-light-accent dark:text-dark-accent opacity-60 mt-0.5">
+                            {isExpanded ? 'Hide details' : 'Show details'}
                         </span>
                     </div>
                 </>
@@ -210,7 +210,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                     type="text" 
                                     value={editTitle} 
                                     onChange={e => setEditTitle(e.target.value)} 
-                                    className="flex-grow px-2 py-1 text-base bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
+                                    className="flex-grow px-2 py-1 text-lg bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
                                     autoFocus
                                 />
                                 <button onClick={() => { onUpdate({...node, title: editTitle}); setIsEditingNode(false); }} className="p-1 text-green-500 bg-green-500/10 rounded"><Check size={16}/></button>
@@ -223,7 +223,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                 {children.length > 0 && (
                                     isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />
                                 )}
-                                <span className="text-base font-medium text-light-text dark:text-dark-text">{node.title}</span>
+                                <span className="text-lg font-medium text-light-text dark:text-dark-text">{node.title}</span>
                             </div>
                         )}
                         {children.length === 0 && !isEditingNode && (
@@ -250,7 +250,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                 onClick={() => onPlay(node.title)}
                 className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-300 hover:scale-110 hover:shadow-lg active:scale-95 ml-4 ${bgColorClass}`}
             >
-                <Play size={24} className="ml-1" />
+                <Play size={24} />
             </button>
         )}
       </div>
@@ -288,7 +288,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder={`New ${nextType}...`}
-                    className="flex-grow px-3 py-2 text-sm bg-black/5 dark:bg-white/5 border border-white/10 dark:border-white/5 rounded-md focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent text-light-text dark:text-dark-text"
+                    className="flex-grow px-3 py-2 text-base bg-black/5 dark:bg-white/5 border border-white/10 dark:border-white/5 rounded-md focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent text-light-text dark:text-dark-text"
                     autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && handleAddChild()}
                   />
