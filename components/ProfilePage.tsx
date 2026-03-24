@@ -63,6 +63,8 @@ const ProfilePage: React.FC = () => {
         return Math.round(focusHistory.reduce((total, session) => total + session.duration, 0) / 60);
     }, [focusHistory]);
 
+    const totalSessions = focusHistory?.length ?? 0;
+
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setName(e.target.value);
     };
@@ -131,7 +133,7 @@ const ProfilePage: React.FC = () => {
                 </div>
                 
                 <div className="my-8 grid grid-cols-2 gap-4">
-                    <StatCard icon={<Timer className="w-5 h-5"/>} label="Sessions" value={userProfile.completedSessions} onClick={() => handleNavigate('focusHistory')} />
+                    <StatCard icon={<Timer className="w-5 h-5"/>} label="Sessions" value={totalSessions} onClick={() => handleNavigate('focusHistory')} />
                     <StatCard icon={<Heart className="w-5 h-5"/>} label="Favorites" value={favoriteQuotes.length} onClick={() => handleNavigate('favorites')} />
                     <div className="col-span-2">
                       <StatCard icon={<Clock className="w-5 h-5"/>} label="Total Focus Time" value={`${totalFocusMinutes} min`} onClick={() => handleNavigate('focusHistory')} />
