@@ -400,13 +400,15 @@ const FocusAnalyticsPage: React.FC = () => {
 
                         {analyticsData ? (
                             <motion.div 
-                                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                                className="grid grid-cols-1 gap-4"
                                 initial="hidden"
                                 animate="visible"
                                 variants={{
                                     visible: { transition: { staggerChildren: 0.1 } }
                                 }}
                             >
+                                {/* Stat cards row */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <ChartCard title="Total Time" icon={<Clock size={16}/>}>
                                     <p className="text-4xl font-bold">{Math.round(analyticsData.totalSeconds / 60)} <span className="text-xl font-medium text-light-text-secondary dark:text-dark-text-secondary">min</span></p>
                                 </ChartCard>
@@ -417,15 +419,18 @@ const FocusAnalyticsPage: React.FC = () => {
                                     <p className="text-2xl font-bold">{analyticsData.mostProductiveDay.minutes} <span className="text-base font-medium text-light-text-secondary dark:text-dark-text-secondary">min</span></p>
                                     <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{new Date(analyticsData.mostProductiveDay.date).toLocaleDateString(undefined, { weekday: 'long' })}</p>
                                 </ChartCard>
-                                
-                                <ChartCard title="Sessions by Time of Day" icon={<PieChartIcon size={16}/>} className="md:col-span-1 lg:col-span-1">
+                                </div>
+
+                                {/* Row 1: Sessions by Time of Day (pie) + Sessions by Day (bar) */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <ChartCard title="Sessions by Time of Day" icon={<PieChartIcon size={16}/>}>
                                     <PieChart 
                                         data={Object.entries(analyticsData.timeOfDayData).map(([label, value]) => ({ label, value }))} 
                                         colors={chartColors}
                                         hole={40}
                                     />
                                 </ChartCard>
-                                 <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>} className="md:col-span-2 lg:col-span-2">
+                                <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>}>
                                      <div className="flex justify-around items-end h-48 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary pb-[28px] pt-[28px]">
                                         {(() => {
                                             const dayDataValues = Object.values(analyticsData.dayOfWeekData);
@@ -449,14 +454,18 @@ const FocusAnalyticsPage: React.FC = () => {
                                             });
                                         })()}
                                      </div>
-                                 </ChartCard>
-                                 <ChartCard title="Session Length Distribution" icon={<Timer size={16}/>} className="md:col-span-2 lg:col-span-3">
+                                </ChartCard>
+                                </div>
+
+                                {/* Row 2: Session Length (pie) + Daily Target Progress (bar) */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <ChartCard title="Session Length Distribution" icon={<Timer size={16}/>}>
                                      <PieChart 
                                         data={Object.entries(analyticsData.sessionLengthData).map(([label, value]) => ({ label, value }))} 
                                         colors={chartColors}
                                     />
-                                 </ChartCard>
-                                 <ChartCard title="Daily Target Progress" icon={<Award size={16}/>} className="md:col-span-2 lg:col-span-3">
+                                </ChartCard>
+                                <ChartCard title="Daily Target Progress" icon={<Award size={16}/>}>
                                      <div className="flex flex-col text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
                                         {(() => {
                                             const targetMinutes = (settings.dailyTargetHours || 4) * 60;
@@ -466,9 +475,9 @@ const FocusAnalyticsPage: React.FC = () => {
 
                                             return (
                                                 <>
-                                                    {/* Bar area with target line */}
-                                                    <div className="relative h-44 w-full mb-2">
-                                                        {/* Target dotted line — purely inside bar area */}
+                                                    {/* Bar area with target line — extra top padding for labels */}
+                                                    <div className="relative w-full mb-2" style={{ height: '13rem', paddingTop: '1.75rem' }}>
+                                                        {/* Target dotted line inside bar area */}
                                                         <div
                                                             className="absolute left-0 right-0 border-t border-dashed border-light-accent dark:border-dark-accent opacity-60 z-10 pointer-events-none"
                                                             style={{ bottom: `${targetPct}%` }}
@@ -478,8 +487,8 @@ const FocusAnalyticsPage: React.FC = () => {
                                                             </span>
                                                         </div>
 
-                                                        {/* Bars row */}
-                                                        <div className="absolute inset-0 flex justify-around items-end gap-1">
+                                                        {/* Bars */}
+                                                        <div className="absolute inset-0 flex justify-around items-end gap-1" style={{ top: '1.75rem' }}>
                                                             {trendData.map((data) => {
                                                                 const height = maxMinutes > 0 ? (data.minutes / maxMinutes) * 100 : 0;
                                                                 const isTargetMet = data.minutes >= targetMinutes;
@@ -501,7 +510,7 @@ const FocusAnalyticsPage: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Day labels row below */}
+                                                    {/* Day labels */}
                                                     <div className="flex justify-around gap-1 mt-1">
                                                         {trendData.map((data) => {
                                                             const dateObj = new Date(data.date);
@@ -517,8 +526,11 @@ const FocusAnalyticsPage: React.FC = () => {
                                             );
                                         })()}
                                      </div>
-                                 </ChartCard>
-                                 <ChartCard title="Time by Subject" icon={<BookOpen size={16}/>} className="md:col-span-2 lg:col-span-3">
+                                </ChartCard>
+                                </div>
+
+                                {/* Time by Subject — full width */}
+                                 <ChartCard title="Time by Subject" icon={<BookOpen size={16}/>}>
                                      <PieChart 
                                         data={Object.entries(analyticsData.subjectData).map(([label, value]) => ({ label, value }))} 
                                         colors={Object.keys(analyticsData.subjectData).map(subject => {
