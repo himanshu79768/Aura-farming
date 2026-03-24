@@ -22,10 +22,10 @@ const JournalListItem: React.FC<JournalListItemProps> = React.memo(({ entry, isS
     const getSubjectColor = (title: string) => {
         if (!title) return 'bg-gray-500/20 text-gray-500';
         const upperTitle = title.toUpperCase();
-        if (upperTitle.includes('ACCOUNTING')) return 'bg-blue-500/20 text-blue-500';
-        if (upperTitle.includes('LAWS')) return 'bg-slate-500/20 text-slate-500';
-        if (upperTitle.includes('APTITUDE')) return 'bg-yellow-500/20 text-yellow-500';
-        if (upperTitle.includes('ECONOMICS')) return 'bg-red-500/20 text-red-500';
+        if (upperTitle.includes('ACCOUNTING')) return 'bg-blue-400/20 text-blue-400';
+        if (upperTitle.includes('LAWS')) return 'bg-yellow-400/20 text-yellow-400';
+        if (upperTitle.includes('APTITUDE')) return 'bg-pink-400/20 text-pink-400';
+        if (upperTitle.includes('ECONOMICS')) return 'bg-purple-400/20 text-purple-400';
         return 'bg-light-accent/20 text-light-accent dark:text-dark-accent';
     };
 
