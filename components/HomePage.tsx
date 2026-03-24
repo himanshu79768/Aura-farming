@@ -274,7 +274,7 @@ const HomePage: React.FC = () => {
         <AnimatePresence>
             {(settings.showHomeWidget ?? true) && (
                 <motion.div
-                    className="w-full max-w-md mt-6 flex flex-col items-center"
+                    className="w-full max-w-md mt-6 mb-36 flex flex-col items-center"
                     initial={{ opacity: 0, y: 20, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.95 }}
