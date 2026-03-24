@@ -434,14 +434,14 @@ const FocusPage: React.FC = () => {
     <div className="w-full h-full flex flex-col bg-light-bg dark:bg-dark-bg">
        <Header title="Focus"/>
        <div className="flex-grow p-4 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6 gap-4">
+            <div className="sticky top-0 z-10 bg-light-bg dark:bg-dark-bg pt-2 pb-4 flex justify-between items-center mb-2 gap-4">
                 <div className="flex flex-col items-center justify-center bg-light-glass dark:bg-dark-glass p-4 rounded-2xl shadow-sm border border-white/20 dark:border-white/10 flex-1">
-                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider font-semibold mb-1">Completed</span>
-                    <span className="text-2xl font-bold text-light-text dark:text-dark-text">{overallProgress.toFixed(2)}%</span>
+                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider mb-1">Completed</span>
+                    <span className="text-2xl text-light-text dark:text-dark-text">{overallProgress.toFixed(2)}%</span>
                 </div>
                 <div className="flex flex-col items-center justify-center bg-light-glass dark:bg-dark-glass p-4 rounded-2xl shadow-sm border border-white/20 dark:border-white/10 flex-1">
-                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider font-semibold mb-1">Time Spent</span>
-                    <span className="text-2xl font-bold text-light-text dark:text-dark-text">{formatTime(todayTimeSpent)}</span>
+                    <span className="text-xs text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider mb-1">Time Spent</span>
+                    <span className="text-2xl text-light-text dark:text-dark-text">{formatTime(todayTimeSpent)}</span>
                 </div>
             </div>
             
