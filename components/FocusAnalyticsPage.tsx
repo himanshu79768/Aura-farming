@@ -346,6 +346,14 @@ const FocusAnalyticsPage: React.FC = () => {
         const sessionLengthData: Record<string, number> = { '0-15m': 0, '15-30m': 0, '30-60m': 0, '60m+': 0 };
         const subjectData: Record<string, number> = {};
 
+        // Current week boundaries (Sun–Sat)
+        const now = new Date();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 7);
+
         filteredHistory.forEach(session => {
             const date = new Date(session.date);
             const hour = date.getHours();
@@ -357,7 +365,10 @@ const FocusAnalyticsPage: React.FC = () => {
             else if (hour >= 18 && hour < 24) timeOfDayData['Evening (6-12)']++;
             else timeOfDayData['Night (12-6)']++;
             
-            dayOfWeekData[Object.keys(dayOfWeekData)[day]]++;
+            // Only count current week sessions for day-of-week chart
+            if (date >= weekStart && date < weekEnd) {
+                dayOfWeekData[Object.keys(dayOfWeekData)[day]]++;
+            }
 
             if (minutes <= 15) sessionLengthData['0-15m']++;
             else if (minutes <= 30) sessionLengthData['15-30m']++;
@@ -400,15 +411,13 @@ const FocusAnalyticsPage: React.FC = () => {
 
                         {analyticsData ? (
                             <motion.div 
-                                className="grid grid-cols-1 gap-4"
+                                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                                 initial="hidden"
                                 animate="visible"
                                 variants={{
                                     visible: { transition: { staggerChildren: 0.1 } }
                                 }}
                             >
-                                {/* Stat cards row */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <ChartCard title="Total Time" icon={<Clock size={16}/>}>
                                     <p className="text-4xl font-bold">{Math.round(analyticsData.totalSeconds / 60)} <span className="text-xl font-medium text-light-text-secondary dark:text-dark-text-secondary">min</span></p>
                                 </ChartCard>
@@ -419,84 +428,87 @@ const FocusAnalyticsPage: React.FC = () => {
                                     <p className="text-2xl font-bold">{analyticsData.mostProductiveDay.minutes} <span className="text-base font-medium text-light-text-secondary dark:text-dark-text-secondary">min</span></p>
                                     <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">{new Date(analyticsData.mostProductiveDay.date).toLocaleDateString(undefined, { weekday: 'long' })}</p>
                                 </ChartCard>
-                                </div>
-
-                                {/* Row 1: Sessions by Time of Day (pie) + Sessions by Day (bar) */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <ChartCard title="Sessions by Time of Day" icon={<PieChartIcon size={16}/>}>
+                                
+                                <ChartCard title="Sessions by Time of Day" icon={<PieChartIcon size={16}/>} className="md:col-span-1 lg:col-span-1">
                                     <PieChart 
                                         data={Object.entries(analyticsData.timeOfDayData).map(([label, value]) => ({ label, value }))} 
                                         colors={chartColors}
                                         hole={40}
                                     />
                                 </ChartCard>
-                                <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>}>
-                                     <div className="flex justify-around items-end h-48 gap-1 text-xs text-center text-light-text-secondary dark:text-dark-text-secondary pb-[28px] pt-[28px]">
+                                 <ChartCard title="Sessions by Day" icon={<CalendarDays size={16}/>} className="md:col-span-2 lg:col-span-2">
+                                     <div className="flex flex-col text-xs text-light-text-secondary dark:text-dark-text-secondary">
                                         {(() => {
                                             const dayDataValues = Object.values(analyticsData.dayOfWeekData);
-                                            const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues.map(v => Number(v))) : 0;
-                                            return Object.entries(analyticsData.dayOfWeekData).map(([day, countValue], index) => {
-                                                const count = Number(countValue);
-                                                const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                                                return (
-                                                    <div key={day} className="flex flex-col items-center flex-grow h-full justify-end relative">
-                                                        <div className="font-semibold text-light-text dark:text-dark-text absolute -top-6 text-xs">{count}</div>
-                                                        <motion.div
-                                                            className="w-full rounded-t-sm"
-                                                            style={{ backgroundColor: chartColors[index % chartColors.length], height: `${height}%` }}
-                                                            initial={{ scaleY: 0, originY: 1 }}
-                                                            animate={{ scaleY: 1 }}
-                                                            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                                                        />
-                                                        <div className="absolute -bottom-[22px] text-xs">{day}</div>
+                                            const maxCount = dayDataValues.length > 0 ? Math.max(...dayDataValues.map(v => Number(v))) : 1;
+                                            return (
+                                                <>
+                                                    <div className="flex justify-around items-end gap-1" style={{ height: '10rem' }}>
+                                                        {Object.entries(analyticsData.dayOfWeekData).map(([day, countValue], index) => {
+                                                            const count = Number(countValue);
+                                                            const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                                                            return (
+                                                                <div key={day} className="flex flex-col items-center flex-grow h-full justify-end relative">
+                                                                    <motion.div
+                                                                        className="w-full rounded-t-sm"
+                                                                        style={{ backgroundColor: chartColors[index % chartColors.length], height: `${height}%` }}
+                                                                        initial={{ scaleY: 0, originY: 1 }}
+                                                                        animate={{ scaleY: 1 }}
+                                                                        transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
-                                                );
-                                            });
+                                                    <div className="flex justify-around gap-1 mt-2">
+                                                        {Object.entries(analyticsData.dayOfWeekData).map(([day, countValue]) => {
+                                                            const count = Number(countValue);
+                                                            return (
+                                                                <div key={day} className="flex-grow text-center">
+                                                                    <div className="text-light-text dark:text-dark-text font-semibold text-[10px]">{count}</div>
+                                                                    <div className="text-[10px]">{day}</div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </>
+                                            );
                                         })()}
                                      </div>
-                                </ChartCard>
-                                </div>
-
-                                {/* Row 2: Session Length (pie) + Daily Target Progress (bar) */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <ChartCard title="Session Length Distribution" icon={<Timer size={16}/>}>
+                                 </ChartCard>
+                                 <ChartCard title="Session Length Distribution" icon={<Timer size={16}/>} className="md:col-span-2 lg:col-span-3">
                                      <PieChart 
                                         data={Object.entries(analyticsData.sessionLengthData).map(([label, value]) => ({ label, value }))} 
                                         colors={chartColors}
                                     />
-                                </ChartCard>
-                                <ChartCard title="Daily Target Progress" icon={<Award size={16}/>}>
-                                     <div className="flex flex-col text-xs text-center text-light-text-secondary dark:text-dark-text-secondary">
+                                 </ChartCard>
+                                 <ChartCard title="Daily Target Progress" icon={<Award size={16}/>} className="md:col-span-2 lg:col-span-3">
+                                     <div className="flex flex-col text-xs text-light-text-secondary dark:text-dark-text-secondary">
                                         {(() => {
                                             const targetMinutes = (settings.dailyTargetHours || 4) * 60;
                                             const trendData = analyticsData.dailyTrendData.slice(-7);
                                             const maxMinutes = Math.max(...trendData.map(d => d.minutes), targetMinutes);
                                             const targetPct = (targetMinutes / maxMinutes) * 100;
-
                                             return (
                                                 <>
-                                                    {/* Bar area with target line — extra top padding for labels */}
-                                                    <div className="relative w-full mb-2" style={{ height: '13rem', paddingTop: '1.75rem' }}>
-                                                        {/* Target dotted line inside bar area */}
+                                                    {/* Bar area */}
+                                                    <div className="relative w-full" style={{ height: '10rem' }}>
+                                                        {/* Dotted target line — no label here, keeps it clean */}
                                                         <div
                                                             className="absolute left-0 right-0 border-t border-dashed border-light-accent dark:border-dark-accent opacity-60 z-10 pointer-events-none"
                                                             style={{ bottom: `${targetPct}%` }}
                                                         >
-                                                            <span className="absolute -top-4 right-0 text-xs text-light-accent dark:text-dark-accent font-medium">
+                                                            <span className="absolute -top-4 right-0 text-[10px] text-light-accent dark:text-dark-accent font-medium">
                                                                 {settings.dailyTargetHours || 4}h goal
                                                             </span>
                                                         </div>
-
-                                                        {/* Bars */}
-                                                        <div className="absolute inset-0 flex justify-around items-end gap-1" style={{ top: '1.75rem' }}>
+                                                        {/* Bars — no labels on top */}
+                                                        <div className="absolute inset-0 flex justify-around items-end gap-1">
                                                             {trendData.map((data) => {
                                                                 const height = maxMinutes > 0 ? (data.minutes / maxMinutes) * 100 : 0;
                                                                 const isTargetMet = data.minutes >= targetMinutes;
                                                                 return (
                                                                     <div key={data.date} className="flex flex-col items-center flex-grow h-full justify-end z-10 relative">
-                                                                        <div className="font-semibold text-light-text dark:text-dark-text absolute -top-5 text-[10px] whitespace-nowrap">
-                                                                            {Math.floor(data.minutes / 60)}h {data.minutes % 60}m
-                                                                        </div>
                                                                         <motion.div
                                                                             className={`w-full rounded-t-sm ${isTargetMet ? 'bg-green-500' : 'bg-light-primary dark:bg-dark-primary'}`}
                                                                             style={{ height: `${height}%` }}
@@ -509,15 +521,15 @@ const FocusAnalyticsPage: React.FC = () => {
                                                             })}
                                                         </div>
                                                     </div>
-
-                                                    {/* Day labels */}
-                                                    <div className="flex justify-around gap-1 mt-1">
+                                                    {/* Day + time labels below bars */}
+                                                    <div className="flex justify-around gap-1 mt-2">
                                                         {trendData.map((data) => {
                                                             const dateObj = new Date(data.date);
                                                             const dayStr = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
                                                             return (
-                                                                <div key={data.date} className="flex-grow text-center text-xs text-light-text-secondary dark:text-dark-text-secondary">
-                                                                    {dayStr}
+                                                                <div key={data.date} className="flex-grow text-center">
+                                                                    <div className="text-light-text dark:text-dark-text font-semibold text-[10px]">{Math.floor(data.minutes / 60)}h {data.minutes % 60}m</div>
+                                                                    <div className="text-light-text-secondary dark:text-dark-text-secondary text-[10px]">{dayStr}</div>
                                                                 </div>
                                                             );
                                                         })}
@@ -526,11 +538,8 @@ const FocusAnalyticsPage: React.FC = () => {
                                             );
                                         })()}
                                      </div>
-                                </ChartCard>
-                                </div>
-
-                                {/* Time by Subject — full width */}
-                                 <ChartCard title="Time by Subject" icon={<BookOpen size={16}/>}>
+                                 </ChartCard>
+                                 <ChartCard title="Time by Subject" icon={<BookOpen size={16}/>} className="md:col-span-2 lg:col-span-3">
                                      <PieChart 
                                         data={Object.entries(analyticsData.subjectData).map(([label, value]) => ({ label, value }))} 
                                         colors={Object.keys(analyticsData.subjectData).map(subject => {
