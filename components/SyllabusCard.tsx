@@ -189,7 +189,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                         </div>
                     ) : (
                         <h3 
-                            className="font-bold text-lg tracking-wide text-light-text dark:text-dark-text select-none"
+                            className="font-bold text-base tracking-wide text-light-text dark:text-dark-text select-none"
                         >
                             {node.title}
                         </h3>
@@ -210,7 +210,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
                                     type="text" 
                                     value={editTitle} 
                                     onChange={e => setEditTitle(e.target.value)} 
-                                    className="flex-grow px-2 py-1 text-lg bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
+                                    className="flex-grow px-2 py-1 text-base bg-black/5 dark:bg-white/5 border border-white/10 rounded focus:outline-none text-light-text dark:text-dark-text"
                                     autoFocus
                                 />
                                 <button onClick={() => { onUpdate({...node, title: editTitle}); setIsEditingNode(false); }} className="p-1 text-green-500 bg-green-500/10 rounded"><Check size={16}/></button>
