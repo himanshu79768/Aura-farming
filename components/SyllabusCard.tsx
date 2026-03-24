@@ -261,6 +261,7 @@ const SyllabusCard: React.FC<SyllabusCardProps> = ({ node, onUpdate, onDelete, o
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
             <div className={`px-4 pb-4 ${isSubject ? 'pt-4 border-t border-white/10 dark:border-white/5' : 'pl-4 border-l-2 border-black/5 dark:border-white/5 ml-2 mt-2'}`}>
